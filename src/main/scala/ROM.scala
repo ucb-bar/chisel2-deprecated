@@ -44,7 +44,7 @@ object ROM {
   def apply[T <: Data](elts: Array[(Int, T)], n: Int): ROM[T] = apply(elts.toSeq, Some(n))
 }
 
-class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.clone, Nil) {
+class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.cloneType, Nil) {
   override val self = elts.unzip._2.toVector
   override val length: Int = lengthIn match {
     case Some(x) => require(x > elts.keySet.max); x
@@ -71,7 +71,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
     elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {
-    val dc = UInt.DC(w).litOf
+    val dc = MInt.DC(w).litOf
     Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
   }
 

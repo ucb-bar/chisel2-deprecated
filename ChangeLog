@@ -1,16 +1,11 @@
-ChangeLog for Chisel v2.2.27 5/19/2015
+ChangeLog for Chisel v2.2.28
 
-#424 Ensure all driver variables are initialized in initChisel().
-#410 Correct signature for mem_t::put().
-#407 Flag the use of "?" in anything other than comparisons as unsupported.
-#406 Literal "+" and "-" shouldn't widen.
-#401 Change wire_poke VPI routine to enable POKE on wires and ports wider than 32 bits under VCS simulation.
- Reduce resources consumed during graph construction and C++ generation.
- Ensure we generate multiple cpp files (when instructed to do so).
- Fix bug in VendingMachine Enum example.
- Update Complex type (inherit Num trait, introduce conjugate).
- Fix null pointer exception for nodes with no component.
- Add a hook to calcElements in Bundle to let subclasses of Bundle filter out unwanted member, do type checking, etc.
- Fix priority encoder for C++ for >64 bits
- Add Wire() no-op (support for Chisel3) and associated tests.
- Add MInt() for masked bit comparisons (support for Chisel3); add MInt() test.
+#440 Repeated printfs - clear printStream after returning accumulated output.
+#431 Use the standard Chisel error mechanism in SystemC backend.
+ Issue more informative error messages for bad io definitions.
+ Clone a copy of the input pin in addPin().
+ Chisel3 support - merge chisel3prep branch into master.
+ Add --assertWarn flag converting Assert to Warn.
+ Stop suppressing compiler warnings for emulator library.
+ Add parameters manual to the docs.
+ Cosmetic changes to cheatsheet, installation, and man page.

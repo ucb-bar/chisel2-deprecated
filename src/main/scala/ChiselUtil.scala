@@ -186,9 +186,9 @@ object Mux1H
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
-  val bits = gen.clone.asOutput
+  val bits = gen.cloneType.asOutput
   def fire(dummy: Int = 0): Bool = valid
-  override def clone: this.type = new ValidIO(gen).asInstanceOf[this.type]
+  override def cloneType: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface. The standard used is
@@ -202,9 +202,9 @@ class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = gen.clone.asOutput
+  val bits  = gen.cloneType.asOutput
   def fire(dummy: Int = 0): Bool = ready && valid
-  override def clone: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
+  override def cloneType: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface.
@@ -221,7 +221,7 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   valid := Bool(false);
   for (io <- bits.flatten.map(x => x._2))
     io := UInt(0)
-  override def clone: this.type = { new EnqIO(gen).asInstanceOf[this.type]; }
+  override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
@@ -229,7 +229,7 @@ class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   flip()
   ready := Bool(false);
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
-  override def clone: this.type = { new DeqIO(gen).asInstanceOf[this.type]; }
+  override def cloneType: this.type = new DeqIO(gen).asInstanceOf[this.type]
 }
 
 
@@ -237,12 +237,12 @@ class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
   val valid = Bool(OUTPUT)
-  val bits  = gen.clone.asOutput
+  val bits  = gen.cloneType.asOutput
 }
 
 
 class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
-  val in  = Vec.fill(n){ Decoupled(gen) }.flip
+  val in  = Vec(n,  Decoupled(gen) ).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
@@ -367,8 +367,8 @@ object Counter
 
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
-  val enq   = Decoupled(gen.clone).flip
-  val deq   = Decoupled(gen.clone)
+  val enq   = Decoupled(gen.cloneType).flip
+  val deq   = Decoupled(gen.cloneType)
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
@@ -424,7 +424,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 object Queue
 {
   def apply[T <: Data](enq: DecoupledIO[T], entries: Int = 2, pipe: Boolean = false): DecoupledIO[T]  = {
-    val q = Module(new Queue(enq.bits.clone, entries, pipe))
+    val q = Module(new Queue(enq.bits.cloneType, entries, pipe))
     q.io.enq.valid := enq.valid // not using <> so that override is allowed
     q.io.enq.bits := enq.bits
     enq.ready := q.io.enq.ready
@@ -557,26 +557,37 @@ object PriorityEncoderOH
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
 
-/** Wrap a Chisel data type with a `Wire`.
+/** Chisel3 - Wrap a Chisel data type with a `Wire`.
   *
-  * This is a no-op in Chisel 2.2. It will be required for Chisel 3.0
+  * This sets the isWired state. It will be required for Chisel 3.0
+  * The logic is:
+  *  - for each element in a module:
+  *    - is that element assigned to?
+  *    - is that element defined with only a type (no compute logic)?
+  *    If so, the element's definition must be wrapped in a Wire.
   */
 object Wire
 {
   def apply[T <: Data](t: T = null, init: T = null): T = {
     val mType = if (t == null) init else t
-    if(mType == null) {
+    val res = if(mType == null) {
       ChiselError.error("cannot infer type of Init.")
       UInt().asInstanceOf[T]
     } else {
-      val x = mType.clone
-      // Should this be part of 'clone'
-      // x.component = mType.component
-      if (init != null) {
-        x assign init
+      if (t != null && !t.isTypeOnly) {
+        ChiselError.error("Wire() must not wrap a node with data %s".format(t))
       }
-      x
+      if (init != null) {
+        val x = mType.cloneType
+        // Should this be part of 'cloneType'
+        // x.component = mType.component
+        x := init
+        x
+      } else {
+        t.cloneType
+      }
     }
+    res.setIsWired(true)
+    res
   }
 }
-

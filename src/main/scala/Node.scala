@@ -504,4 +504,20 @@ abstract class Node extends nameable {
     oldNode.inputs.clear()
     oldNode.consumers.clear()
   }
+
+  // Chisel3 - type-only nodes (no data - no initialization or assignment)
+  // This is used to determine which nodes must be Wire() wrapped,
+  //  and whether Wire() wrapping of the node is legal or not.
+  protected[Chisel] def isTypeOnly: Boolean = {
+    // If we're the last node in a type chain, the chain is type only.
+    // Nodes with real data will override this definition.
+    // NOTE: We don't look at this node's inputs, since if this is an assignment,
+    //  they will be the source of the assignment, and they will most likely be data carrying nodes.
+    val gNode = getNode
+    if (gNode == this) {
+      true
+    } else {
+      gNode.isTypeOnly
+    }
+  }
 }

@@ -106,7 +106,7 @@ abstract class Data extends Node {
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */
   def fromNode(n: Node): this.type = {
-    val res = this.clone
+    val res = this.cloneType
     val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
     var ind = 0
     for (((name, io), gotWidth) <- packet) {
@@ -145,30 +145,55 @@ abstract class Data extends Node {
   protected def illegalAssignment(that: Any): Unit =
     ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)
 
-  override def clone(): this.type = {
-    try {
-      val constructor = this.getClass.getConstructors.head
+  // Chisel3 prep
+  override def clone(): this.type = this.cloneType()
 
-      if(constructor.getParameterTypes.size == 0) {
-        constructor.newInstance().asInstanceOf[this.type]
-      } else if(constructor.getParameterTypes.size == 1) {
-        val paramtype = constructor.getParameterTypes.head
-        // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
-        //    added by scalac for nested classes and closures. Thus, try faking the constructor
-        //    by not supplying said class or closure (pass null).
-        // CONSIDER: Don't try to create this
-        if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-          constructor.newInstance(null).asInstanceOf[this.type]
-        } else throw new Exception("Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+  def cloneType(): this.type = {
+    def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
+      val methodNames = c.getDeclaredMethods.map(_.getName())
+      if (methodNames.contains("cloneType")) {
+        c.getDeclaredMethod("cloneType")
+      } else if (methodNames.contains("clone")) {
+        c.getDeclaredMethod("clone")
       } else {
-       throw new Exception(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments")
+        null
+      }
+    }
+
+    try {
+      val clazz = this.getClass
+      val cloneMethod = getCloneMethod(clazz)
+      if (cloneMethod != null) {
+        cloneMethod.invoke(this).asInstanceOf[this.type]
+      } else {
+        val constructor = clazz.getConstructors.head
+        if(constructor.getParameterTypes.size == 0) {
+          val obj = constructor.newInstance()
+          obj.asInstanceOf[this.type]
+        } else {
+          val params = constructor.getParameterTypes.toList
+          if(constructor.getParameterTypes.size == 1) {
+            val paramtype = constructor.getParameterTypes.head
+            // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+            //    added by scalac for nested classes and closures. Thus, try faking the constructor
+            //    by not supplying said class or closure (pass null).
+            // CONSIDER: Don't try to create this
+            if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+              constructor.newInstance(null).asInstanceOf[this.type]
+            } else {
+              throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+            }
+          } else {
+           throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+          }
+        }
       }
 
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-        throwException("Parameterized Bundle " + this.getClass + " needs clone method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
+        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
       case e: java.lang.Exception =>
-        throwException("Parameterized Bundle " + this.getClass + " needs clone method", e)
+        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method", e)
     }
   }
 
@@ -181,4 +206,20 @@ abstract class Data extends Node {
   }
 
   def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+
+  // Chisel3 - This node has been wrapped in Wire() and may participate in assignment (:=, <>) statements.
+  private var _isWired = false
+  def isWired = _isWired
+  def setIsWired(value: Boolean) {
+    _isWired = value
+  }
+
+  // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
+  override def isTypeOnly = {
+    if (isTypeNode && comp != null) {
+      comp.isTypeOnly
+    } else {
+      super.isTypeOnly
+    }
+  }
 }

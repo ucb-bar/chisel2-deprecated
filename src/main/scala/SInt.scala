@@ -103,6 +103,8 @@ class SInt extends Bits with Num[SInt] {
   def unary_!(): Bool = this === SInt(0)
   def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
   def ?  (b: SInt): SInt = fromNode(Multiplex(this.toBool, b, null))
+  def >> (i: Int): SInt = newBinaryOp(UInt(i), "s>>") // chisel3
+  def << (i: Int): SInt = newBinaryOp(UInt(i), "<<") // chisel3
 
   // order operators
   def <  (b: SInt): Bool = newLogicalOp(b, "s<");
@@ -129,6 +131,10 @@ class SInt extends Bits with Num[SInt] {
   def /  (b: SInt): SInt = newBinaryOp(b, "s/s");
   def %  (b: SInt): SInt = newBinaryOp(b, "s%s");
   def -  (b: SInt): SInt = newBinaryOp(b, "-");
+  def +%  (b: SInt): SInt = newBinaryOp(b, "+") // chisel3 add-wrap
+  def +&  (b: SInt): SInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
+  def -%  (b: SInt): SInt = newBinaryOp(b, "-") // chisel3 sub-wrap
+  def -&  (b: SInt): SInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
 
   //SInt to UInt arithmetic
   def * (b: UInt): SInt = newBinaryOp(b.zext, "s*u")

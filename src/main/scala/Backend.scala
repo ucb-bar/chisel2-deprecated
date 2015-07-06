@@ -116,6 +116,10 @@ abstract class Backend extends FileSystemUtilities{
   def markComponents {
     Driver.components foreach (_.markComponent)
   }
+ 
+  def verifyComponents {
+    Driver.components foreach (_.verify)
+  }
 
   def verifyAllMuxes {
     Driver.bfs { _ match {
@@ -833,6 +837,7 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
     markComponents
     sortComponents
+    verifyComponents
 
     ChiselError.info("giving names")
     nameAll

@@ -43,7 +43,7 @@ object Bits {
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
 
-  def DC(width: Int): UInt = UInt.DC(width)
+  def DC(width: Int): MInt = MInt.DC(width)
 }
 
 
@@ -173,6 +173,7 @@ abstract class Bits extends Data with proc {
   }
 
   override def <>(src: Node) {
+    checkCompatibility(src)
     if (dir == INPUT) {
       src match {
       case other: Bits =>
@@ -278,7 +279,7 @@ abstract class Bits extends Data with proc {
     }
   }
 
-  override def clone: this.type = {
+  override def cloneType: this.type = {
     val res = this.getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = this.inferWidth
     res.width_ = this.width_.clone()
@@ -326,6 +327,7 @@ abstract class Bits extends Data with proc {
 
   /** Assignment operator */
   override protected def colonEquals(that: Bits): Unit = {
+    checkCompatibility(that)
     (if (comp != null) comp else this) procAssign that
   }
 
@@ -481,6 +483,13 @@ abstract class Bits extends Data with proc {
       case b: Bits => newBinaryOp(b, "##");
       case _ =>
         (this.asInstanceOf[Data] ## right).asInstanceOf[this.type];
+    }
+  }
+
+  // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
+  private def checkCompatibility(src: Node) {
+    if (Driver.minimumCompatibility > "2") {
+      component.addAssignment(this)
     }
   }
 }

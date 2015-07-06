@@ -363,6 +363,8 @@ object Driver extends FileSystemUtilities{
     implicitClock.setName("clk")
     isInGetWidth = false
     modStackPushed = false
+    minimumCompatibility = Version("0.0.0")
+    wError = false
     chiselConfigClassName = None
     chiselProjectName = None
     chiselConfigMode = None
@@ -451,6 +453,8 @@ object Driver extends FileSystemUtilities{
           }
           i += 1
         }
+        case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
+        case "--wError" => wError = true
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -528,6 +532,8 @@ object Driver extends FileSystemUtilities{
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false
   var modAdded: Boolean = false
+  var minimumCompatibility = Version("0.0.0")
+  var wError = false
   /* ChiselConfig flags */
   var chiselConfigClassName: Option[String] = None
   var chiselProjectName: Option[String] = None

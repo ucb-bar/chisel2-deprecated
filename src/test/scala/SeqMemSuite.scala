@@ -28,62 +28,51 @@
  MODIFICATIONS.
 */
 
+import Chisel._
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
 
-import Chisel._
-
-class MIntSuite extends TestSuite {
-  // MInt ? literals
-  @Test def testMInt() {
-    println("\ntestMInt...")
-    class MIntModule extends Module {
+class SeqMemSuite extends TestSuite {
+  // Test out creating a Sequential Memory
+  @Test def testSeqMemCreate() {
+    println("\ntestSeqMemCreate ...")
+    class CreateSeqMem(size: Integer) extends Module {
       val io = new Bundle {
-        val in = UInt(INPUT,4)
-        val out = Bool(OUTPUT)
+        val wEnable = Bool(INPUT)
+        val rEnable = Bool(INPUT)
+        val addr    = UInt(INPUT, log2Ceil(size))
+        val value   = UInt(INPUT, 32)
+        val out    = UInt(OUTPUT, 32)
       }
-      io.out := Bool(false)
-      switch(io.in) {
-        is(UInt(0)) { io.out := Bool(true) }
-        is(MInt("b???1")) { io.out := Bool(true) }
+      val mem = SeqMem(UInt(width = 32), size)
+      when(io.wEnable) {
+        mem(io.addr) := io.value
+      }
+      // Explicit read in when block.
+      // Can we grab the condition inside the read so we don't have to pass in the enable.
+      val rdata = Wire(UInt(width = 32), init = UInt(0,32))
+      when(io.rEnable) {
+        rdata := mem(io.addr)
+      }
+      io.out := rdata
+    }
+    
+    class CreateSeqMemTester(c: CreateSeqMem, size: Int) extends Tester(c) {
+      for (t <- 0 until 4) {
+        val test_addr = rnd.nextInt(size)
+        val test_value = rnd.nextInt(log2Ceil(size))
+        poke(c.io.addr, test_addr)
+        poke(c.io.value, test_value)
+        poke(c.io.wEnable, 1)
+        poke(c.io.rEnable, 1)
+        step(2)
+        expect(c.io.out, test_value)
       }
     }
-
-    class MIntModuleTests(m: MIntModule) extends Tester(m) {
-      (0 until 8).map { i =>
-        poke(m.io.in, i)
-        step(1)
-        expect(m.io.out, if(i == 0) (1) else (i % 2))
-      }
-    }
-
-    launchCppTester((m: MIntModule) => new MIntModuleTests(m))
-  }
-
-  @Test def testMIntBool() {
-    println("\ntestMIntBool...")
-    class MIntBoolModule extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
-      io.out := Bool(false)
-      val testDC = Bool.DC
-      val testTrue = Bool(true)
-      switch(io.in) {
-        is(testDC) { io.out := Bool(true) }
-      }
-    }
-
-    class MIntBoolModuleTests(m: MIntBoolModule) extends Tester(m) {
-      (0 until 8).map { i =>
-        poke(m.io.in, i)
-        step(1)
-        expect(m.io.out, 1)
-      }
-    }
-
-    launchCppTester((m: MIntBoolModule) => new MIntBoolModuleTests(m))
+    val size = 1024
+    val testArgs = chiselEnvironmentArguments() ++ Array("--compile", "--genHarness", "--test", "--targetDir", dir.getPath)
+    chiselMainTest(testArgs, () => Module(new CreateSeqMem(size))){
+      c => new CreateSeqMemTester(c, size)}
   }
 }
