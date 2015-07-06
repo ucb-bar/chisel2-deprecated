@@ -1460,7 +1460,11 @@ class CppBackend extends Backend {
       if (Driver.isVCD) {
         // Yes. dump is a real method.
         val codePrefix = "  if (t == 0) return dump_init(f);\n" +
-                "  fprintf(f, \"#%d\\n\", t);\n"
+                "  fprintf(f, \"#%d\\n\", t * 2);\n" +
+                "  fputs(\"0!\\n\", f);\n" +         // Falling edge of clk
+                "  fprintf(f, \"#%d\\n\", t * 2 + 1);\n" +
+                "  fputs(\"1!\\n\", f);\n"           // Rising edge of clk
+
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
