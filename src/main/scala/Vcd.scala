@@ -111,6 +111,12 @@ class VcdBackend(top: Module) extends Backend {
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
     write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
+    write("  fputs(\"$var wire 1 " + clockName(Driver.implicitClock) + " " + emitRef(Driver.implicitClock) + " $end\\n\", f);\n") 
+    for (clk <- c.clocks) {
+      if (clk != Driver.implicitClock) {
+        write("  fputs(\"$var wire 1 " + clockName(clk) + " " + emitRef(clk) + " $end\\n\", f);\n") 
+      }
+    }
     for (i <- 0 until sortedMods.length) {
       val mod = sortedMods(i)
       if (mod.component == c && !mod.name.isEmpty)
@@ -180,6 +186,9 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$dumpvars\\n\", f);\n")
       write("  fputs(\"$end\\n\", f);\n")
       write("  fputs(\"#0\\n\", f);\n")
+      for (clock <- Driver.clocks) {
+        write("  fputs(\"0" + clockName(clock) + "\\n\", f);\n")
+      }
       for (i <- 0 until sortedMods.length) {
         write(emitDefUnconditional(sortedMods(i), i))
         val ref = emitRef(sortedMods(i))
@@ -272,10 +281,19 @@ class VcdBackend(top: Module) extends Backend {
 
   private val (lo, hi) = ('!'.toInt, '~'.toInt)
   private val range = hi - lo + 1
-  private def varName(x: Int): String =
-    ("\\x" + (lo + (x % range)).toHexString) + (if (x >= range) varName(x / range) else "")
-  private def varNumber(x: Int): Long =
-    (if (x >= range) varNumber(x / range) * 256 else 0) + (lo + (x % range))
-  private def varNameLength(x: Int): Int =
-    1 + (if (x >= range) varNameLength(x / range) else 0)
+  def clockName(clock : Clock) : String = {
+      ("\\x" + (lo + (clock.id % range)).toHexString) + (if (clock.id >= range) varName(clock.id / range) else "")
+  }
+  private def varName(x: Int): String = {
+    val index = x + Driver.clocks.length	// Reserve identifiers for clocks
+    ("\\x" + (lo + (index % range)).toHexString) + (if (index >= range) varName(index / range) else "")
+  }
+  private def varNumber(x: Int): Long = {
+    val index = x + Driver.clocks.length	
+    (if (index >= range) varNumber(index / range) * 256 else 0) + (lo + (index % range))
+  }
+  private def varNameLength(x: Int): Int = {
+    val index = x + Driver.clocks.length
+    1 + (if (index >= range) varNameLength(index / range) else 0)
+  }
 }

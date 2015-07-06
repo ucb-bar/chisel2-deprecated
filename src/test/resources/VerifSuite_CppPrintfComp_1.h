@@ -19,6 +19,7 @@ class VerifSuite_CppPrintfComp_1_t : public mod_t {
   dat_t<104> T4;
   int clk;
   int clk_cnt;
+  int last_dump_time;
 
   void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset );

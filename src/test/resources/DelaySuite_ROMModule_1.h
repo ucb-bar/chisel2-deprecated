@@ -11,9 +11,10 @@ class DelaySuite_ROMModule_1_t : public mod_t {
  public:
   dat_t<2> DelaySuite_ROMModule_1__io_addr;
   dat_t<4> DelaySuite_ROMModule_1__io_out;
-  mem_t<4,3> T0;
+  mem_t<4,3> T1;
   int clk;
   int clk_cnt;
+  int last_dump_time;
 
   void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset );

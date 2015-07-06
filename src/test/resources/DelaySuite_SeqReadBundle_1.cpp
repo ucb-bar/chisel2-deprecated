@@ -4,7 +4,10 @@ void DelaySuite_SeqReadBundle_1_t::init ( val_t rand_init ) {
   this->__srand(rand_init);
   DelaySuite_SeqReadBundle_1__R9.randomize(&__rand_seed);
   DelaySuite_SeqReadBundle_1__mem.randomize(&__rand_seed);
+  clk = 1;
 }
+
+
 int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
@@ -14,10 +17,14 @@ int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
+
+
 mod_t* DelaySuite_SeqReadBundle_1_t::clone() {
   mod_t* cloned = new DelaySuite_SeqReadBundle_1_t(*this);
   return cloned;
 }
+
+
 bool DelaySuite_SeqReadBundle_1_t::set_circuit_from ( mod_t* src ) {
   DelaySuite_SeqReadBundle_1_t* mod_typed = dynamic_cast<DelaySuite_SeqReadBundle_1_t*>(src);
   assert(mod_typed);
@@ -45,14 +52,24 @@ bool DelaySuite_SeqReadBundle_1_t::set_circuit_from ( mod_t* src ) {
   clk_cnt = mod_typed->clk_cnt;
   return true;
 }
+
+
 void DelaySuite_SeqReadBundle_1_t::print ( FILE* f ) {
 }
 void DelaySuite_SeqReadBundle_1_t::print ( std::ostream& s ) {
 }
+
+
 void DelaySuite_SeqReadBundle_1_t::dump_init ( FILE* f ) {
 }
+
+
 void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t ) {
 }
+
+
+
+
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T0[2];
   { T0[0] = DelaySuite_SeqReadBundle_1__mem.get(DelaySuite_SeqReadBundle_1__R9.values[0], 0); T0[1] = DelaySuite_SeqReadBundle_1__mem.get(DelaySuite_SeqReadBundle_1__R9.values[0], 1);}
@@ -93,11 +110,15 @@ void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
   T13 = T13 & 0xffffffffL;
   { DelaySuite_SeqReadBundle_1__io_out_0_a_b_.values[0] = T13;}
 }
+
+
 void DelaySuite_SeqReadBundle_1_t::clock_hi ( dat_t<1> reset ) {
   dat_t<4> DelaySuite_SeqReadBundle_1__R9__shadow = T6;
   { if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 0, T12.values[0]); if (DelaySuite_SeqReadBundle_1__io_wen.values[0]) DelaySuite_SeqReadBundle_1__mem.put(DelaySuite_SeqReadBundle_1__io_waddr.values[0], 1, T12.values[1]);}
   DelaySuite_SeqReadBundle_1__R9 = T6;
 }
+
+
 void DelaySuite_SeqReadBundle_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();

@@ -2,7 +2,10 @@
 
 void VerifSuite_CppPrintfComp_1_t::init ( val_t rand_init ) {
   this->__srand(rand_init);
+  clk = 1;
 }
+
+
 int VerifSuite_CppPrintfComp_1_t::clock ( dat_t<1> reset ) {
   uint32_t min = ((uint32_t)1<<31)-1;
   if (clk_cnt < min) min = clk_cnt;
@@ -12,10 +15,14 @@ int VerifSuite_CppPrintfComp_1_t::clock ( dat_t<1> reset ) {
   if (clk_cnt == 0) clk_cnt = clk;
   return min;
 }
+
+
 mod_t* VerifSuite_CppPrintfComp_1_t::clone() {
   mod_t* cloned = new VerifSuite_CppPrintfComp_1_t(*this);
   return cloned;
 }
+
+
 bool VerifSuite_CppPrintfComp_1_t::set_circuit_from ( mod_t* src ) {
   VerifSuite_CppPrintfComp_1_t* mod_typed = dynamic_cast<VerifSuite_CppPrintfComp_1_t*>(src);
   assert(mod_typed);
@@ -30,6 +37,8 @@ bool VerifSuite_CppPrintfComp_1_t::set_circuit_from ( mod_t* src ) {
   clk_cnt = mod_typed->clk_cnt;
   return true;
 }
+
+
 void VerifSuite_CppPrintfComp_1_t::print ( FILE* f ) {
 #if __cplusplus >= 201103L
   if (T1.values[0]) dat_fprintf<104>(f, "display %h %h", T3, T2);
@@ -42,10 +51,18 @@ void VerifSuite_CppPrintfComp_1_t::print ( std::ostream& s ) {
 #endif
 s.flush();
 }
+
+
 void VerifSuite_CppPrintfComp_1_t::dump_init ( FILE* f ) {
 }
+
+
 void VerifSuite_CppPrintfComp_1_t::dump ( FILE* f, int t ) {
 }
+
+
+
+
 void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
   val_t T0;
   { T0 = VerifSuite_CppPrintfComp_1__io_y.values[0] | VerifSuite_CppPrintfComp_1__io_x.values[0] << 8;}
@@ -54,8 +71,12 @@ void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
   { T2.values[0] = VerifSuite_CppPrintfComp_1__io_y.values[0];}
   { T3.values[0] = VerifSuite_CppPrintfComp_1__io_x.values[0];}
 }
+
+
 void VerifSuite_CppPrintfComp_1_t::clock_hi ( dat_t<1> reset ) {
 }
+
+
 void VerifSuite_CppPrintfComp_1_api_t::init_mapping_table (  ) {
   dat_table.clear();
   mem_table.clear();

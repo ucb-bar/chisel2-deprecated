@@ -34,6 +34,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class Clock(reset: Bool = Driver.implicitReset) extends Node {
   val stateElms = new ArrayBuffer[Node]
+  val id = Driver.clocks.length
   Driver.clocks += this
   init("", 1)
 
