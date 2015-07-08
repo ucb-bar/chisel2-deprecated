@@ -29,17 +29,7 @@
 */
 
 package Chisel
-import scala.math._
-import scala.collection.mutable.{ArrayBuffer, Stack, BitSet}
-import scala.collection.mutable.{LinkedHashSet, HashSet, HashMap}
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import java.lang.reflect.Modifier._
-import scala.sys.process._
-import scala.math.max
-import Literal._
-import Bundle._
-import ChiselError._
-import Module._
+import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
 
 object Module {
   def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
@@ -174,7 +164,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   def hasClock = !(clock == null)
 
   Driver.components += this
-  push(this)
+  Module.push(this)
 
   //Parameter Stuff
   lazy val params = Module.params
@@ -309,7 +299,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     val q = params.alterPartial(f)
     Driver.compStack.push(this)
     Driver.parStack.push(q)
-    val res = init(c)
+    val res = Module.init(c)
     Driver.parStack.pop
     Driver.compStack.pop
     res
@@ -319,7 +309,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     Driver.modAdded = true
     Driver.compStack.push(this)
     Driver.parStack.push(p.push)
-    val res = init(c)
+    val res = Module.init(c)
     res.markComponent
     Driver.parStack.pop
     Driver.compStack.pop
@@ -446,6 +436,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
   def markComponent() {
+    import Module.backend
+
     ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
@@ -461,7 +453,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers())) {
+        && java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
@@ -548,7 +540,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   private[Chisel] def addAssignment(assignee: Data) = {
     val stack = Thread.currentThread().getStackTrace
     if (!assignments.contains(assignee)) {
-      assignments += ((assignee, findFirstUserLine(stack) getOrElse stack(0)))
+      assignments += ((assignee, ChiselError.findFirstUserLine(stack) getOrElse stack(0)))
     }
   }
   

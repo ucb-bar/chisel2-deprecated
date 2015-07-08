@@ -30,18 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.ArrayBuffer
-import scala.math._
-import java.io.File;
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import scala.sys.process._
-import Node._
-import Reg._
-import ChiselError._
-import Literal._
-import Module._
-import scala.collection.mutable.HashSet
+import sys.process.stringSeqToProcess
 
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR

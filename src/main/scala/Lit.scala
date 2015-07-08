@@ -29,13 +29,7 @@
 */
 
 package Chisel
-import scala.math.log
-import scala.math.abs
-import scala.math.ceil
-import scala.math.max
-import scala.math.min
-import Literal._
-import ChiselError._
+import scala.math.{log, abs, ceil, max, min}
 
 /* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
@@ -289,7 +283,7 @@ class Literal extends Node {
   var hasInferredWidth = false
   var isZ = false;
   var base = 'x';
-  lazy val value: BigInt = stringToVal(base, name);
+  lazy val value: BigInt = Literal.stringToVal(base, name);
   override def litOf: Literal = this
   override def toString: String = name;
   override lazy val isInVCD: Boolean = false

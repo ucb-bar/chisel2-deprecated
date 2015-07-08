@@ -30,9 +30,6 @@
 
 package Chisel
 
-import Node._
-import ChiselError._
-
 abstract trait Num[T <: Data] {
   // def << (b: T): T;
   // def >> (b: T): T;
@@ -87,7 +84,7 @@ abstract class Data extends Node {
   def setIsTypeNode {
     assert(inputs.length > 0, ChiselError.error("Type Node must have an input"))
     isTypeNode = true
-    inferWidth = widthOf(0)
+    inferWidth = Node.widthOf(0)
   }
 
   def apply(name: String): Data = null

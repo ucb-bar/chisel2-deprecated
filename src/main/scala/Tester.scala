@@ -29,15 +29,10 @@
 */
 
 package Chisel
-import Chisel._
-import scala.math._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.util.Random
 import java.io.{File, IOException, InputStream, OutputStream, PrintStream}
-import scala.sys.process._
-import scala.io.Source._
-import Literal._
+import scala.sys.process.{Process, ProcessIO}
 
 case class Poke(val node: Node, val index: Int, val value: BigInt);
 
@@ -182,7 +177,7 @@ class ManualTester[+T <: Module]
         cmd = "wire_peek " + dumpName(data);
       }
       val s = emulatorCmd(cmd)
-      val rv = toLitVal(s)
+      val rv = Literal.toLitVal(s)
       if (isTrace) println("  PEEK " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
       rv
     }
@@ -319,7 +314,7 @@ class ManualTester[+T <: Module]
     if (gotFLoat != expectedFloat) {
       val gotDiff = gotBits - expectedBits
       // Do we have a single bit difference?
-      if (abs(gotDiff) <= 1) {
+      if (scala.math.abs(gotDiff) <= 1) {
         expectedFloat = gotFLoat
       }
     }

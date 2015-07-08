@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import ChiselError._
 
 object UInt {
   /* Implementation Note: scalac does not allow multiple overloaded

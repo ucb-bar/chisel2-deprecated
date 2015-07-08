@@ -30,14 +30,7 @@
 
 package Chisel
 
-import ChiselError._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.BufferProxy
-import scala.collection.mutable.Stack
-import scala.math._
-import Vec._
-import Node._
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 object VecMux {
   def apply(addr: UInt, elts: Seq[Data]): Data = {

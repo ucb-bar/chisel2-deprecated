@@ -29,18 +29,7 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import scala.collection.mutable.Stack
-import scala.collection.mutable.{HashSet, HashMap, LinkedHashMap}
-import java.lang.reflect.Modifier._
-import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue=>ScalaQueue}
 
 object Backend {
   var moduleNamePrefix = ""
@@ -50,11 +39,11 @@ trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
   def ensureDir(dir: String): String = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new File(d).mkdirs()
+    new java.io.File(d).mkdirs()
     d
   }
 
-  def createOutputFile(name: String): java.io.FileWriter = {
+  def createOutputFile(name: String) = {
     val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
   }

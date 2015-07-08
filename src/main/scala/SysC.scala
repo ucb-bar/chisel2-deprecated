@@ -29,19 +29,6 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.math._
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import scala.sys.process._
-import sys.process.stringSeqToProcess
-import Node._
-import Reg._
-import ChiselError._
-import Literal._
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
 
 class SysCBackend extends CppBackend {
    override def elaborate(c: Module): Unit = {

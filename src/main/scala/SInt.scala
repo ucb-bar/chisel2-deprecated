@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import ChiselError._
 
 object SInt {
 

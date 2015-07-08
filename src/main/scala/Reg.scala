@@ -29,10 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
-import scala.reflect._
 
 class GetWidthException(s: String) extends Exception(s)
 
@@ -42,7 +38,7 @@ object Reg {
     if (Driver.isInGetWidth) {
       throw new GetWidthException("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
-      maxWidth(m)
+      Node.maxWidth(m)
     }
 
   // Rule: If no width is specified, use max width. Otherwise, use the specified width.
@@ -60,7 +56,7 @@ object Reg {
     if (! w.isKnown) {
       regMaxWidth _ ;
     } else {
-      fixWidth(w.needWidth())  // TODO 0WW
+      Node.fixWidth(w.needWidth())  // TODO 0WW
     }
 
   /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
@@ -74,7 +70,7 @@ object Reg {
     if (rLit != null && rLit.hasInferredWidth) {
       regMaxWidth _
     } else {
-      fixWidth(r.getWidth)
+      Node.fixWidth(r.getWidth)
     }
   }
 

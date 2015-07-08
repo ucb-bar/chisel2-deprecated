@@ -29,13 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.LinkedHashMap
-import scala.collection.mutable.Stack
-import java.lang.reflect.Modifier._
-import Node._;
-import ChiselError._
+import scala.collection.mutable.{HashSet, LinkedHashMap}
 
 object Bundle {
   val keywords = Set("elements", "flip", "toString",
@@ -76,11 +70,9 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       val isInterface = classOf[Data].isAssignableFrom(rtype)
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
-      if( types.length == 0 && !isStatic(modifiers) && isInterface
-        && !(name contains '$')
-        && !(Bundle.keywords contains name)
-        && (view == null || (view contains name))
-        && checkPort(m, name)) {
+      if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers) 
+        && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
+        && (view == null || (view contains name)) && checkPort(m, name)) {
         // Fetch the actual object
         val obj = m invoke this
         if(!(seen contains obj)) {
@@ -101,7 +93,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
           line
         } else {
           val stack = Thread.currentThread().getStackTrace
-          findFirstUserLine(stack) getOrElse stack(0)
+          ChiselError.findFirstUserLine(stack) getOrElse stack(0)
         }
         ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"", errorLine)
       }

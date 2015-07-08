@@ -29,13 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import Literal._
-import ChiselError._
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.ArrayBuffer
 
 class VcdBackend(top: Module) extends Backend {
   val keywords = Set[String]()

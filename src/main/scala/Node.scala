@@ -30,18 +30,7 @@
 
 package Chisel
 
-import scala.collection.immutable.Vector
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Stack
-import scala.collection.mutable.LinkedHashSet
-import java.io.PrintStream
-
-import Node._;
-import ChiselError._;
-import Width._;
-
-import java.lang.Double.longBitsToDouble
-import java.lang.Float.intBitsToFloat
+import scala.collection.mutable.{ArrayBuffer, Stack, LinkedHashSet}
 
 object Node {
   def sprintf(message: String, args: Node*): Bits = {
@@ -144,7 +133,7 @@ abstract class Node extends nameable {
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
   var width_ = Width()
-  var inferWidth: (=> Node) => Width = maxWidth
+  var inferWidth: (=> Node) => Width = Node.maxWidth
   val inputs = ArrayBuffer[Node]()
   val consumers = LinkedHashSet[Node]() // nodes that consume one of my outputs
 
@@ -152,7 +141,7 @@ abstract class Node extends nameable {
   val line: StackTraceElement =
     if (Driver.getLineNumbers) {
       val trace = new Throwable().getStackTrace
-      findFirstUserLine(trace) getOrElse trace(0)
+      ChiselError.findFirstUserLine(trace) getOrElse trace(0)
     } else null
   var prune = false
   var driveRand = false
@@ -179,7 +168,7 @@ abstract class Node extends nameable {
   /** Sets the width of a Node. */
   private[Chisel] def width_=(w: Int) {
     width_.setWidth(w);
-    inferWidth = fixWidth(w);
+    inferWidth = Node.fixWidth(w);
   }
 
   private[Chisel] def width_=(w: Width) {
@@ -223,14 +212,14 @@ abstract class Node extends nameable {
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
-  def ##(b: Node): Node  = Op("##", sumWidth _,  this, b );
+  def ##(b: Node): Node  = Op("##", Node.sumWidth _,  this, b );
   final def isLit: Boolean = litOf ne null
   def litOf: Literal = if (getNode != this) getNode.litOf else null
   def litValue(default: BigInt = BigInt(-1)): BigInt =
     if (isLit) litOf.value
     else default
-  def floLitValue: Float = intBitsToFloat(litValue().toInt)
-  def dblLitValue: Double = longBitsToDouble(litValue().toLong)
+  def floLitValue: Float = java.lang.Float.intBitsToFloat(litValue().toInt)
+  def dblLitValue: Double = java.lang.Double.longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
   def assign(src: Node): Unit = throw new Exception("unimplemented assign")
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
@@ -254,7 +243,7 @@ abstract class Node extends nameable {
   }
   def init (n: String, w: Int, ins: Node*): Node = {
     width_ = Width(w)
-    initOf(n, fixWidth(w), ins.toList)
+    initOf(n, Node.fixWidth(w), ins.toList)
   }
 
   // Called while we're walking the graph inferring the width of nodes.
@@ -290,7 +279,7 @@ abstract class Node extends nameable {
 
   /** Prints all members of a node and recursively its inputs up to a certain
     depth level. This method is purely used for debugging. */
-  def printTree(writer: PrintStream, depth: Int = 4, indent: String = ""): Unit = {
+  def printTree(writer: java.io.PrintStream, depth: Int = 4, indent: String = ""): Unit = {
     if (depth < 1) return;
     writer.println(indent + getClass + " width=" + getWidth + " #inputs=" + inputs.length);
     this match {
@@ -456,7 +445,7 @@ abstract class Node extends nameable {
   }
   def setWidth(w: Int) = {
     width_.setWidth(w)
-    inferWidth = fixWidth(w);
+    inferWidth = Node.fixWidth(w);
   }
   // Return a value or raise an exception.
   def needWidth(): Int = {

@@ -29,15 +29,9 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.ArrayBuffer
-import PartitionIslands._
 
 class DotBackend extends Backend {
+  import PartitionIslands._
   val keywords = Set[String]()
   var islands = Array[Island]()
   val allDottable = false

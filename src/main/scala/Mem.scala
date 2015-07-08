@@ -29,9 +29,6 @@
 */
 
 package Chisel
-import ChiselError._
-import Node._
-import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 /** *seqRead* means that if a port tries to read the same address that another
@@ -82,7 +79,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   val readwrites = ArrayBuffer[MemReadWrite]()
   val data = gen().toNode
 
-  inferWidth = fixWidth(data.getWidth)
+  inferWidth = Node.fixWidth(data.getWidth)
 
   private val readPortCache = HashMap[UInt, T]()
   def read(addr: UInt): T = {
@@ -202,7 +199,7 @@ class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def cond = Bool(true)
 
   inputs += mem
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = "cread"
@@ -220,7 +217,7 @@ class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri)
   }
 
   inputs += mem
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = "read"
@@ -244,7 +241,7 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
   def cond_=(c: Bool) = inputs(1) = c
   clock = mem.clock
 
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   inputs += condi
   inputs += datai

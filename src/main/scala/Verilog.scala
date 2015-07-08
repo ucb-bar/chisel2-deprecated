@@ -29,19 +29,9 @@
 */
 
 package Chisel
-import Node._
-import java.io.File;
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import scala.sys.process._
-import Reg._
-import ChiselError._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.LinkedHashMap
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap}
 import scala.collection.immutable.ListSet
+import sys.process.stringSeqToProcess
 
 object VerilogBackend {
 
