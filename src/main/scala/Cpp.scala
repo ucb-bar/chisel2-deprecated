@@ -722,7 +722,7 @@ class CppBackend extends Backend {
     harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
     harness.write(s"""  api->init(module);\n""");
     if (Driver.isVCD) {
-      val basedir = ensureDir(Driver.targetDir)
+      val basedir = Driver.targetDir
       harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
     } else {
       harness.write(s"""  FILE *f = NULL;\n""");
@@ -921,13 +921,12 @@ class CppBackend extends Backend {
     hierarchy by prefixing its name by a component path (except for "reset"
     and all nodes in *c*). */
   def renameNodes(nodes: ArrayBuffer[Node]) {
-    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
         case _: Literal =>
-        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+        case _ if m.named && (m != topMod.defaultResetPin) && m.component != null =>
           // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.name != Driver.implicitReset.name || m.component != comp)
+          if (m.name != "reset" || m.name != Driver.implicitReset.name || m.component != topMod)
             m.name = m.component.getPathName + "__" + m.name
         case _ =>
       }

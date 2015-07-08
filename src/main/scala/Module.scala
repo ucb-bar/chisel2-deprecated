@@ -32,6 +32,8 @@ package Chisel
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
 
 object Module {
+  def topMod = Driver.topComponent getOrElse (throw new RuntimeException("no top component"))
+
   def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
     Driver.parStack.push(p.push)
@@ -95,15 +97,15 @@ object Module {
   }
 
   // XXX Remove and instead call current()
-  def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
-  def current: Module = {
+  def getComponent: Module = if (Driver.compStack.length != 0) Driver.compStack.top else null
+  def current = {
     val comp = getComponent
-    if (comp == null) Driver.topComponent else comp
+    if (comp == null) topMod else comp
   }
 
   // despite being notionally internal, these have leaked into the API
-  def backend: Backend = Driver.backend
-  def components: ArrayBuffer[Module] = Driver.components
+  def backend = Driver.backend
+  def components = Driver.components
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
     Driver.modStackPushed = true
@@ -400,10 +402,10 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def addDefaultReset {
+  def addDefaultReset(topMod: Module) {
     if (!(defaultResetPin == null)) {
       addResetPin(_reset)
-      if (this != Driver.topComponent && hasExplicitReset)
+      if (this != topMod && hasExplicitReset)
         defaultResetPin.inputs += _reset
     }
   }

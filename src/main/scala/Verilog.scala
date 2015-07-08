@@ -530,7 +530,7 @@ class VerilogBackend extends Backend {
     harness.write("  initial begin\n")
     if (Driver.isDebug) {
       harness.write("    /*** Debuggin with VPD dump ***/\n")
-      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name))
       harness.write("    $vcdpluson(0, %s);\n".format(c.name))
       if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
     }
@@ -541,7 +541,7 @@ class VerilogBackend extends Backend {
         val pathName = dumpvar.component.getPathName(".") + "." + emitRef(dumpvar)
         harness.write("    $dumpvars(1, %s);\n".format(pathName))
       }
-      harness.write("    $dumpfile(\"%s.vcd\");\n".format(ensureDir(Driver.targetDir)+c.name))
+      harness.write("    $dumpfile(\"%s.vcd\");\n".format(Driver.targetDir+c.name))
       harness.write("    $dumpon;\n")
     }
     harness.write("  end\n\n")
@@ -877,7 +877,7 @@ class VerilogBackend extends Backend {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
-          val prune = if (io.prune && c != Driver.topComponent) "//" else ""
+          val prune = if (io.prune && c != topMod) "//" else ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " +
                                        emitWidth(io) + " " + emitRef(io));

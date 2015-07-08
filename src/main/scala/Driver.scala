@@ -93,7 +93,7 @@ object Driver extends FileSystemUtilities{
       backend.elaborate(c)
       if (isCompiling && isGenHarness) backend.compile(c)
       if(chiselConfigDump && !Dump.dump.isEmpty) {
-        val w = createOutputFile(appendString(Some(topComponent.name),chiselConfigClassName) + ".prm")
+        val w = createOutputFile(appendString(Some(c.name),chiselConfigClassName) + ".prm")
         w.write(Dump.getDump); w.close
       }
     }
@@ -115,14 +115,14 @@ object Driver extends FileSystemUtilities{
 
   def elapsedTime: Long = System.currentTimeMillis - startTime
 
-  def setTopComponent(mod: Module): Unit = {
-    topComponent = mod
-    implicitReset.component = topComponent
-    implicitClock.component = topComponent
-    topComponent.reset = implicitReset
-    topComponent.hasExplicitReset = true
-    topComponent.clock = implicitClock
-    topComponent.hasExplicitClock = true
+  def setTopComponent(mod: Module) {
+    topComponent = Some(mod)
+    implicitReset.component = mod 
+    implicitClock.component = mod
+    mod.reset = implicitReset
+    mod.hasExplicitReset = true
+    mod.clock = implicitClock
+    mod.hasExplicitClock = true
   }
 
   def bfs (visit: Node => Unit) = {
@@ -343,7 +343,7 @@ object Driver extends FileSystemUtilities{
     hasSRAM = false
     sramMaxSize = 0
     backend = null
-    topComponent = null
+    topComponent = None
     components.clear()
     sortedComps.clear()
     nodes.clear()
@@ -421,7 +421,7 @@ object Driver extends FileSystemUtilities{
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
         case "--testCommand" => testCommand = Some(args(i + 1)); i += 1
-        case "--targetDir" => targetDir = args(i + 1); i += 1
+        case "--targetDir" => targetDir = ensureDir(args(i + 1)); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
@@ -491,7 +491,7 @@ object Driver extends FileSystemUtilities{
   var isGenHarness = false
   var isReportDims = false
   var includeArgs: List[String] = Nil
-  var targetDir: String = null
+  var targetDir: String = "."
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
@@ -513,7 +513,7 @@ object Driver extends FileSystemUtilities{
   var hasSRAM = false
   var sramMaxSize = 0
   var backend: Backend = null
-  var topComponent: Module = null
+  var topComponent: Option[Module] = None 
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
   val nodes = ArrayBuffer[Node]()

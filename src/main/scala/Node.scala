@@ -129,7 +129,7 @@ abstract class Node extends nameable {
   var component: Module = Module.getComponent
   var isTypeNode = false;
   var depth = 0;
-  def componentOf: Module = if (Driver.backend.isEmittingComponents && component != null) component else Driver.topComponent
+  def componentOf = if (Driver.backend.isEmittingComponents && component != null) component else Module.topMod
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
   var width_ = Width()
@@ -264,16 +264,14 @@ abstract class Node extends nameable {
     }
   }
   
-  def isTopLevelIO: Boolean = isIo && (component == Driver.topComponent)
+  def isTopLevelIO = isIo && component == Module.topMod
 
-  lazy val isInObject: Boolean =
-    (isIo && (Driver.isIoDebug || component == Driver.topComponent)) ||
-    Driver.topComponent.debugs.contains(this) ||
-    isReg || isUsedByClockHi || Driver.isDebug && named ||
-    Driver.emitTempNodes ||
-    Driver.backend.isInObject(this)
+  lazy val isInObject =
+    (isIo && (Driver.isIoDebug || component == Module.topMod)) || 
+    (Module.topMod.debugs contains this) || (Driver.backend isInObject this) ||
+    isReg || isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
-  lazy val isInVCD: Boolean = name != "reset" && needWidth() > 0 &&
+  lazy val isInVCD = name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 

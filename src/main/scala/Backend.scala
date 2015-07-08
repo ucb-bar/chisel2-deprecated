@@ -37,14 +37,14 @@ object Backend {
 
 trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
-  def ensureDir(dir: String): String = {
+  def ensureDir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
     new java.io.File(d).mkdirs()
     d
   }
 
   def createOutputFile(name: String) = {
-    val baseDir = ensureDir(Driver.targetDir)
+    val baseDir = Driver.targetDir
     new java.io.FileWriter(baseDir + name)
   }
 }
@@ -56,6 +56,8 @@ abstract class Backend extends FileSystemUtilities{
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
   val needsLowering = Set[String]()
+
+  def topMod = Driver.topComponent getOrElse (throw new RuntimeException("no top component"))
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
@@ -96,9 +98,9 @@ abstract class Backend extends FileSystemUtilities{
       result
     }
 
-    levelChildren(Driver.topComponent, 0)
+    levelChildren(topMod, 0)
     Driver.sortedComps.clear
-    Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
+    Driver.sortedComps ++= gatherChildren(topMod).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 
@@ -195,11 +197,10 @@ abstract class Backend extends FileSystemUtilities{
     m match {
       case l: Literal => l.toString;
       case any       =>
-        if (m.name != ""
-          && m != Driver.topComponent.defaultResetPin && m.component != null) {
+        if (m.name != "" && m != topMod.defaultResetPin && m.component != null) {
           /* Only modify name if it is not the reset signal
            or not in top component */
-          if(m.name != "reset" && m.component != Driver.topComponent) {
+          if(m.name != "reset" && m.component != topMod) {
             m.component.getPathName + "__" + m.name;
           } else {
             m.name
@@ -328,7 +329,7 @@ abstract class Backend extends FileSystemUtilities{
     val outputs = m.wires.filter(_._2.dir == OUTPUT)
 
     for ((name, i) <- inputs) {
-      if (i.inputs.length == 0 && m != Driver.topComponent)
+      if (i.inputs.length == 0 && m != topMod)
         if (i.consumers.size > 0) {
           if (Driver.warnInputs)
             ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
@@ -367,7 +368,7 @@ abstract class Backend extends FileSystemUtilities{
         + " is unconnected in module " + compInstName + " " + compName)
     }
 
-    for (c <- Driver.components ; if c != Driver.topComponent) {
+    for (c <- Driver.components ; if c != topMod) {
       for ((n,i) <- c.wires) {
         if (i.inputs.length == 0) {
           prettyPrint(i, c)
@@ -418,7 +419,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def addDefaultResets {
-    Driver.components foreach (_.addDefaultReset)
+    Driver.components foreach (_.addDefaultReset(topMod))
   }
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
@@ -435,7 +436,7 @@ abstract class Backend extends FileSystemUtilities{
             parent.addResetPin(reset)
 
           // special case for implicit reset
-          if (reset == Driver.implicitReset && parent == Driver.topComponent)
+          if (reset == Driver.implicitReset && parent == topMod) 
             if (!parent.resets.contains(reset))
               parent.resets += (reset -> reset)
         }
@@ -720,21 +721,20 @@ abstract class Backend extends FileSystemUtilities{
     Driver.components foreach (_.nindex = -1)
 
     // Flatten all signals
-    val comp = Driver.topComponent
-    for (c <- Driver.components ; if c != comp) {
-      comp.debugs ++= c.debugs
-      comp.nodes ++= c.nodes
+    for (c <- Driver.components ; if c != topMod) {
+      topMod.debugs ++= c.debugs
+      topMod.nodes ++= c.nodes
     }
 
     // Find roots
     val roots = ArrayBuffer[Node]()
     for (c <- Driver.components)
       roots ++= c.debugs
-    for ((n, io) <- comp.wires)
+    for ((n, io) <- topMod.wires)
       roots += io
     for (b <- Driver.blackboxes)
       roots += b.io
-    for (node <- comp.nodes) {
+    for (node <- topMod.nodes) {
       node match {
         case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
           roots += node

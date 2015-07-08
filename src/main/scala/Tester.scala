@@ -65,17 +65,6 @@ class ManualTester[+T <: Module]
     }
   }
 
-  // TODO: MOVE TO SOMEWHERE COMMON TO BACKEND
-  def ensureDir(dir: String): String = {
-    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new File(d).mkdirs()
-    d
-  }
-  def createOutputFile(name: String): java.io.FileWriter = {
-    val baseDir = ensureDir(Driver.targetDir)
-    new java.io.FileWriter(baseDir + name)
-  }
-
   def puts(str: String) = {
     while (testOut == null) { Thread.sleep(100) }
     for (e <- str) testOut.write(e);

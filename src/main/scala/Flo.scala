@@ -138,11 +138,11 @@ class FloBackend extends Backend {
 
       case x: Bits =>
         if (x.inputs.length == 1) {
-          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + Driver.topComponent)
+          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topMod)
           if (node.isInObject && x.inputs.length == 1) {
-            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == Driver.topComponent)) ||
+            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == topMod)) ||
             // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
-            if (x.dir == OUTPUT && x.component == Driver.topComponent)
+            if (x.dir == OUTPUT && x.component == topMod)
               emitDec(x) + (if (isRnd) "eat" else ("out'" + x.needWidth()))  + " " + emitRef(x.inputs(0)) + "\n"
             else
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
@@ -191,13 +191,12 @@ class FloBackend extends Backend {
   }
 
   def renameNodes(nodes: ArrayBuffer[Node]) {
-    val comp = Driver.topComponent
     for (m <- nodes) {
       m match {
         case _: Literal =>
-        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
+        case _ if m.named && (m != topMod.defaultResetPin) && m.component != null =>
           // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.component != comp)
+          if (m.name != "reset" || m.component != topMod)
             m.name = m.component.getPathName(":") + "::" + m.name
         case _ =>
       }
