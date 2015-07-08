@@ -55,8 +55,8 @@ object UInt {
     res
   }
 
-// FIXME: This should return a MInt, not a UInt
-//  def DC(width: Int): MInt = MInt.DC(width)
+// FIXME: This should return a BitPat, not a UInt
+//  def DC(width: Int): BitPat = BitPat.DC(width)
   def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 
   private def checkSign(x: BigInt) = {
@@ -81,7 +81,7 @@ class UInt extends Bits with Num[UInt] {
       case l: Literal =>
         if (l.isZ && Driver.minimumCompatibility > "2") {
           // Chisel3 compatibility - generic don't care UInts/Bits are deprecated.
-          ChiselError.warning("General don't care UInts are deprecated. Please use MInt().")
+          ChiselError.warning("General don't care UInts are deprecated. Please use BitPat().")
         }
       case _ =>
     }
