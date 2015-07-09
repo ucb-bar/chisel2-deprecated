@@ -382,8 +382,9 @@ abstract class Backend extends FileSystemUtilities{
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == null)
+      if (module.clock == None) {
         module.clock = module.parent.clock
+      }
       if (!module.hasExplicitReset)
         module.reset_=
     }
@@ -400,17 +401,17 @@ abstract class Backend extends FileSystemUtilities{
     Driver.bfs {
       _ match {
         case x: Delay =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
+          val clock = x.clock getOrElse x.component.clock.get
           val reset =
             if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
+            else if (x.clock != None) x.clock.get.getReset
+            else if (x.component.clock != None) x.component.clock.get.getReset
             else x.component._reset
           x.assignReset(x.component.addResetPin(reset))
           x.assignClock(clock)
           x.component.addClock(clock)
          case x: Printf =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
+          val clock = x.clock getOrElse x.component.clock.get
           x.assignClock(clock)
           x.component.addClock(clock)
        case _ =>
@@ -419,7 +420,7 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def addDefaultResets {
-    Driver.components foreach (_.addDefaultReset(topMod))
+    Driver.components foreach (_.addDefaultReset)
   }
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
@@ -470,22 +471,21 @@ abstract class Backend extends FileSystemUtilities{
   // walk forward from root register assigning consumer clk = root.clock
   private def createClkDomain(root: Node, walked: HashSet[Node]) = {
     val dfsStack = new Stack[Node]
-    walked += root; dfsStack.push(root)
+    walked += root
+    dfsStack.push(root)
     val clock = root.clock
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-      for (consumer <- node.consumers) {
-        if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          val c1 = consumer.clock
-          val c2 = clock
-          if(!(consumer.clock == null || consumer.clock == clock)) {
-            ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                                 consumer.component + " resolves to clock domain " +
-                                 emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
-          } else { consumer.clock = clock }
-          walked += consumer
-          dfsStack.push(consumer)
+      for (consumer <- node.consumers ; if !(walked contains consumer)) {
+        if (consumer.clock != None && consumer.clock.get != clock.get) {
+          ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
+                               consumer.component + " resolves to clock domain " + emitRef(consumer.clock.get) + 
+                               " and " + emitRef(clock.get) + " traced from " + root.name})
+        } else { 
+          consumer.clock = clock 
         }
+        walked += consumer
+        dfsStack.push(consumer)
       }
     }
   }

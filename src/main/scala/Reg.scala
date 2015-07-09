@@ -84,8 +84,7 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: T = null, next: T = null, init: T = null,
-    clock: Clock = null): T = {
+  def apply[T <: Data](outType: T = null, next: T = null, init: T = null, clock: Option[Clock] = None): T = {
     var mType = outType
     if(mType == null) {
       mType = next

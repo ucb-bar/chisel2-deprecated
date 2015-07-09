@@ -325,7 +325,7 @@ class VerilogBackend extends Backend {
           val name = getMemName(m, configStr)
           ChiselError.info("MEM " + name)
 
-          val clk = "    .CLK(" + emitRef(m.clock) + ")"
+          val clk = "    .CLK(" + emitRef(m.clock.get) + ")"
           val portdefs = for (i <- 0 until m.ports.size)
             yield emitPortDef(m.ports(i), i)
           "  " + name + " " + emitRef(m) + " (\n" +
@@ -453,9 +453,10 @@ class VerilogBackend extends Backend {
       harness.write("  reg %s = 0;\n".format(mainClk.name))
       if (clocks.size > 1) {
         for (clk <- clocks) {
-          val clkLength =
-            if (clk.srcClock == null) "0" else
-            clk.srcClock.name + "_length " + clk.initStr
+          val clkLength = clk.srcClock match {
+            case None => "0"
+            case Some(src) => src.name + "_length " + clk.initStr
+          }
           harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
           harness.write("  integer %s_cnt = 0;\n".format(clk.name))
           harness.write("  reg %s_fire = 0;\n".format(clk.name))
@@ -464,9 +465,10 @@ class VerilogBackend extends Backend {
       harness.write("  always #`CLOCK_PERIOD %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
     } else {
       for (clk <- clocks) {
-        val clkLength =
-            if (clk.srcClock == null) "`CLOCK_PERIOD" else
-            clk.srcClock.name + "_length " + clk.initStr
+        val clkLength = clk.srcClock match {
+          case None => "`CLOCK_PERIOD"
+          case Some(src) => src.name + "_length " + clk.initStr
+        }
         harness.write("  reg %s = 1;\n".format(clk.name))
         harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
       }
@@ -672,8 +674,8 @@ class VerilogBackend extends Backend {
       apis.append("      // inputs: clocks' length\n")
       apis.append("      // return: \"ok\" or \"error\"\n")
       apis.append("      \"set_clocks\": begin\n")
-      val clkFormat = ((clocks filter (_.srcClock == null)).toList map (x => "%x"))
-      val clkFires  = ((clocks filter (_.srcClock == null)) map (_.name + "_length")).toList
+      val clkFormat = ((clocks filter (_.srcClock == None)).toList map (x => "%x"))
+      val clkFires  = ((clocks filter (_.srcClock == None)) map (_.name + "_length")).toList
       apis.append("        " + fscanf((clkFormat foldLeft "")(_ + " " + _), clkFires:_*) )
       apis.append("        " + display("%s", "\"ok\""))
       for (clk <- clocks) {
@@ -765,35 +767,30 @@ class VerilogBackend extends Backend {
   }
 
   def emitRegs(c: Module): StringBuilder = {
-    val res = new StringBuilder();
-    val clkDomains = new HashMap[Clock, StringBuilder]
-    for (clock <- c.clocks) {
-      clkDomains += (clock -> new StringBuilder)
-    }
+    val res = new StringBuilder
+    val clkDomains = (c.clocks map (_ -> new StringBuilder)).toMap
     if (Driver.isAssert) {
-      for (p <- c.asserts) {
-        clkDomains(p.clock).append(emitAssert(p))
-      }
+      c.asserts foreach (p => p.clock match {
+        case Some(clk) if clkDomains contains clk =>
+          clkDomains(clk) append emitAssert(p)
+        case _ =>
+      })
     }
-    for (m <- c.nodes) {
-      val clkDomain = clkDomains getOrElse (m.clock, null)
-      if (m.clock != null && clkDomain != null)
-        clkDomain.append(emitReg(m))
-    }
-    for (p <- c.printfs) {
-      val clkDomain = clkDomains getOrElse (p.clock, null)
-      if (p.clock != null && clkDomain != null)
-        clkDomain.append(emitPrintf(p))
-    }
-    for (clock <- c.clocks) {
-      val dom = clkDomains(clock)
-      if (!dom.isEmpty) {
-        if (res.isEmpty)
-          res.append("\n")
-        res.append("  always @(posedge " + emitRef(clock) + ") begin\n")
-        res.append(dom.result())
-        res.append("  end\n")
-      }
+    c.nodes foreach (m => m.clock match {
+      case Some(clk) if clkDomains contains clk =>
+        clkDomains(clk) append emitReg(m)
+      case _ =>
+    })
+    c.printfs foreach (p => p.clock match {
+      case Some(clk) if clkDomains contains clk => 
+        clkDomains(clk) append emitReg(p)
+      case _ =>
+    })
+    for ((clock, dom) <- clkDomains ; if !dom.isEmpty) {
+      if (res.isEmpty) res.append("\n")
+      res.append("  always @(posedge " + emitRef(clock) + ") begin\n")
+      res.append(dom.result)
+      res.append("  end\n")
     }
     res
   }

@@ -121,8 +121,7 @@ object Driver extends FileSystemUtilities{
     implicitClock.component = mod
     mod.reset = implicitReset
     mod.hasExplicitReset = true
-    mod.clock = implicitClock
-    mod.hasExplicitClock = true
+    mod.clock = Some(implicitClock)
   }
 
   def bfs (visit: Node => Unit) = {
@@ -342,7 +341,7 @@ object Driver extends FileSystemUtilities{
     hasMem = false
     hasSRAM = false
     sramMaxSize = 0
-    backend = null
+    backend = new CppBackend
     topComponent = None
     components.clear()
     sortedComps.clear()
@@ -355,11 +354,11 @@ object Driver extends FileSystemUtilities{
     parStack.clear()
     stackIndent = 0
     printStackStruct.clear()
-    clocks.clear()
     implicitReset.isIo = true
     implicitReset.setName("reset")
-    implicitClock = new Clock()
     implicitClock.setName("clk")
+    clocks.clear()
+    clocks += implicitClock
     isInGetWidth = false
     modStackPushed = false
     minimumCompatibility = Version("0.0.0")
@@ -512,7 +511,7 @@ object Driver extends FileSystemUtilities{
   var hasMem = false
   var hasSRAM = false
   var sramMaxSize = 0
-  var backend: Backend = null
+  var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
@@ -527,7 +526,7 @@ object Driver extends FileSystemUtilities{
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val clocks = ArrayBuffer[Clock]()
   val implicitReset = Bool(INPUT)
-  var implicitClock: Clock = null
+  val implicitClock = Clock()
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false
   var modAdded: Boolean = false

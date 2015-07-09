@@ -138,7 +138,8 @@ class CppBackend extends Backend {
       case _ => wordMangle(x, w.toString)
     }
 
-  protected[this] def isLit(node: Node): Boolean = node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
+  protected[this] def isLit(node: Node): Boolean = 
+    node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
 
   def emitWordRef(node: Node, w: Int): String = {
     node match {
@@ -615,12 +616,12 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock =>
-        if (x.srcClock != null) {
-          "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr +
+      case x: Clock => x.srcClock match {
+        case None => ""
+        case Some(src) => 
+          "  " + emitRef(node) + " = " + emitRef(src) + x.initStr +
           "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
-        } else
-          ""
+      }
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -708,7 +709,7 @@ class CppBackend extends Backend {
       harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
       var i = 0;
       for (clock <- Driver.clocks) {
-        if (clock.srcClock == null) {
+        if (clock.srcClock == None) {
           harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
           harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
           i += 1;
@@ -1581,7 +1582,7 @@ class CppBackend extends Backend {
         }
       }
 
-      def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
+      def clock(n: Node) = n.clock getOrElse Driver.implicitClock
 
       def populate() {
         var nodeCount = 0

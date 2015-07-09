@@ -104,7 +104,6 @@ object Module {
   }
 
   // despite being notionally internal, these have leaked into the API
-  def backend = Driver.backend
   def components = Driver.components
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
@@ -124,7 +123,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
+abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _reset: Bool = null) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -163,7 +162,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   val resets = new HashMap[Bool, Bool]
 
   def hasReset = !(reset == null)
-  def hasClock = !(clock == null)
+  def hasClock = clock != None
 
   Driver.components += this
   Module.push(this)
@@ -172,7 +171,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   lazy val params = Module.params
   params.path = this.getClass :: params.path
 
-  var hasExplicitClock = !(clock == null)
   var hasExplicitReset = !(_reset == null)
 
   var defaultResetPin: Bool = null
@@ -268,15 +266,12 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       res.component = this
       res
     }
-    def pin =
-      if (reset == _reset) this.reset
-      else makeIO
-    this.resets.getOrElseUpdate(reset, pin)
+    def pin = if (reset == _reset) reset else makeIO
+    resets.getOrElseUpdate(reset, pin)
   }
 
   def addClock(clock: Clock) {
-    if (!this.clocks.contains(clock))
-      this.clocks += clock
+    if (!(clocks contains clock)) clocks += clock
   }
 
   def addPin[T <: Data](pin: T, name: String = "") = {
@@ -402,10 +397,10 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     }
   }
 
-  def addDefaultReset(topMod: Module) {
+  def addDefaultReset {
     if (!(defaultResetPin == null)) {
       addResetPin(_reset)
-      if (this != topMod && hasExplicitReset)
+      if (this != Module.topMod && hasExplicitReset)
         defaultResetPin.inputs += _reset
     }
   }
@@ -437,9 +432,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
-  def markComponent() {
-    import Module.backend
-
+  def markComponent {
+    import Driver.backend
     ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.

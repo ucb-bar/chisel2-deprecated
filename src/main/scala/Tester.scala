@@ -137,11 +137,9 @@ class ManualTester[+T <: Module]
 
   def setClocks(clocks: HashMap[Clock, Int]) {
     var cmd = "set_clocks"
-    for (clock <- Driver.clocks) {
-      if (clock.srcClock == null) {
-        val s = BigInt(clocks(clock)).toString(16)
-        cmd = cmd + " " + s
-      }
+    for (clock <- Driver.clocks ; if clock.srcClock == None) {
+      val s = BigInt(clocks(clock)).toString(16)
+      cmd = cmd + " " + s
     }
     emulatorCmd(cmd)
     // TODO: check for errors in return

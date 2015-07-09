@@ -30,15 +30,21 @@
 
 package Chisel
 
-import scala.collection.mutable.ArrayBuffer
+object Clock {
+  def apply(reset: Bool = Driver.implicitReset, src: Option[Clock] = None, str: String = "") = {
+    new Clock(reset, src, str)
+  }
 
-class Clock(reset: Bool = Driver.implicitReset) extends Node {
-  val stateElms = new ArrayBuffer[Node]
-  Driver.clocks += this
+  // conversions to remove nulls
+  implicit def clockToOption(c: Clock) = if (c == null) None else Some(c)
+}
+
+class Clock(reset: Bool = Driver.implicitReset, 
+  private[Chisel] val srcClock: Option[Clock] = None, 
+  private[Chisel] val initStr: String = "") extends Node {
+
   init("", 1)
-
-  var srcClock: Clock = null
-  var initStr = ""
+  Driver.clocks += this
 
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
@@ -49,19 +55,6 @@ class Clock(reset: Bool = Driver.implicitReset) extends Node {
     }
   }
 
-  def * (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " * " + x + ";\n"
-    clock
-  }
-
-  def / (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " / " + x + ";\n"
-    clock
-  }
+  def * (x: Int) = Clock(reset, Some(this), " * " + x + ";\n")
+  def / (x: Int) = Clock(reset, Some(this), " / " + x + ";\n")
 }

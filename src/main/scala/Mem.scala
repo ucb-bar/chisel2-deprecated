@@ -42,7 +42,7 @@ object Mem {
     val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
-    if (!(clock == null)) res.clock = clock
+    if (clock != null) res.clock = Some(clock)
     Driver.hasMem = true
     Driver.hasSRAM = Driver.hasSRAM | seqRead
     if (seqRead) {
@@ -172,7 +172,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   def isInline = Driver.isInlineMem || !reads.isEmpty
 
   override def assignClock(clk: Clock): Unit = {
-    for (w <- writes) w.clock = clk
+    for (w <- writes) w.clock = Some(clk)
     super.assignClock(clk)
   }
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
