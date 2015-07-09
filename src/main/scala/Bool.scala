@@ -41,10 +41,10 @@ object Bool {
   }
 
   /** Factory method to create a don't-care.
-    *  FIXME: This should remain a MInt(), not a Bool().
-    *  We don't want to give the impression that MInt()'s can be used in arbitrary expressions.
+    *  FIXME: This should remain a BitPat(), not a Bool().
+    *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
     */
-  def DC = Bool().fromNode(MInt.DC(1))
+  def DC = Bool().fromNode(BitPat.DC(1))
 }
 
 class Bool extends UInt {

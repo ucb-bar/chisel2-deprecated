@@ -20,7 +20,7 @@ This will report warnings for the following Chisel3 issues -
  - Vec(Reg) should be replaced with Reg(Vec),
  - type-only vals (no associated data) must be wrapped in a Wire() if
    they will be the destination of a wiring operation (":=" or "<>"),
- - masked bit patterns ('b??') should be created using MInts(), not
+ - masked bit patterns ('b??') should be created using BitPat(), not
    UInt() or Bits(),
  - the "clone" method required for parameterized Bundles has been
    renamed "cloneType".
