@@ -783,7 +783,7 @@ class VerilogBackend extends Backend {
     })
     c.printfs foreach (p => p.clock match {
       case Some(clk) if clkDomains contains clk => 
-        clkDomains(clk) append emitReg(p)
+        clkDomains(clk) append emitPrintf(p)
       case _ =>
     })
     for ((clock, dom) <- clkDomains ; if !dom.isEmpty) {

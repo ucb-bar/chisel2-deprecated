@@ -157,7 +157,7 @@ abstract class BlackBox extends Module {
 class Delay extends Node {
   override def isReg: Boolean = true
   def assignReset(rst: => Bool): Boolean = false
-  def assignClock(clk: Clock): Unit = { clock = Some(clk) }
+  def assignClock(clk: Clock) { clock = Some(clk) }
 }
 
   /** If there is an environment variable `chiselArguments`, construct an `Array[String]`

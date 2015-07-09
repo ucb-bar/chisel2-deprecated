@@ -104,6 +104,7 @@ object Module {
   }
 
   // despite being notionally internal, these have leaked into the API
+  def backend = Driver.backend
   def components = Driver.components
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
@@ -131,16 +132,15 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
     and discard textual duplicates. By walking the nodes from level zero
     (leafs) to level N (root), we are guaranteed to generate all
     Module/modules source text before their first instantiation. */
-  var level = 0;
-  var traversal = 0;
-  var ioVal: Data = null;
+  var level = 0
+  var traversal = 0
   /** Name of the instance. */
-  var name: String = "";
+  var name: String = ""
   /** Name of the module this component generates (defaults to class name). */
-  var moduleName: String = "";
-  var named = false;
-  val bindings = new ArrayBuffer[Binding];
-  var parent: Module = null;
+  var moduleName: String = ""
+  var named = false
+  val bindings = new ArrayBuffer[Binding]
+  var parent: Module = null
   val children = ArrayBuffer[Module]()
   val debugs = LinkedHashSet[Node]()
   val printfs = ArrayBuffer[Printf]()
@@ -154,15 +154,21 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
 
   val nodes = new LinkedHashSet[Node]
   val names = new HashMap[String, Node]
-  var nindex = -1;
-  var defaultWidth = 32;
-  var pathParent: Module = null;
+  var nindex = -1
+  var defaultWidth = 32
+  var pathParent: Module = null
   var verilog_parameters = "";
   val clocks = new ArrayBuffer[Clock]
   val resets = new HashMap[Bool, Bool]
 
   def hasReset = !(reset == null)
   def hasClock = clock != None
+  def hasExplicitClock = (this eq Module.topMod) || (clock match {
+    case None => false
+    case Some(c) => c != Driver.implicitClock 
+  })
+
+  if (clock == null) clock = None
 
   Driver.components += this
   Module.push(this)
@@ -266,7 +272,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
       res.component = this
       res
     }
-    def pin = if (reset == _reset) reset else makeIO
+    val pin = if (reset == _reset) this.reset else makeIO
     resets.getOrElseUpdate(reset, pin)
   }
 
@@ -433,7 +439,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
   def markComponent {
-    import Driver.backend
+    import Module.backend
     ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.

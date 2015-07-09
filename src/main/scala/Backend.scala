@@ -113,10 +113,10 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def verifyAllMuxes {
-    Driver.bfs { _ match {
+    Driver.bfs { 
       case p: proc => p.verifyMuxes
       case _ =>
-    } }
+    } 
   }
 
   /* Returns a string derived from _name_ that can be used as a valid
@@ -163,14 +163,13 @@ abstract class Backend extends FileSystemUtilities{
         // since sortedComps, all children should have names due to check above
       
       // ensure all nodes in the design has SOME name
-      comp dfs { _ match {
+      comp dfs { 
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
-
         case node: Node if !node.isTypeNode && node.name == "" && node.component != null =>
           node.name = "T" + node.component.nextIndex
         case _ =>
-      } }
+      }
 
       // Now, ensure everything has a UNIQUE name
       // First, reserve all the IO names
@@ -179,7 +178,7 @@ abstract class Backend extends FileSystemUtilities{
       // Second, give module instances high priority for names
       children.foreach(c => c.name = namespace.getUniqueName(c.name))
       // Then, check all other nodes in the design
-      comp dfs { _ match {
+      comp dfs { 
         case reg: Reg =>
           reg setName namespace.getUniqueName(reg.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
@@ -188,8 +187,7 @@ abstract class Backend extends FileSystemUtilities{
           node.name = namespace.getUniqueName(node.name)
         }
         case _ =>
-      } }
-
+      }
     }
   }
 
@@ -382,9 +380,8 @@ abstract class Backend extends FileSystemUtilities{
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == None) {
+      if (module.clock == None) 
         module.clock = module.parent.clock
-      }
       if (!module.hasExplicitReset)
         module.reset_=
     }
@@ -399,23 +396,21 @@ abstract class Backend extends FileSystemUtilities{
   //          component's clock's reset
   def addClocksAndResets {
     Driver.bfs {
-      _ match {
-        case x: Delay =>
-          val clock = x.clock getOrElse x.component.clock.get
-          val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != None) x.clock.get.getReset
-            else if (x.component.clock != None) x.component.clock.get.getReset
-            else x.component._reset
-          x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
-         case x: Printf =>
-          val clock = x.clock getOrElse x.component.clock.get
-          x.assignClock(clock)
-          x.component.addClock(clock)
-       case _ =>
-      }
+      case x: Delay =>
+        val clock = x.clock getOrElse x.component.clock.get
+        val reset =
+          if (x.component.hasExplicitReset) x.component._reset
+          else if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitClock) x.component.clock.get.getReset
+          else x.component._reset
+        x.assignReset(x.component.addResetPin(reset))
+        x.assignClock(clock)
+        x.component.addClock(clock)
+      case x: Printf =>
+        val clock = x.clock getOrElse x.component.clock.get
+        x.assignClock(clock)
+        x.component.addClock(clock)
+      case _ =>
     }
   }
 
@@ -542,14 +537,14 @@ abstract class Backend extends FileSystemUtilities{
 
   def computeMemPorts(mod: Module) {
     if (Driver.hasMem) {
-      Driver.bfs { _ match {
+      Driver.bfs { 
         case memacc: MemAccess => memacc.referenced = true
         case _ =>
-      } }
-      Driver.bfs { _ match {
+      }
+      Driver.bfs { 
         case mem: Mem[_] => mem.computePorts
         case _ =>
-      } }
+      }
     }
   }
 
