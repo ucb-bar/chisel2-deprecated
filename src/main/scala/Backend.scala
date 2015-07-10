@@ -194,18 +194,10 @@ abstract class Backend extends FileSystemUtilities{
   def fullyQualifiedName( m: Node ): String = {
     m match {
       case l: Literal => l.toString;
-      case any       =>
-        if (m.name != "" && m != topMod.defaultResetPin && m.component != null) {
-          /* Only modify name if it is not the reset signal
-           or not in top component */
-          if(m.name != "reset" && m.component != topMod) {
-            m.component.getPathName + "__" + m.name;
-          } else {
-            m.name
-          }
-        } else {
-          m.name
-        }
+      case _ if m.name != "" && m.name != "reset" && m.component != null && m.component != topMod =>
+        /* Only modify name if it is not the reset signal or not in top component */
+        m.component.getPathName + "__" + m.name;
+      case _ => m.name
     }
   }
 
@@ -383,7 +375,7 @@ abstract class Backend extends FileSystemUtilities{
       if (module.clock == None) 
         module.clock = module.parent.clock
       if (!module.hasExplicitReset)
-        module.reset_=
+        module._reset = module.parent._reset
     }
   }
 
@@ -399,11 +391,11 @@ abstract class Backend extends FileSystemUtilities{
       case x: Delay =>
         val clock = x.clock getOrElse x.component.clock.get
         val reset =
-          if (x.component.hasExplicitReset) x.component._reset
+          if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.clock != None) x.clock.get.getReset
           else if (x.component.hasExplicitClock) x.component.clock.get.getReset
-          else x.component._reset
-        x.assignReset(x.component.addResetPin(reset))
+          else x.component._reset.get
+        x.assignReset(x.component addResetPin reset)
         x.assignClock(clock)
         x.component.addClock(clock)
       case x: Printf =>
@@ -420,64 +412,52 @@ abstract class Backend extends FileSystemUtilities{
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
   def gatherClocksAndResets {
-    for (parent <- Driver.sortedComps) {
-      for (child <- parent.children) {
-        for (clock <- child.clocks) {
-          parent.addClock(clock)
-        }
-        for (reset <- child.resets.keys) {
-          // create a reset pin in parent if reset does not originate in parent and
-          // if reset is not an output from one of parent's children
-          if (reset.component != parent && !parent.children.contains(reset.component))
-            parent.addResetPin(reset)
-
-          // special case for implicit reset
-          if (reset == Driver.implicitReset && parent == topMod) 
-            if (!parent.resets.contains(reset))
-              parent.resets += (reset -> reset)
-        }
+    for (parent <- Driver.sortedComps ; child <- parent.children) {
+      child.clocks foreach (parent addClock _)
+      for (reset <- child.resets.keys) {
+        // create a reset pin in parent if reset does not originate in parent and
+        // if reset is not an output from one of parent's children
+        if (reset.component != parent && !(parent.children contains reset.component))
+          parent addResetPin reset
+        // special case for implicit reset
+        if (reset == Driver.implicitReset && parent == topMod) 
+          parent.resets getOrElseUpdate (reset, reset)
       }
     }
   }
 
   def connectResets {
-    for (parent <- Driver.sortedComps) {
-      for (child <- parent.children) {
-        for (reset <- child.resets.keys) {
-          if (child.resets(reset).inputs.length == 0)
-            if (parent.resets.contains(reset))
-              child.resets(reset).inputs += parent.resets(reset)
-            else
-              child.resets(reset).inputs += reset
-        }
-      }
+    for {
+      parent <- Driver.sortedComps
+      child <- parent.children
+      reset <- child.resets.keys
+      pin = child.resets(reset) if pin.inputs.isEmpty
+    } { 
+      pin := (parent.resets getOrElse (reset, reset))
     }
   }
 
   def nameRsts {
-    for (comp <- Driver.sortedComps) {
-      for (rst <- comp.resets.keys) {
-        if (!comp.resets(rst).named)
-            comp.resets(rst).setName(rst.name)
-      }
+    for (comp <- Driver.sortedComps ; rst <- comp.resets.keys ; if !comp.resets(rst).named) {
+      comp.resets(rst) setName rst.name
     }
   }
 
   // walk forward from root register assigning consumer clk = root.clock
-  private def createClkDomain(root: Node, walked: HashSet[Node]) = {
+  private def createClkDomain(root: Reg, walked: HashSet[Node]) = {
     val dfsStack = new Stack[Node]
     walked += root
     dfsStack.push(root)
-    val clock = root.clock
+    val clock = root.clock getOrElse (throw new RuntimeException("Reg should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
       for (consumer <- node.consumers ; if !(walked contains consumer)) {
-        if (consumer.clock != None && consumer.clock.get != clock.get) {
-          ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                               consumer.component + " resolves to clock domain " + emitRef(consumer.clock.get) + 
-                               " and " + emitRef(clock.get) + " traced from " + root.name})
-        } else { 
-          consumer.clock = clock 
+        consumer.clock match {
+          case Some(clk) if clk != clock =>
+            ChiselError.warning(consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + 
+                                "in module" + consumer.component + " resolves to clock domain " + 
+                                emitRef(clk) + " and " + emitRef(clock) + " traced from " + root.name)
+          case _ => consumer.clock = Some(clock)
         }
         walked += consumer
         dfsStack.push(consumer)
@@ -578,8 +558,7 @@ abstract class Backend extends FileSystemUtilities{
           case _ =>
         }
       }
-      if (!lowerTo.isEmpty)
-        inferAll(mod)
+      if (!lowerTo.isEmpty) inferAll(mod)
     }
   }
 
@@ -636,13 +615,11 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def nameBindings {
-    for (comp <- Driver.sortedComps) {
-      for (bind <- comp.bindings) {
-        var genName = bind.targetComponent.name + "_" + bind.targetNode.name
-        if(nameSpace contains genName) genName += ("_" + bind.emitIndex)
-        bind.name = asValidName(genName) // Not using nameIt to avoid override
-        bind.named = true
-      }
+    for (comp <- Driver.sortedComps ; bind <- comp.bindings) {
+      var genName = bind.targetComponent.name + "_" + bind.targetNode.name
+      if (nameSpace contains genName) genName += ("_" + bind.emitIndex)
+      bind.name = asValidName(genName) // Not using nameIt to avoid override
+      bind.named = true
     }
   }
 
@@ -879,11 +856,13 @@ abstract class Backend extends FileSystemUtilities{
     nameRsts
 
     ChiselError.info("creating clock domains")
-    val clkDomainWalkedNodes = new HashSet[Node]
-    for (comp <- Driver.sortedComps)
-      for (node <- comp.nodes)
-        if (node.isInstanceOf[Reg])
-          createClkDomain(node, clkDomainWalkedNodes)
+    val clkDomainWalkedNodes = HashSet[Node]()
+    for (comp <- Driver.sortedComps ; node <- comp.nodes) {
+      node match {
+        case r: Reg => createClkDomain(r, clkDomainWalkedNodes)
+        case _ =>
+      }
+    } 
 
     ChiselError.info("pruning unconnected IOs")
     for (comp <- Driver.sortedComps) {

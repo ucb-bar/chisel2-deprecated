@@ -59,7 +59,7 @@ class DotBackend extends Backend {
     if (allDottable) {
       true
     } else
-    if (m == m.component.defaultResetPin) {
+    if (m.component.resetPin != None && m == m.component.resetPin.get) {
       false
     } else {
       m match {

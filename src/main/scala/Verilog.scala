@@ -434,7 +434,7 @@ class VerilogBackend extends Backend {
     val scanNodes = for ((n, io) <- c.wires ; if io.dir == INPUT) yield io
     val mainClk = Driver.implicitClock
     val clocks = ListSet(mainClk) ++ c.clocks
-    val resets = c.resets.unzip._2.toList
+    val resets = c.resets.values.toList
 
     harness.write("module test;\n")
     for (node <- scanNodes) {
@@ -779,7 +779,7 @@ class VerilogBackend extends Backend {
     c.nodes foreach (m => m.clock match {
       case Some(clk) if clkDomains contains clk =>
         clkDomains(clk) append emitReg(m)
-      case _ =>
+      case _ => 
     })
     c.printfs foreach (p => p.clock match {
       case Some(clk) if clkDomains contains clk => 
@@ -1029,7 +1029,7 @@ class VerilogBackend extends Backend {
             classFile.close()
             resourceStream.close()
           } else {
-                println(s"WARNING: Unable to copy '$filename'" )
+            println(s"WARNING: Unable to copy '$filename'" )
           }
     }
     copyToTarget("vpi_user.cc")

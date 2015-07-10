@@ -45,6 +45,8 @@ object Bool {
     *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
     */
   def DC = Bool().fromNode(BitPat.DC(1))
+
+  implicit def toOption(b: Bool) = Option(b)
 }
 
 class Bool extends UInt {

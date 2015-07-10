@@ -370,7 +370,7 @@ class ManualTester[+T <: Module]
   }
 }
 
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends ManualTester(c, isTrace) {
+class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends ManualTester(c, isTrace) with FileSystemUtilities {
   start()
 }
 

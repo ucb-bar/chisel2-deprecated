@@ -119,8 +119,7 @@ object Driver extends FileSystemUtilities{
     topComponent = Some(mod)
     implicitReset.component = mod 
     implicitClock.component = mod
-    mod.reset = implicitReset
-    mod.hasExplicitReset = true
+    mod._reset = Some(implicitReset)
     mod.clock = Some(implicitClock)
   }
 
@@ -136,12 +135,12 @@ object Driver extends FileSystemUtilities{
       queue enqueue io
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        queue enqueue c.defaultResetPin
+      c._reset match {
+        case Some(r) if r != implicitReset => queue enqueue r.getNode
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        queue enqueue c._reset.getNode
-      }
+      for (pin <- c.resets.values)
+        queue enqueue pin
     }
 
     // Do BFS
@@ -177,12 +176,12 @@ object Driver extends FileSystemUtilities{
       stack push io
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        stack push c.defaultResetPin
+      c._reset match {
+        case Some(r) if r != implicitReset => stack push r.getNode
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        stack push c._reset.getNode
-      }
+      for (pin <- c.resets.values)
+        stack push pin
     }
     for (c <- components; a <- c.debugs)
       stack push a
@@ -251,12 +250,12 @@ object Driver extends FileSystemUtilities{
     }
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        pushInitialNode(c.defaultResetPin)
+      c._reset match {
+        case Some(r) if r != implicitReset => pushInitialNode(r.getNode)
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        pushInitialNode(c._reset.getNode)
-      }
+      for (pin <- c.resets.values) 
+        pushInitialNode(pin)
     }
     val stack = inputs ++ res
 
