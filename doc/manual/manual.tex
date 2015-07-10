@@ -1349,7 +1349,7 @@ signalB := s2
 \noindent
 Due to metastability issues, this technique is limited to communicating one bit data between domains.
 
-The second and more general way to send data between domains is by using an asynchronous queue:
+The second and more general way to send data between domains is by using an asynchronous fifo:
 
 \begin{scala}
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clock: Clock)
@@ -1358,7 +1358,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clock: Clock)
 
 \noindent
 We can then get a version of signalA from clock domains clockA to clockB by
-specifying the standard queue parameters and the two clocks and then using the
+specifying the standard fifo parameters and the two clocks and then using the
 standard decoupled ready/valid signals:
 
 \begin{scala}
