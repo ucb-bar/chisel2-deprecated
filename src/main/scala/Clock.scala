@@ -40,6 +40,8 @@ class Clock(reset: Bool = Driver.implicitReset) extends Node {
   var srcClock: Clock = null
   var initStr = ""
 
+  var period = "1ps"
+
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
     if (Driver.compStack.length != 0) {
