@@ -243,7 +243,7 @@ class CppBackend extends Backend {
   }
   def block(s: Seq[String]): String =
     if (s.length == 0) ""
-    else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
+    else s"  {${s.map(" " + _ + ";\n").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String = {
     val gotWidth = x.needWidth()
     if (x.isInObject) emitRef(x)
@@ -397,25 +397,25 @@ class CppBackend extends Backend {
           } else {
             var shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
-            res += s"val_t __c = 0"
             res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
             res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
             res += s"val_t __r = ${bpw} - __s"
+            res += s"val_t __c = ${emitWordRef(o.inputs(0), words(o.inputs(0))-1)} << (${bpw} - (${emitLoWordRef(o.inputs(1))} % ${bpw}))"
             if (arith)
-              res += s"val_t __msb = (sval_t)${emitWordRef(o.inputs(0), words(o)-1)} << ${(bpw - o.needWidth() % bpw) % bpw} >> ${(bpw-1)}"
+              res += s"val_t __msb = (sval_t)${emitWordRef(o.inputs(0), words(o.inputs(0))-1)} << ${(bpw - o.inputs(0).needWidth() % bpw) % bpw} >> ${(bpw - 1)}"
             for (i <- words(o)-1 to 0 by -1) {
               val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}+__w, 0, ${words(o.inputs(0))-1})")
               res += s"val_t __v${i} = MASK(${inputWord}, __w + ${i} < ${words(o.inputs(0))})"
               res += s"${emitWordRef(o, i)} = __v${i} >> __s | __c"
               res += s"__c = MASK(__v${i} << __r, __s != 0)"
               if (arith) {
-                val gotWidth = o.needWidth()
+                val gotWidth = o.inputs(0).needWidth()
                 res += s"${emitWordRef(o, i)} |= MASK(__msb << ((${gotWidth-1}-${emitLoWordRef(o.inputs(1))}) % ${bpw}), ${(i + 1) * bpw} > ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
                 res += s"${emitWordRef(o, i)} |= MASK(__msb, ${i*bpw} >= ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
               }
             }
             if (arith) {
-              val gotWidth = o.needWidth()
+              val gotWidth = o.inputs(0).needWidth()
               res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
             }
             block(res) + (if (arith) trunc(o) else "")
