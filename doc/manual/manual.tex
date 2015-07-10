@@ -1352,25 +1352,31 @@ Due to metastability issues, this technique is limited to communicating one bit 
 The second and more general way to send data between domains is by using an asynchronous queue:
 
 \begin{scala}
-class AsyncQueue[T<:Data](gen: T, depth: Int, enq_clk: Clock, deq_clock: Clock)
+class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clock: Clock)
   extends Module
 \end{scala}
 
 \noindent
-We can then get a version of signalA from clock domains clockA to clockB by specifying the standard queue parameters and the two clocks and then using the standard decoupled ready/valid signals:
+We can then get a version of signalA from clock domains clockA to clockB by
+specifying the standard queue parameters and the two clocks and then using the
+standard decoupled ready/valid signals:
 
 \begin{scala}
-val queue = new AsyncQueue(Uint(width = 32), 2, clockA, clockB)
-fifo.enq.bits := signalA
-signalB       := fifo.deq.bits
-fifo.valid    := condA
-fifo.ready    := condB
+val fifo = new AsyncFifo(Uint(width = 32), 2, clockA, clockB)
+fifo.io.enq.bits  := signalA
+signalB           := fifo.io.deq.bits
+fifo.io.enq.valid := condA
+fifo.io.deq.ready := condB
 ...
 \end{scala}
 
 \subsection{Backend Specific Multiple Clock Domains}
 
-Clock domains can be mapped to both the C++ and Verilog backends in a domain-specific manner.  For the purposes of showing how to drive a multi clock design, consider the example of hardware with two modules communicating using an AsyncQueue with each module on separate clocks: \verb+fastClock+ and \verb+slowClock+.  
+Clock domains can be mapped to both the C++ and Verilog backends in a
+domain-specific manner.  For the purposes of showing how to drive a multi
+clock design, consider the example of hardware with two modules communicating
+using an AsyncFifo with each module on separate clocks: \verb+fastClock+ and
+\verb+slowClock+.
 
 \subsubsection{C++}
 
