@@ -54,19 +54,6 @@ class FixedSuite extends TestSuite {
     if (it == 0) nxt else tailNR(in, nxt, it - 1)
   }
 
-
-  @Test def testNewtonRhapson() {
-    val r = scala.util.Random
-    val in = BigInt(r.nextInt(1 << 30))
-    val b = toDouble(in, 8)
-    val x0 = BigDecimal(1.0/b).setScale(16, BigDecimal.RoundingMode.HALF_UP).toDouble
-    val numNR = 8
-    val repb = tailNR(b, x0, numNR)
-
-    assertTrue(1.0/b - repb < java.lang.Double.MIN_VALUE)
-  }
-
-
   @Test def testConversion() {
     val r = scala.util.Random
     val in = BigInt(r.nextInt(1 << 30))
@@ -486,46 +473,62 @@ class FixedSuite extends TestSuite {
   @Test def testFixedNDiv() {
     class FixedNDiv extends Module {
       val io = new Bundle {
-        val a = Fixed(INPUT, 16, 8)
-        val b = Fixed(INPUT, 16, 8)
-        val c = Fixed(OUTPUT, 16, 8)
+        val a = Fixed(INPUT, 24, 16)
+        val b = Fixed(INPUT, 24, 16)
+        val c = Fixed(OUTPUT, 24, 16)
       }
       io.c := io.a /& io.b
     }
-    
 
     class FixedNDivTests(c : FixedNDiv) extends Tester(c) {
       val trials = 10
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-
-        // For the testing find two numbers that we also give a number that is representable in fixed point
-        var inA = BigInt(r.nextInt(1 << 14))
-        var inB = BigInt(r.nextInt(1 << 14))
-        var doubleA = toDouble(inA, 8)
-        var doubleB = toDouble(inB, 8)
-        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 8), 8) - doubleA/doubleB) > scala.math.pow(2, -9)) {
-          inA = BigInt(r.nextInt(1 << 14))
-          inB = BigInt(r.nextInt(1 << 14))
-          doubleA = toDouble(inA, 8)
-          doubleB = toDouble(inB, 8)
-        }
+        var inA = BigInt(r.nextInt(1 << 22))
+        var inB = BigInt(r.nextInt(1 << 22))
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        val a = toDouble(inA, 8)
-        val b = toDouble(inB, 8)
-        val x0 = BigDecimal(1.0/b).setScale(16, BigDecimal.RoundingMode.HALF_UP).toDouble
-        val numNR = 4
-        val repb = tailNR(b, x0, numNR)
-        val div = a * repb
+        val div = toDouble(inA, 16) / toDouble(inB, 16)
         val nrDiv = peek(c.io.c)
-        val err = scala.math.abs(toDouble(nrDiv, 8) - div)
-        val res = if (err < toDouble(BigInt(scala.math.pow(2, 7).toInt), 8)) true else false
-        expect(true, "Error: " + err.toString)
+        val err = scala.math.abs(toDouble(nrDiv, 16) - div)
+        val res = if (err < toDouble(BigInt(scala.math.pow(2, 8).toInt), 16)) true else false
+        expect(res, "Error: " + err.toString)
       }
     }
 
     launchCppTester((c: FixedNDiv) => new FixedNDivTests(c))
+  }
+  
+  // This is the same as the NDiv test, however the optional pipelining is enabled.
+  @Test def testFixedNDivPipe() {
+    class FixedNDivPipe extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 24, 16)
+        val b = Fixed(INPUT, 24, 16)
+        val c = Fixed(OUTPUT, 24, 16)
+      }
+      io.c := io.a /& (io.b, true)
+    }
+
+    class FixedNDivPipeTests(c : FixedNDivPipe) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+        var inA = BigInt(r.nextInt(1 << 22))
+        var inB = BigInt(r.nextInt(1 << 22))
+        poke(c.io.a, inA)
+        poke(c.io.b, inB)
+        step(5)
+        val div = toDouble(inA, 16) / toDouble(inB, 16)
+        val nrDiv = peek(c.io.c)
+        val err = scala.math.abs(toDouble(nrDiv, 16) - div)
+        val res = if (err < toDouble(BigInt(scala.math.pow(2, 8).toInt), 16)) true else false
+        expect(res, "Error: " + err.toString)
+      }
+    }
+
+    launchCppTester((c: FixedNDivPipe) => new FixedNDivPipeTests(c))
   }
 }
