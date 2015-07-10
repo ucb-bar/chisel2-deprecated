@@ -485,8 +485,16 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        var inA = BigInt(r.nextInt(1 << 22))
-        var inB = BigInt(r.nextInt(1 << 22))
+        var inA = BigInt(r.nextInt(1 << 22)) //BigInt(670823)
+        var inB = BigInt(r.nextInt(1 << 22)) //BigInt(2613)
+        var doubleA = toDouble(inA, 16)
+        var doubleB = toDouble(inB, 16)
+        while(doubleA/doubleB > scala.math.pow(2, 8)) {
+          inA = BigInt(r.nextInt(1 << 22))
+          inB = BigInt(r.nextInt(1 << 22))
+          doubleA = toDouble(inA, 16)
+          doubleB = toDouble(inB, 16)
+        }
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         val div = toDouble(inA, 16) / toDouble(inB, 16)
@@ -518,6 +526,14 @@ class FixedSuite extends TestSuite {
       for (i <- 0 until trials) {
         var inA = BigInt(r.nextInt(1 << 22))
         var inB = BigInt(r.nextInt(1 << 22))
+        var doubleA = toDouble(inA, 16)
+        var doubleB = toDouble(inB, 16)
+        while(doubleA/doubleB > scala.math.pow(2, 8)) {
+          inA = BigInt(r.nextInt(1 << 22))
+          inB = BigInt(r.nextInt(1 << 22))
+          doubleA = toDouble(inA, 16)
+          doubleB = toDouble(inB, 16)
+        }
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         step(5)
