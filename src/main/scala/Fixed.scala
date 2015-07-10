@@ -142,13 +142,13 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     }
 
 
-    /* This is the Newton-Rhapson APPROXIMATE division algorithm
+    /* This is the Newton-Raphson APPROXIMATE division algorithm
      * Please test to make sure that the method is accurate enough for your application
      */
 
     def toDouble(x : BigInt, fracWidth : Int) : Double = x.toDouble/scala.math.pow(2, fracWidth)
 
-    // Newton-Rhapson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
+    // Newton-Raphson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
     def performNR(in : Fixed, xt : Fixed) : Fixed = xt*(Fixed(2.0, in.getWidth, in.fractionalWidth) - in*xt)
 
     def tailNR(in : Fixed, xt : Fixed, it : Int, pipeline : Boolean) : Fixed = {
@@ -158,7 +158,7 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
       if (it == 0) xtn else tailNR(in, xtn, it - 1, pipeline)
     }
 
-    /* Different methods for calling the Newton-Rhapson Division
+    /* Different methods for calling the Newton-Raphson Division
      * By default, pipelining is turned off, the resolution of the lookup table is set of 1/4 of the fractionalWidth length
      * and the number of NR iterations is 4.
      */

@@ -46,7 +46,7 @@ class FixedSuite extends TestSuite {
   def toFixed(x : Double, fracWidth : Int) : BigInt = BigInt(scala.math.round(x*scala.math.pow(2, fracWidth)))
   def toDouble(x : BigInt, fracWidth : Int) : Double = x.toDouble/scala.math.pow(2, fracWidth)
 
-  // Newton-Rhapson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
+  // Newton-Raphson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
   def performNR(in : Double, xt : Double) : Double = xt*(2.0 - in*xt)
 
   def tailNR(in : Double, xt : Double, it : Int) : Double = {
