@@ -33,7 +33,7 @@ import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
 
-class MissingWireSuite extends TestSuite {
+class Chisel3CompatibilitySuite extends TestSuite {
   @Test def testMissingWire() {
     println("\ntestMissingWire ...")
 
@@ -107,6 +107,50 @@ class MissingWireSuite extends TestSuite {
     // This should fail since we use a Wire wrapper around a node with data
     intercept[IllegalStateException] {
       chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
+
+  @Test def testBadMixedMux() {
+    println("\ntestBadMixedMux ...")
+
+    class OptionalMux(mixedTypes: Boolean) extends Module {
+    
+      val io = new Bundle {
+        val t = Bool(INPUT)
+        val c = UInt(INPUT, 8)
+        val ua = UInt(INPUT, 8)
+        val sa = SInt(INPUT, 8)
+        val out = UInt(OUTPUT)
+      }
+
+      // The following should fail if mixedTypes is true.
+      if (mixedTypes) {
+        io.out := Mux(io.t, io.c, io.sa)
+      } else {
+        io.out := Mux(io.t, io.c, io.ua)
+      }
+    }
+
+    class OptionalMuxTester(c: OptionalMux) extends Tester(c) {
+      poke(c.io.c, 42)
+      poke(c.io.ua, 1)
+      poke(c.io.sa, 1)
+      poke(c.io.t, 1)
+      step(1)
+      expect(c.io.out, 42)
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
+    
+    // This should pass (mixedTypes is false)
+    chiselMainTest(testArgs, () => Module(new OptionalMux(false))){ c => new OptionalMuxTester(c) }
+    assertFalse(ChiselError.hasErrors)
+
+    // This should fail since we use mixed types.
+    intercept[IllegalStateException] {
+      chiselMainTest(testArgs, () => Module(new OptionalMux(true))){ c => new OptionalMuxTester(c) }
     }
     assertTrue(ChiselError.hasErrors)
   }

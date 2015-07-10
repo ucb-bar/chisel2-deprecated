@@ -172,7 +172,7 @@ class VcdBackend(top: Module) extends Backend {
 
   def dumpVCDInit(write: String => Unit): Unit = {
     if (Driver.isVCD) {
-      write("  fputs(\"$timescale 1ps $end\\n\", f);\n")
+      write("  fputs(\"$timescale " + Driver.implicitClock.period + " $end\\n\", f);\n")
       dumpVCDScope(top, write)
       if (Driver.emitTempNodes)
         dumpScopeForTemps(write)
