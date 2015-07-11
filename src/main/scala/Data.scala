@@ -89,8 +89,8 @@ abstract class Data extends Node {
 
   def apply(name: String): Data = null
   def flatten: Array[(String, Bits)]
-  def flip(): this.type = this;
-  def asInput(): this.type = this;
+  def flip(): this.type = this
+  def asInput(): this.type = this
 
   /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
     or recursively sets members of Bundle/Vec to OUTPUT.
@@ -98,7 +98,7 @@ abstract class Data extends Node {
     */
   def asOutput(): this.type
   def asDirectionless(): this.type
-  def isDirectionless: Boolean = true;
+  def isDirectionless: Boolean = true
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */

@@ -342,6 +342,7 @@ object Driver extends FileSystemUtilities{
     sramMaxSize = 0
     backend = new CppBackend
     topComponent = None
+    moduleNamePrefix = ""
     components.clear()
     sortedComps.clear()
     nodes.clear()
@@ -399,7 +400,7 @@ object Driver extends FileSystemUtilities{
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
         case "--v" => backendName = "v"
-        case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
+        case "--moduleNamePrefix" => moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--assert" => isAssert = true
@@ -512,6 +513,7 @@ object Driver extends FileSystemUtilities{
   var sramMaxSize = 0
   var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
+  var moduleNamePrefix = ""
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
   val nodes = ArrayBuffer[Node]()

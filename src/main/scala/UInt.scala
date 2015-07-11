@@ -38,17 +38,16 @@ object UInt {
    */
   def apply(x: Int): UInt = apply(BigInt(x))
   def apply(x: Int, width: Int): UInt = apply(BigInt(x), width)
-  def apply(x: BigInt): UInt = Lit(checkSign(x)){UInt()};
-  def apply(x: BigInt, width: Int): UInt = Lit(checkSign(x), width){UInt()};
-  def apply(x: String): UInt = Lit(x, -1){UInt()};
-  def apply(x: String, width: Int): UInt = Lit(x, width){UInt()};
-  def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()};
-  def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()};
+  def apply(x: BigInt): UInt = Lit(checkSign(x)){UInt()}
+  def apply(x: BigInt, width: Int): UInt = Lit(checkSign(x), width){UInt()}
+  def apply(x: String): UInt = Lit(x, -1){UInt()}
+  def apply(x: String, width: Int): UInt = Lit(x, width){UInt()}
+  def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()}
+  def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()}
   def apply(x: Node): UInt = UInt(x, -1)
   def apply(x: Node, width: Int): UInt = UInt(width = width).asTypeFor(x)
-
-  def apply(dir: IODirection = null, width: Int = -1): UInt = {
-    val res = new UInt();
+  def apply(dir: IODirection = NODIR, width: Int = -1): UInt = {
+    val res = new UInt()
     res.create(dir, width)
     res
   }
@@ -99,13 +98,13 @@ class UInt extends Bits with Num[UInt] {
   def zext(): SInt = Cat(UInt(0,1), this).toSInt
   def unary_-(): UInt = UInt(0) - this
   def unary_!(): Bool = this === UInt(0)
-  def >> (b: UInt): UInt = newBinaryOp(b, ">>");
-  def +  (b: UInt): UInt = newBinaryOp(b, "+");
-  def *  (b: UInt): UInt = newBinaryOp(b, "*");
-  def /  (b: UInt): UInt = newBinaryOp(b, "/");
-  def %  (b: UInt): UInt = newBinaryOp(b, "%");
+  def >> (b: UInt): UInt = newBinaryOp(b, ">>")
+  def +  (b: UInt): UInt = newBinaryOp(b, "+")
+  def *  (b: UInt): UInt = newBinaryOp(b, "*")
+  def /  (b: UInt): UInt = newBinaryOp(b, "/")
+  def %  (b: UInt): UInt = newBinaryOp(b, "%")
   def ?  (b: UInt): UInt = fromNode(Multiplex(this.toBool, b, null))
-  def -  (b: UInt): UInt = newBinaryOp(b, "-");
+  def -  (b: UInt): UInt = newBinaryOp(b, "-")
   def >> (i: Int): UInt = newBinaryOp(UInt(i), ">>") // chisel3
   def << (i: Int): UInt = newBinaryOp(UInt(i), "<<") // chisel3
   def +%  (b: UInt): UInt = newBinaryOp(b, "+") // chisel3 add-wrap
@@ -114,8 +113,8 @@ class UInt extends Bits with Num[UInt] {
   def -&  (b: UInt): UInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
 
   // order operators
-  def <  (b: UInt): Bool = newLogicalOp(b, "<");
-  def <= (b: UInt): Bool = newLogicalOp(b, "<=");
+  def <  (b: UInt): Bool = newLogicalOp(b, "<")
+  def <= (b: UInt): Bool = newLogicalOp(b, "<=")
   def >  (b: UInt): Bool = b < this
   def >= (b: UInt): Bool = b <= this
 

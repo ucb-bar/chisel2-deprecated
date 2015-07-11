@@ -32,20 +32,19 @@ package Chisel
 
 object SInt {
 
-  def apply(x: Int): SInt = Lit(x){SInt()};
-  def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()};
-  def apply(x: BigInt): SInt = Lit(x){SInt()};
-  def apply(x: BigInt, width: Int): SInt = Lit(x, width){SInt()};
-
-  def apply(dir: IODirection = null, width: Int = -1): SInt = {
-    val res = new SInt();
+  def apply(x: Int): SInt = Lit(x){SInt()}
+  def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()}
+  def apply(x: BigInt): SInt = Lit(x){SInt()}
+  def apply(x: BigInt, width: Int): SInt = Lit(x, width){SInt()}
+  def apply(dir: IODirection = NODIR, width: Int = -1): SInt = {
+    val res = new SInt()
     res.create(dir, width)
     res
   }
 }
 
 class SInt extends Bits with Num[SInt] {
-  type T = SInt;
+  type T = SInt
 
   /** Factory method to create and assign a *SInt* type to a Node *n*.
     */
@@ -68,22 +67,22 @@ class SInt extends Bits with Num[SInt] {
       val match_width = w.needWidth()
       if (match_width > my_width) {
         if (my_width == 1) {
-          val res = NodeFill(match_width, this); res.infer
+          val res = NodeFill(match_width, this) ; res.infer
           res
         } else {
-          val topBit = NodeExtract(this, my_width-1); topBit.infer
-          val fill = NodeFill(match_width - my_width, topBit); fill.infer
-          val res = Concatenate(fill, this); res.infer
+          val topBit = NodeExtract(this, my_width-1) ; topBit.infer
+          val fill = NodeFill(match_width - my_width, topBit) ; fill.infer
+          val res = Concatenate(fill, this) ; res.infer
           res
         }
       } else if (match_width < my_width) {
-        val res = NodeExtract(this, match_width-1,0); res.infer
+        val res = NodeExtract(this, match_width-1,0) ; res.infer
         res
       } else {
         this
       }
     } else {
-      ChiselError.error("SInt.matchWidth with unknown width: " + w + ", node " + this);
+      ChiselError.error("SInt.matchWidth with unknown width: " + w + ", node " + this)
       this
     }
   }
@@ -94,20 +93,20 @@ class SInt extends Bits with Num[SInt] {
     case _ => super.colonEquals(that)
   }
 
-  def gen[T <: Bits](): T = SInt().asInstanceOf[T];
+  def gen[T <: Bits](): T = SInt().asInstanceOf[T]
 
   // arithmetic operators
   def unary_-(): SInt = SInt(0) - this
   def unary_!(): Bool = this === SInt(0)
-  def >> (b: UInt): SInt = newBinaryOp(b, "s>>");
+  def >> (b: UInt): SInt = newBinaryOp(b, "s>>")
   def ?  (b: SInt): SInt = fromNode(Multiplex(this.toBool, b, null))
   def >> (i: Int): SInt = newBinaryOp(UInt(i), "s>>") // chisel3
   def << (i: Int): SInt = newBinaryOp(UInt(i), "<<") // chisel3
 
   // order operators
-  def <  (b: SInt): Bool = newLogicalOp(b, "s<");
+  def <  (b: SInt): Bool = newLogicalOp(b, "s<")
   def >  (b: SInt): Bool = b < this
-  def <= (b: SInt): Bool = newLogicalOp(b, "s<=");
+  def <= (b: SInt): Bool = newLogicalOp(b, "s<=")
   def >= (b: SInt): Bool = b <= this
   def !=  (b: UInt): Bool = this != b.zext
   def >   (b: UInt): Bool = this > b.zext
@@ -117,18 +116,18 @@ class SInt extends Bits with Num[SInt] {
 
   override def ===[T <: Data](right: T): Bool = {
     right match {
-      case b: UInt => this === b.zext;
+      case b: UInt => this === b.zext
       case _ =>
         super.===(right)
     }
   }
 
   //SInt to SInt arithmetic
-  def +  (b: SInt): SInt = newBinaryOp(b, "+");
-  def *  (b: SInt): SInt = newBinaryOp(b, "s*s");
-  def /  (b: SInt): SInt = newBinaryOp(b, "s/s");
-  def %  (b: SInt): SInt = newBinaryOp(b, "s%s");
-  def -  (b: SInt): SInt = newBinaryOp(b, "-");
+  def +  (b: SInt): SInt = newBinaryOp(b, "+")
+  def *  (b: SInt): SInt = newBinaryOp(b, "s*s")
+  def /  (b: SInt): SInt = newBinaryOp(b, "s/s")
+  def %  (b: SInt): SInt = newBinaryOp(b, "s%s")
+  def -  (b: SInt): SInt = newBinaryOp(b, "-")
   def +%  (b: SInt): SInt = newBinaryOp(b, "+") // chisel3 add-wrap
   def +&  (b: SInt): SInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
   def -%  (b: SInt): SInt = newBinaryOp(b, "-") // chisel3 sub-wrap

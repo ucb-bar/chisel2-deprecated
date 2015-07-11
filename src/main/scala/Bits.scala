@@ -32,27 +32,25 @@ package Chisel
 
 /* backward compatibility */
 object Bits {
-  def apply(x: Int): UInt = UInt(x);
-  def apply(x: Int, width: Int): UInt = UInt(x, width);
-  def apply(x: BigInt): UInt = UInt(x);
-  def apply(x: BigInt, width: Int): UInt = UInt(x, width);
-  def apply(x: String): UInt = UInt(x);
-  def apply(x: String, width: Int): UInt = UInt(x, width);
-
-  def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
-
+  def apply(x: Int): UInt = UInt(x)
+  def apply(x: Int, width: Int): UInt = UInt(x, width)
+  def apply(x: BigInt): UInt = UInt(x)
+  def apply(x: BigInt, width: Int): UInt = UInt(x, width)
+  def apply(x: String): UInt = UInt(x)
+  def apply(x: String, width: Int): UInt = UInt(x, width)
+  def apply(dir: IODirection = NODIR, width: Int = -1): UInt = UInt(dir, width)
   def DC(width: Int): BitPat = BitPat.DC(width)
 }
 
 
 /** Base class for built-in Chisel types Bits and SInt. */
 abstract class Bits extends Data with proc {
-  var dir: IODirection = null;
+  var dir: IODirection = NODIR
 
   def create(dir: IODirection, width: Int) {
-    this.dir = dir;
+    this.dir = dir
     if(width > -1) {
-      init("", width);
+      init("", width)
     } else {
       init("", Node.widthOf(0))
     }
@@ -75,15 +73,15 @@ abstract class Bits extends Data with proc {
   // internal, non user exposed connectors
   private var assigned = false
   private def checkAssign(src: Node) = {
-    if (dir == INPUT && component == Module.current && (component.wires.unzip._2 contains this)) {
-      ChiselError.error({"assigning to your own input port " + this + " RHS: " + src});
+    dir match {
+      case INPUT if component == Module.current && (component.wires.unzip._2 contains this) =>
+        ChiselError.error("assigning to your own input port " + this + " RHS: " + src)
+      case OUTPUT if component != Module.current && src.component != null && src.component.parent != component =>
+        ChiselError.error("assigning to a non parent module's output port: " + this + " RHS: " + src)
+      case _ if assigned =>
+        ChiselError.error("reassignment to Wire " + this + " with inputs " + inputs(0) + " RHS: " + src)
+      case _ =>
     }
-    if (dir == OUTPUT && component != Module.current &&
-        src.component != null && src.component.parent != component) {
-      ChiselError.error({"assigning to a non parent module's output port: " + this + " RHS: " + src});
-    }
-    if (assigned)
-      ChiselError.error({"reassignment to Wire " + this + " with inputs " + inputs(0) + " RHS: " + src})
     !assigned
   }
 
@@ -118,16 +116,13 @@ abstract class Bits extends Data with proc {
     // width_ but it seems to also have some underlying computations associated
     // to it.
     var str = (
-      "/*" + (if (name != null && !name.isEmpty) name else "?")
+      "/*" + (if (name != "") name else "?")
         + (if (component != null) (" in " + component) else "") + "*/ "
-        + getClass.getName + "("
-        + (if (dir == INPUT) "INPUT, "
-        else if (dir == OUTPUT) "OUTPUT, " else "")
-        + "width=" + width_
+        + getClass.getName + "(" + dir + ", " + "width=" + width_
         + ", connect to " + inputs.length + " inputs: (")
     var sep = ""
     for( i <- inputs ) {
-      str = (str + sep + (if (i.name != null) i.name else "?")
+      str = (str + sep + (if (i.name != "") i.name else "?")
         + "[" + i.getClass.getName + "]"
         + " in " + (if (i.component != null) i.component.getClass.getName else "?"))
       sep = ", "
@@ -136,139 +131,115 @@ abstract class Bits extends Data with proc {
     str
   }
 
-  override def flip = {
-    assert(dir != null,
-      ChiselError.error("Can't flip something that doesn't have a direction"))
-    if (dir == INPUT) {
-      dir = OUTPUT
-    } else if(dir == OUTPUT) {
-      dir = INPUT
+  override def flip: this.type = {
+    dir match {
+      case INPUT => dir = OUTPUT
+      case OUTPUT => dir = INPUT
+      case NODIR => throw new RuntimeException("Can't flip something that doesn't have a direction")
     }
     this
   }
 
-  override def asDirectionless: this.type = {
-    dir = null
-    this
-  }
-
-  override def asInput: this.type = {
-    dir = INPUT
-    this
-  }
-
-  override def asOutput: this.type = {
-    dir = OUTPUT
-    this
-  }
-
-  override def isDirectionless: Boolean = {
-    return dir == null
-  }
+  override def asDirectionless: this.type = { dir = NODIR ; this }
+  override def asInput: this.type = { dir = INPUT ; this }
+  override def asOutput: this.type = { dir = OUTPUT ; this }
+  override def isDirectionless: Boolean = { dir == NODIR }
 
   override def <>(src: Node) {
     checkCompatibility(src)
-    if (dir == INPUT) {
-      src match {
-      case other: Bits =>
-          if (other.dir == OUTPUT) { // input - output connections
-          if(component == other.component && !isTypeNode) {//passthrough
-            other assign this
-          } else if (component.parent == other.component.parent || isTypeNode) { //producer - consumer
-            if (!other.inputs.isEmpty || other.component.isInstanceOf[BlackBox]) { // includes when a child is a blackbox
-              this assign other // only do assignment if output has stuff connected to it
-            }
-          } else {
-            ChiselError.error({"Undefined connections between " + this + " and " + other})
-          }
-        } else if (other.dir == INPUT) { // input <> input conections
-            if(component == other.component.parent) { // parent <> child
-              other assign this
-            } else if(component.parent == other.component) { //child <> parent
-              this assign other
-            } else {
-              ChiselError.error({"Can't connect Input " + this + " Input " + other})
-            }
-          } else { // io <> wire
-            if(component == other.component) { //internal wire
-              other assign this
-            } else if(component.parent == other.component) { //external wire
-              this assign other
-            } else {
-            ChiselError.error({"Connecting Input " + this + " to " + other})
-            }
+    val p = component
+    val q = src.component
+    src match {
+      case other: Bits => (dir, other.dir) match {
+        // input <> output connections
+        case (INPUT, OUTPUT) if p == q && !isTypeNode => other assign this //passthrough
+        case (INPUT, OUTPUT) if p.parent == q.parent || isTypeNode => q match { //producer - consumer
+          // includes when a child is a blackbox
+          case _: BlackBox => this assign other 
+          // only do assignment if output has stuff connected to it
+          case _ if !other.inputs.isEmpty => this assign other 
+          case _ => 
         }
-      case default =>
-        ChiselError.error({"Connecting Input " + this + " to IO without direction " + default})
+        case (INPUT, OUTPUT) =>
+          ChiselError.error("Undefined connections between " + this + " and " + other)
+
+        // output <> input connections
+        case (OUTPUT, INPUT) if p == q && !isTypeNode => this assign other //passthrough
+        case (OUTPUT, INPUT) if p.parent == q.parent || isTypeNode => q match { //producer - consumer
+          // includes when a child is a black box
+          case _: BlackBox => other assign this
+          // only do connection if I have stuff connected to me
+          case _ if !inputs.isEmpty => other assign this
+          case _ =>
+        }
+        case (OUTPUT, INPUT) => 
+            ChiselError.error("Undefined connection between " + this + " and " + other)
+
+        // input <> input conections
+        case (INPUT, INPUT) if p == q.parent => other assign this // parent <> child
+        case (INPUT, INPUT) if p.parent == q => this assign other //child <> parent
+        case (INPUT, INPUT) => 
+          ChiselError.error("Can't connect Input " + this + " Input " + other)
+
+        // output <> output connections
+        case (OUTPUT, OUTPUT) if p == q.parent => q match { // parent <> child
+          // includes when a child is a black box
+          case _: BlackBox => this assign other
+          // only do connection if child is assigning to that output
+          case _ if !other.inputs.isEmpty => this assign other 
+          case _ =>
+        }
+        case (OUTPUT, OUTPUT) if p.parent == q => p match { // child <> parent
+          // includes when a child is a black box
+          case _: BlackBox => other assign this
+          // only do connection if child (me) is assinging that output
+          case _ if !inputs.isEmpty => other assign this 
+          case _ =>
+        }
+        case (OUTPUT, OUTPUT) if isTypeNode && other.isTypeNode => //connecting two type nodes together
+          ChiselError.error("Ambiguous Connection of Two Nodes")
+        case (OUTPUT, OUTPUT) if isTypeNode => other assign this // type <> output
+        case (OUTPUT, OUTPUT) if other.isTypeNode => this assign other // output <> type
+        case (OUTPUT, OUTPUT) =>
+          ChiselError.error("Connecting Output " + this + " to Output " + other)
+
+        // input <> wire
+        case (INPUT, NODIR) if p == q => other assign this //internal wire
+        case (INPUT, NODIR) if p.parent == q => this assign other //external wire
+        case (INPUT, NODIR) =>
+          ChiselError.error("Connecting Input " + this + " to " + other)
+
+        // wire <> input
+        case (NODIR, INPUT) if p == q => this assign other
+        case (NODIR, INPUT) if p == q.parent => other assign this
+        case (NODIR, INPUT) =>
+          ChiselError.error("Undefined connection between wire " + this + " and input " + other)
+
+        // io <> wire
+        case (OUTPUT, NODIR) if p == q => this assign other
+        case (OUTPUT, NODIR) if p.parent == q =>
+          ChiselError.error("Connecting Ouptut " + this + " to an external wire " + other)
+        case (OUTPUT, NODIR) =>
+          ChiselError.error("Connecting Output " + this + " to IO without direction " + other)
+
+        // wire <> output
+        case (NODIR, OUTPUT) if p == q => other assign this // internal wire
+        case (NODIR, OUTPUT) if p == q.parent => this assign other // external wire
+        case (NODIR, OUTPUT) =>
+          ChiselError.error("Undefined connection between wire " + this + " and output " + other)
+
+        // wire <> wire
+        case (NODIR, NODIR) => this assign other
+
+        case _ => // shouldn't reach here
       }
-    } else if (dir == OUTPUT) {
-      src match {
-        case other: Bits  =>
-          if (other.dir == INPUT) { // input - output connections
-            if (component == other.component && !isTypeNode) { //passthrough
-              this assign other;
-            } else if (component.parent == other.component.parent || isTypeNode) { //producer - consumer
-              if (!inputs.isEmpty || component.isInstanceOf[BlackBox]) { // includes when a child is a black box
-                other assign this; // only do connection if I have stuff connected to me
-              }
-            } else {
-              ChiselError.error({"Undefined connection between " + this + " and " + other})
-            }
-          } else if (other.dir == OUTPUT) { // output <> output connections
-            if(component == other.component.parent) { // parent <> child
-              if (!other.inputs.isEmpty || other.component.isInstanceOf[BlackBox]) { // includes when a child is a black box
-                this assign other // only do connection if child is assigning to that output
-              }
-            } else if (component.parent == other.component) { // child <> parent
-              if (!inputs.isEmpty || component.isInstanceOf[BlackBox]) { // includes when a child is a black box
-                other assign this // only do connection if child (me) is assinging that output
-              }
-            } else if (isTypeNode && other.isTypeNode) { //connecting two type nodes together
-              ChiselError.error("Ambiguous Connection of Two Nodes")
-            } else if (isTypeNode){ // type <> output
-              other assign this;
-            } else if (other.isTypeNode){ // output <> type
-              this assign other;
-            } else {
-              ChiselError.error({"Connecting Output " + this + " to Output " + other})
-            }
-          } else { // io <> wire
-            if(component == other.component) { //output <> wire
-              this assign other
-            } else if(component.parent == other.component) {
-              ChiselError.error({"Connecting Ouptut " + this + " to an external wire " + other})
-            } else {
-              ChiselError.error({"Connecting Output " + this + " to IO without direction " + other})
-            }
-          }
-        case default =>
-          ChiselError.error({"Connecting Output " + this + " to an IO withouth direction " + default})
-      }
-    }
-    else {
-      src match {
-        case other: Bits =>
-          if (other.dir == INPUT) { // wire <> input
-            if(component == other.component) {
-              this assign other
-            } else if(component == other.component.parent) {
-              other assign this
-            } else {
-              ChiselError.error({"Undefined connection between wire " + this + " and input " + other})
-            }
-          } else if (other.dir == OUTPUT) { //wire <> output
-            if(component == other.component) { // internal wire
-              other assign this
-            } else if(component == other.component.parent) { // external wire
-              this assign other
-            } else {
-              ChiselError.error({"Undefined connection between wire " + this + " and output " + other})
-            }
-          } else {
-            this assign other
-          }
-        case default =>
-          ChiselError.error({"Undefined connection between " + this + " and " + default})
+      case _ => dir match {
+        case INPUT =>
+          ChiselError.error("Connecting Input " + this + " to IO without direction " + src)
+        case OUTPUT =>
+          ChiselError.error("Connecting Output " + this + " to an IO withouth direction " + src)
+        case NODIR =>        
+          ChiselError.error("Undefined connection between " + this + " and " + src)
       }
     }
   }

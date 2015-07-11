@@ -31,20 +31,17 @@
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue=>ScalaQueue}
 
-object Backend {
-  var moduleNamePrefix = ""
-}
-
 trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
   def ensureDir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new java.io.File(d).mkdirs()
+    val file = new java.io.File(d)
+    if (!file.exists) file.mkdirs
     d
   }
 
   def createOutputFile(name: String) = {
-    val baseDir = Driver.targetDir
+    val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
   }
 }
@@ -63,16 +60,16 @@ abstract class Backend extends FileSystemUtilities{
   def isEmittingComponents: Boolean = false
 
   def depthString(depth: Int): String = {
-    var res = "";
+    var res = ""
     for (i <- 0 until depth)
-      res += "  ";
+      res += "  "
     res
   }
 
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');
-    Backend.moduleNamePrefix + (
+    Driver.moduleNamePrefix + (
       if (dotPos >= 0) cname.substring(dotPos + 1) else cname);
   }
 
@@ -349,21 +346,18 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def checkPorts {
-    def prettyPrint(n: Node, c: Module) {
-      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+    for {
+      c <- Driver.components 
+      if c != topMod 
+      n <- c.wires.unzip._2
+      if n.inputs.isEmpty
+    } {
+      val dir = if (n.dir == INPUT) "Input" else "Output"
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
       ChiselError.warning(dir + " port " + portName
         + " is unconnected in module " + compInstName + " " + compName)
-    }
-
-    for (c <- Driver.components ; if c != topMod) {
-      for ((n,i) <- c.wires) {
-        if (i.inputs.length == 0) {
-          prettyPrint(i, c)
-        }
-      }
     }
   }
 

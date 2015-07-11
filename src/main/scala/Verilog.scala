@@ -76,12 +76,12 @@ class VerilogBackend extends Backend {
        All others, we return the previously generated name. */
       val compName = if (mem.component != null) {
         (if( !mem.component.moduleName.isEmpty ) {
-          Backend.moduleNamePrefix + mem.component.moduleName
+          Driver.moduleNamePrefix + mem.component.moduleName
         } else {
           extractClassName(mem.component)
         } + "_")
       } else {
-        Backend.moduleNamePrefix
+        Driver.moduleNamePrefix
       }
       // Generate a unique name for the memory module.
       val candidateName = compName + emitRef(mem)
