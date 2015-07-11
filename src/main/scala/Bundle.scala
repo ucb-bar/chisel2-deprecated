@@ -129,9 +129,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   }
 
   override def nameIt (path: String, isNamingIo: Boolean) {
-    if( !named
-      && (name.isEmpty
-        || (!path.isEmpty && name != path)) ) {
+    if( !named && (name.isEmpty || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
@@ -163,36 +161,21 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   override def apply(name: String): Data = elements(name)
 
   override def <>(src: Node): Unit = {
-    if (comp == null) {
-      src match {
-        case other: Bundle => {
-          for ((n, i) <- elements) {
-            if (other contains n){
-              i <> other(n)
-            } else {
-              ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component)
-            }
-          }
-        }
-        case default =>
-          ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default)
+    (comp, src) match {
+      case (None, other: Bundle) => for ((n, i) <- elements) {
+        if (other contains n) i <> other(n)
+        else ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component)
       }
-    } else {
-      src match {
-        case other: Bundle => {
-          comp assign other
-        }
-        case default =>
-          ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
-      }
+      case (None, _) => ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + src)
+      case (Some(p), other: Bundle) => p assign other
+      case (Some(p), _) => ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
     }
   }
 
   override protected def colonEquals(src: Bundle): Unit = {
-    if (isTypeNode && comp != null) {
-      comp procAssign src.toNode
-    } else {
-      for ((n, i) <- elements ; if src contains n) i := src(n)
+    comp match {
+      case Some(p) if isTypeNode => p procAssign src.toNode
+      case _ => for ((n, i) <- elements if src contains n) i := src(n)
     }
   }
 
@@ -208,31 +191,11 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   }
 
   override def getWidth: Int = (elements foldLeft 0)(_ + _._2.getWidth)
-
-  override def asDirectionless(): this.type = {
-    elements.foreach(_._2.asDirectionless)
-    this
-  }
-
-  override def asInput(): this.type = {
-    elements.foreach(_._2.asInput)
-    this
-  }
-
-  override def asOutput(): this.type = {
-    elements.foreach(_._2.asOutput)
-    this
-  }
-
+  override def asDirectionless: this.type = { elements.foreach(_._2.asDirectionless) ; this }
+  override def asInput: this.type = { elements.foreach(_._2.asInput) ; this }
+  override def asOutput: this.type = { elements.foreach(_._2.asOutput) ;this }
   override def isDirectionless: Boolean = elements.forall(_._2.isDirectionless)
-
-  override def setIsTypeNode {
-    isTypeNode = true
-    elements foreach (_._2.setIsTypeNode)
-  }
-
+  override def setIsTypeNode { isTypeNode = true ; elements foreach (_._2.setIsTypeNode) }
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
-  override def isTypeOnly: Boolean = {
-    elements.forall(_._2.isTypeOnly)
-  }
+  override def isTypeOnly: Boolean = { elements.forall(_._2.isTypeOnly) }
 }

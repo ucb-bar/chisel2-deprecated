@@ -31,18 +31,18 @@
 package Chisel
 
 abstract trait Num[T <: Data] {
-  // def << (b: T): T;
-  // def >> (b: T): T;
-  def unary_-(): T;
-  def +  (b: T): T;
-  def *  (b: T): T;
-  def /  (b: T): T;
-  def %  (b: T): T;
-  def -  (b: T): T;
-  def <  (b: T): Bool;
-  def <= (b: T): Bool;
-  def >  (b: T): Bool;
-  def >= (b: T): Bool;
+  // def << (b: T): T
+  // def >> (b: T): T
+  def unary_-(): T
+  def +  (b: T): T
+  def *  (b: T): T
+  def /  (b: T): T
+  def %  (b: T): T
+  def -  (b: T): T
+  def <  (b: T): Bool
+  def <= (b: T): Bool
+  def >  (b: T): Bool
+  def >= (b: T): Bool
 
   def min(b: T): T = Mux(this < b, this.asInstanceOf[T], b)
   def max(b: T): T = Mux(this < b, b, this.asInstanceOf[T])
@@ -57,7 +57,7 @@ abstract trait Num[T <: Data] {
   generates target code.
   */
 abstract class Data extends Node {
-  var comp: proc = null;
+  var comp: Option[proc] = None // TODO: better name?
 
   // Interface required by Vec:
   def ===[T <: Data](right: T): Bool = {
@@ -70,9 +70,9 @@ abstract class Data extends Node {
     if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
     } else if(gotWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
+      throw new Exception("multi bit signal " + this + " converted to Bool")
     }
-    chiselCast(this){Bool()};
+    chiselCast(this){Bool()}
   }
 
   // Interface required by Cat:
@@ -87,7 +87,7 @@ abstract class Data extends Node {
     inferWidth = Node.widthOf(0)
   }
 
-  def apply(name: String): Data = null
+  def apply(name: String): Data = null // TODO: neccessary?
   def flatten: Array[(String, Bits)]
   def flip(): this.type = this
   def asInput(): this.type = this
@@ -195,10 +195,9 @@ abstract class Data extends Node {
   }
 
   override def nameIt(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp.nameIt(path, isNamingIo)
-    } else {
-      super.nameIt(path, isNamingIo)
+    comp match {
+      case Some(p) if isTypeNode => p nameIt (path, isNamingIo)
+      case _ => super.nameIt(path, isNamingIo)
     }
   }
 
@@ -207,16 +206,13 @@ abstract class Data extends Node {
   // Chisel3 - This node has been wrapped in Wire() and may participate in assignment (:=, <>) statements.
   private var _isWired = false
   def isWired = _isWired
-  def setIsWired(value: Boolean) {
-    _isWired = value
-  }
+  def setIsWired(value: Boolean) { _isWired = value }
 
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
   override def isTypeOnly = {
-    if (isTypeNode && comp != null) {
-      comp.isTypeOnly
-    } else {
-      super.isTypeOnly
+    comp match {
+      case Some(p) if isTypeNode => p.isTypeOnly
+      case _ => super.isTypeOnly
     }
   }
 }

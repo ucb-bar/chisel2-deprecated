@@ -63,16 +63,14 @@ object Vec {
   /** Returns a new *Vec* from the concatenation of a *Data* node
     and a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elt0: T, elts: T*): Vec[T] =
-    apply(elt0 +: elts.toSeq)
+  def apply[T <: Data](elt0: T, elts: T*): Vec[T] = apply(elt0 +: elts.toSeq)
 
   /** Returns an array that contains the results of some element computation
     a number of times.
 
     Note that this means that elem is computed a total of n times.
     */
-  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = 
-    tabulate(n){ i => gen }
+  def fill[T <: Data](n: Int)(gen: => T): Vec[T] = tabulate(n){ i => gen }
 
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
@@ -89,8 +87,10 @@ object Vec {
 class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
   override def procAssign(src: Node): Unit = {
     for ((en, elm) <- enables zip elms) when (en) {
-      if(elm.comp != null) elm.comp procAssign src
-      else elm.asInstanceOf[Bits] procAssign src
+      elm.comp match {
+        case None => elm.asInstanceOf[Bits] procAssign src
+        case Some(p) => p procAssign src
+      }
     }
   }
 }
@@ -131,7 +131,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       for(((n, io), sortedElm) <- res.flatten zip sortedElements) {
         io assign VecMux(iaddr, sortedElm)
         // setup the comp for writes
-        io.comp = new VecProc(enables, sortedElm)
+        io.comp = Some(new VecProc(enables, sortedElm))
       }
       readPorts(addr) = res
       res.setIsTypeNode
@@ -153,69 +153,40 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
 
   override def <>(src: Node) {
     src match {
-      case other: Vec[T] => {
-        for((b, o) <- self zip other.self)
-          b <> o
-      }
+      case other: Vec[T] => (self zip other.self) foreach {case (s, o) => s <> o}
       case _ =>
     }
   }
+  def <>(src: Vec[T]) { (self zip src) foreach {case (s, o) => s <> o} }
+  def <>(src: Iterable[T]) { (self zip src) foreach {case (s, o) => s <> o} }
 
-  def <>(src: Vec[T]) {
-    for((b, e) <- self zip src)
-      b <> e
-  }
-
-  def <>(src: Iterable[T]) {
-    for((b, e) <- self zip src)
-      b <> e
-  }
-
-  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = {
-    if (comp != null) {
-      comp procAssign Vec(that)
-    } else {
+  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = comp match {
+    case Some(p) => p procAssign Vec(that)
+    case None => { 
       def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
         who.forall(_._2.dir == who.head._2.dir)
 
-      assert(size == that.size, {
-        ChiselError.error("Can't wire together Vecs of mismatched lengths")
-      })
-
-      assert(unidirectional(flatten), {
-        ChiselError.error("Cannot mix directions on left hand side of :=")
-      })
-
-      assert(unidirectional(that.flatMap(_.flatten)), {
-        ChiselError.error("Cannot mix directions on left hand side of :=")
-      })
-
+      assert(size == that.size, 
+        ChiselError.error("Can't wire together Vecs of mismatched lengths"))
+      assert(unidirectional(flatten),
+        ChiselError.error("Cannot mix directions on left hand side of :="))
+      assert(unidirectional(that.flatMap(_.flatten)),
+        ChiselError.error("Cannot mix directions on left hand side of :="))
       for ((me, other) <- this zip that)
         me := other
     }
   }
 
   override protected def colonEquals(that: Bits): Unit = {
-    for (i <- 0 until length)
-      this(i) := that(i)
+    for (i <- 0 until length) this(i) := that(i)
   }
-
   // We need this special := because Iterable[T] is not a Data.
   def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
-
-  override def removeTypeNodes {
-    self foreach (_.removeTypeNodes)
-  }
-
-  override def flip(): this.type = {
-    self foreach (_.flip)
-    this
-  }
+  override def removeTypeNodes { self foreach (_.removeTypeNodes) }
+  override def flip: this.type = { self foreach (_.flip) ; this }
 
   override def nameIt (path: String, isNamingIo: Boolean) {
-    if( !named
-      && (name.isEmpty
-        || (!path.isEmpty && name != path)) ) {
+    if( !named && (name.isEmpty || (!path.isEmpty && name != path)) ) {
       val prevPrefix = if (name.length > 0) name + "_" else ""
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
@@ -235,32 +206,13 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     }
   }
 
-  override def cloneType(): this.type =
-    Vec.tabulate(size)(gen).asInstanceOf[this.type]
-    //Vec(this: Seq[T]).asInstanceOf[this.type]
-
-  override def asDirectionless(): this.type = {
-    self.foreach(_.asDirectionless)
-    this
-  }
-
-  override def asOutput(): this.type = {
-    self.foreach(_.asOutput)
-    this
-  }
-
-  override def asInput(): this.type = {
-    self.foreach(_.asInput)
-    this
-  }
-
-  override def setIsTypeNode() {
-    isTypeNode = true
-    self foreach (_.setIsTypeNode)
-  }
+  override def cloneType: this.type = Vec.tabulate(size)(gen).asInstanceOf[this.type] //Vec(this: Seq[T]).asInstanceOf[this.type]
+  override def asDirectionless: this.type = { self.foreach(_.asDirectionless) ; this }
+  override def asOutput: this.type = { self.foreach(_.asOutput) ; this }
+  override def asInput: this.type = { self.foreach(_.asInput) ; this }
+  override def setIsTypeNode { isTypeNode = true ; self foreach (_.setIsTypeNode) }
 
   def length: Int = self.size
-
   override val hashCode: Int = _id
   override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
 
@@ -269,9 +221,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   override def getWidth(): Int = self.map(_.getWidth).foldLeft(0)(_ + _)
 
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
-  override def isTypeOnly: Boolean = {
-    self forall (_.isTypeOnly)
-  }
+  override def isTypeOnly: Boolean = { self forall (_.isTypeOnly) }
 }
 
 trait VecLike[T <: Data] extends collection.IndexedSeq[T] {

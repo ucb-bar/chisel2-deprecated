@@ -104,28 +104,33 @@ object Reg {
 
     if (init != null) for (((res_n, res_i), (rval_n, rval_i)) <- res.flatten zip init.flatten) {
       if (rval_i.getWidth < 0) ChiselError.error("Negative width to wire " + res_i)
-      res_i.comp = new RegReset
-      res_i.comp.init("", regWidth(rval_i), res_i.comp, rval_i)
-      res_i.inputs += res_i.comp
+      val p = new RegReset
+      p.init("", regWidth(rval_i), p, rval_i)
+      res_i.inputs += p
+      res_i.comp = Some(p)
     } else for ((res_n, res_i) <- res.flatten) {
-      res_i.comp = new Reg
+      val p = new Reg
       val w = res_i.getWidthW()
-      res_i.comp.init("", regWidth(w), res_i.comp)
-      res_i.inputs += res_i.comp
+      p.init("", regWidth(w), p)
+      res_i.inputs += p
+      res_i.comp = Some(p)
     }
 
     if (next != null) for (((res_n, res_i), (next_n, next_i)) <- res.flatten zip next.flatten) {
-      res_i.comp.doProcAssign(next_i, Bool(true))
+      res_i.comp match {
+        case None => // Todo: Error!
+        case Some(p) => p doProcAssign (next_i, Bool(true))
+      }
     }
 
     res.setIsTypeNode
 
     // set clock
     for ((name, sig) <- res.flatten) {
-      if (sig.comp != null)
-        sig.comp.clock = clock
-      else
-        sig.clock = clock
+      sig.comp match { 
+        case None => sig.clock = clock
+        case Some(p) => p.clock = clock
+      }
     }
 
     res
