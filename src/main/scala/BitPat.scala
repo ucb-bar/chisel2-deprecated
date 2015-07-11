@@ -29,9 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Literal._
-import ChiselError._
 
 /* Chisel3 compatibility */
 object BitPat {
@@ -58,9 +55,9 @@ class BitPat(val value: String) extends UInt {
   // Since we have a constructor parameter, we need a clone method.
   override def cloneType: BitPat.this.type = (new BitPat(value)).asInstanceOf[BitPat.this.type]
   def fromInt(x: BigInt): BitPat = (BitPat(x.toString(2))).asInstanceOf[BitPat.this.type]
-  val (bits, mask, swidth) = parseLit(value)
+  val (bits, mask, swidth) = Literal.parseLit(value)
   def zEquals(other: Bits): Bool = 
-    (Bits(toLitVal(mask, 2)) & other) === Bits(toLitVal(bits, 2))
+    (Bits(Literal.toLitVal(mask, 2)) & other) === Bits(Literal.toLitVal(bits, 2))
   def === (other: Bits): Bool = zEquals(other)
   override def != (other: Bits): Bool  = !zEquals(other)
 

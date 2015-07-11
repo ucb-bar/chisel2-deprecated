@@ -29,7 +29,6 @@
 */
 
 package Chisel
-import Node._
 
 object Cat {
   def apply[T <: Data](mod: T, mods: T*): UInt = apply(mod :: mods.toList)

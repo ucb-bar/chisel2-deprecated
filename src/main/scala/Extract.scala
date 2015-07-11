@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Lit._
 
 object NodeExtract {
   // extract one bit
@@ -55,7 +53,7 @@ object NodeExtract {
     } else if (bits_lit != null) {
       Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
     } else {
-      makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
+      makeExtract(mod, Literal(hi), Literal(lo), Node.fixWidth(w))
     }
   }
 
@@ -63,12 +61,12 @@ object NodeExtract {
   def apply(mod: Node, hi: Node, lo: Node, width: Int = -1): Node = {
     val hiLit = hi.litOf
     val loLit = lo.litOf
-    val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
+    val widthInfer = if (width == -1) Node.widthOf(0) else Node.fixWidth(width)
     if (hiLit != null && loLit != null) {
       apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
     } else { // avoid extracting from constants and avoid variable part selects
       val rsh = Op(">>", widthInfer, mod, lo)
-      val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
+      val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
       val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
       Op("&", widthInfer, rsh, mask)
     }

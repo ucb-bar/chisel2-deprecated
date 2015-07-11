@@ -29,7 +29,6 @@
 */
 
 package Chisel
-import Node._
 
 // used for component to component connections
 object Binding {
@@ -40,7 +39,7 @@ object Binding {
       case None => {
         val res = new Binding(m, ioComp)
         res.component = c
-        res.init("", widthOf(0), m)
+        res.init("", Node.widthOf(0), m)
         res.infer
         c.nodes += res
         c.bindings += res

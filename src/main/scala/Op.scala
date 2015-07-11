@@ -29,10 +29,8 @@
 */
 
 package Chisel
-import scala.math.max
-import Node._
-import Literal._
 import Op._
+import Node._
 
 object chiselCast {
   def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
@@ -200,11 +198,11 @@ object Op {
         case "<=" => return Literal(if (av <= bv) 1 else 0);
         case "##" => return Literal(av << bw | bv, aw + bw);
         // "+" and "-" should NOT widen the result.
-        case "+"  => return Literal(av + bv, max(aw, bw))
-        case "-"  => return Literal(av - bv, max(aw, bw))
-        case "|"  => return Literal(av | bv, max(aw, bw));
-        case "&"  => return Literal(av & bv, max(aw, bw));
-        case "^"  => return Literal(av ^ bv, max(aw, bw));
+        case "+"  => return Literal(av + bv, math.max(aw, bw))
+        case "-"  => return Literal(av - bv, math.max(aw, bw))
+        case "|"  => return Literal(av | bv, math.max(aw, bw));
+        case "&"  => return Literal(av & bv, math.max(aw, bw));
+        case "^"  => return Literal(av ^ bv, math.max(aw, bw));
         case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
         case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
         case _ => ;
@@ -425,7 +423,7 @@ object Op {
   }
 
   private def zEquals(a: Node, b: Node) = {
-    val (bits, mask, swidth) = parseLit(b.litOf.name)
+    val (bits, mask, swidth) = Literal.parseLit(b.litOf.name)
     val Op = OpGen2({ new BinaryOp(_)}) _
     UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
   }
@@ -448,7 +446,7 @@ abstract class Op extends Node {
         if (inputs(0).widthW != widthW) inputs(0) = inputs(0).matchWidth(widthW)
         if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
       } else if (List("==", "!=", "<", "<=").contains(op)) {
-        val w = max(inputs(0).needWidth(), inputs(1).needWidth())
+        val w = math.max(inputs(0).needWidth(), inputs(1).needWidth())
         if (inputs(0).needWidth() != w) inputs(0) = inputs(0).matchWidth(Width(w))
         if (inputs(1).needWidth() != w) inputs(1) = inputs(1).matchWidth(Width(w))
  /* Issue #242 - This breaks Verilog simulation:

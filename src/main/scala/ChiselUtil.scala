@@ -29,9 +29,7 @@
 */
 
 package Chisel
-import Node._
-import scala.math._
-import Literal._
+import scala.math.{ceil, floor, log}
 
 object log2Up
 {

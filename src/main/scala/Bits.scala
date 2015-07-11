@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import ChiselError._
 
 /* backward compatibility */
 object Bits {
@@ -56,7 +54,7 @@ abstract class Bits extends Data with proc {
     if(width > -1) {
       this.init("", width);
     } else {
-      this.init("", widthOf(0))
+      this.init("", Node.widthOf(0))
     }
   }
 

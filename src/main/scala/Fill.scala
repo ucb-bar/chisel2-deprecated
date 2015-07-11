@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Fill._
-import Lit._
 
 object Fill {
   def apply(n: Int, mod: Bool): UInt = n match {

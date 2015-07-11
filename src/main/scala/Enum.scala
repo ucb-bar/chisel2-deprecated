@@ -29,9 +29,9 @@
 */
 
 package Chisel
-import Literal._
 
 object Enum {
+  import Literal.sizeof
   /** create n enum values of given type */
   def apply[T <: UInt](nodeType: T, n: Int): List[T] = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(nodeType)))).toList;
 

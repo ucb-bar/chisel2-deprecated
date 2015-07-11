@@ -30,9 +30,8 @@
 
 package Chisel
 
-import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
-import scala.sys.process._
-import scala.math.min
+import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, Queue => ScalaQueue}
+import sys.process.stringSeqToProcess
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {

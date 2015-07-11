@@ -29,15 +29,12 @@
 */
 
 package Chisel
-import Node._
-import ChiselError._
+import Node.fixWidth
 
 /// FLO
 
-import java.lang.Float.floatToIntBits
-
 object Flo {
-  def apply(x: Float): Flo = Lit(floatToIntBits(x), 32){ Flo() }
+  def apply(x: Float): Flo = Lit(java.lang.Float.floatToIntBits(x), 32){ Flo() }
   def apply(x: Double): Flo = Flo(x.toFloat);
 
   def apply(dir: IODirection = null): Flo = {
@@ -100,12 +97,10 @@ class Flo extends Bits with Num[Flo] {
 
 /// DBL
 
-import java.lang.Double.doubleToLongBits
-
 object Dbl {
 
   def apply(x: Float): Dbl = Dbl(x.toDouble);
-  def apply(x: Double): Dbl = Lit(doubleToLongBits(x), 64){ Dbl() }
+  def apply(x: Double): Dbl = Lit(java.lang.Double.doubleToLongBits(x), 64){ Dbl() }
 
   def apply(dir: IODirection = null): Dbl = {
     val res = new Dbl();

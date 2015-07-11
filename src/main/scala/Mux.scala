@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import scala.math._
 
 object MuxLookup {
   def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
@@ -69,7 +67,7 @@ object Multiplex{
         return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
       }
     }
-    new Mux().init("", maxWidth _, t, c, a);
+    new Mux().init("", Node.maxWidth _, t, c, a);
   }
 }
 

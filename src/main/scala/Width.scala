@@ -30,10 +30,6 @@
 
 package Chisel
 
-import Node._
-import Width._
-import ChiselError._
-
 object Width {
   type WidthType = Option[Int]  // The internal representation of width
   // Class variables.
@@ -55,6 +51,8 @@ object Width {
 }
 
 class Width(_width: Int) extends Ordered[Width] {
+  import Width._
+
   // Construction: initialize internal state
   private var widthVal: WidthType = if (_width > -1) Some(_width) else unSet
 

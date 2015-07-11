@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import ChiselError._
-import Node._
 import scala.collection.SortedMap
 
 object ROM {
@@ -54,7 +52,7 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
 
   override def read(addr: UInt): T = {
     val res = gen(0)
-    val port = new ROMRead().init("", widthOf(1), addr, data)
+    val port = new ROMRead().init("", Node.widthOf(1), addr, data)
     res assign port
     res.setIsTypeNode
     res
@@ -67,7 +65,7 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
 class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
   val w = elts.values.map(_.litOf.needWidth()).max
   val sparseLits = {
-    inferWidth = fixWidth(w)
+    inferWidth = Node.fixWidth(w)
     elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {

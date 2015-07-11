@@ -29,22 +29,9 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.math._
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import scala.sys.process._
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap}
+import java.io.{BufferedReader, InputStreamReader}
 import sys.process.stringSeqToProcess
-import Node._
-import Reg._
-import ChiselError._
-import Literal._
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import PartitionIslands._
 
 object CString {
   def apply(s: String): String = {
@@ -63,6 +50,7 @@ object CString {
 }
 
 class CppBackend extends Backend {
+  import PartitionIslands._
   val keywords = Set[String]()
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
@@ -281,7 +269,7 @@ class CppBackend extends Backend {
           (if (o.op == "^") {
             val res = ArrayBuffer[String]()
             res += "val_t __x = " + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " ^ " + _)
-            for (i <- log2Up(min(bpw, o.inputs(0).needWidth()))-1 to 0 by -1)
+            for (i <- log2Up(scala.math.min(bpw, o.inputs(0).needWidth()))-1 to 0 by -1)
               res += "__x = (__x >> " + (1L << i) + ") ^ __x"
             res += emitLoWordRef(o) + " = __x & 1"
             block(res)

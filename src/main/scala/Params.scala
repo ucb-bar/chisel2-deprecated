@@ -30,18 +30,7 @@
 
 /* Unfinished. Has 3 basic parameters available */
 package Chisel
-
-import Node._
-import Module._
-import JHFormat._
-
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.ArrayBuffer
-
-import java.lang.reflect.{Type, ParameterizedType}
-
-import scala.io.Source
-import java.io._
 
 //>Params.scala: Implementation of parameter framework. Defines case class
   //containers for parameter types. Params object is what actually stores
@@ -57,9 +46,9 @@ abstract class Param[+T] {
   def pname: String
   var index: Int = -2
   var gID: Int = -1
-  var register = Params.register(getComponent(), pname, this)
+  var register = Params.register(Module.getComponent(), pname, this)
   //def register(pName: String) = { pname = pName; Params.register(jack.getComponent(), pname, this)}
-  def getValue: T = Params.getValue(getComponent(),this.pname,this).asInstanceOf[T]
+  def getValue: T = Params.getValue(Module.getComponent(),this.pname,this).asInstanceOf[T]
 }
 
 case class ValueParam(pname:String, init: Any) extends Param[Any] {
@@ -131,7 +120,7 @@ object Params {
 
   def dump_file(filename: String, design: Space) = {
     val string = JHFormat.serialize(design)
-    val writer = new PrintWriter(new File(filename))
+    val writer = new java.io.PrintWriter(new java.io.File(filename))
     println("Dumping to " + filename + ":\n" + string)
     writer.write(string)
     writer.close()

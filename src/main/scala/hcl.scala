@@ -29,7 +29,6 @@
 */
 
 package Chisel
-import ChiselError._
 import scala.util.Properties
 
 class TestIO(val format: String, val args: Seq[Data] = null)
@@ -84,7 +83,7 @@ class ChiselException(message: String, cause: Throwable) extends Exception(messa
 object throwException {
   def apply(s: String, t: Throwable = null) = {
     val xcpt = new ChiselException(s, t)
-    findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
+    ChiselError.findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
     // Record this as an error (for tests and error reporting).
     ChiselError.error(s)
     throw xcpt
