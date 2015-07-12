@@ -742,13 +742,13 @@ class CppBackend extends Backend {
     harness.close();
   }
 
-  override def compile(c: Module, flagsIn: String) {
+  override def compile(c: Module, flagsIn: Option[String]) {
     val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
     val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
     val chiselENV = java.lang.System.getenv("CHISEL")
 
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
-    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
+    val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
     val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = cppFlags + " " + cxxFlags
     val dir = Driver.targetDir + "/"

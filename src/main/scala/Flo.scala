@@ -222,9 +222,8 @@ class FloBackend extends Backend {
     out.close();
   }
 
-  override def compile(c: Module, flagsIn: String) {
-    val flags = if (flagsIn == null) "-O2" else flagsIn
-
+  override def compile(c: Module, flagsIn: Option[String]) {
+    val flags = flagsIn getOrElse "-O2" 
     val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"

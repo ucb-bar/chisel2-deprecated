@@ -963,7 +963,7 @@ class VerilogBackend extends Backend {
     var level = 0;
     for (c <- Driver.sortedComps) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
-        + " " + c.children.length + " CHILDREN"
+        + " " + c.children.size + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")");
       ChiselError.checkpoint()
 
@@ -1018,7 +1018,7 @@ class VerilogBackend extends Backend {
     }
   }
 
-  override def compile(c: Module, flags: String) {
+  override def compile(c: Module, flags: Option[String]) {
     def copyToTarget(filename: String) = {
           val resourceStream = getClass().getResourceAsStream("/" + filename)
           if( resourceStream != null ) {

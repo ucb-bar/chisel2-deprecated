@@ -59,10 +59,7 @@ abstract class Bits extends Data with proc {
   /** assigns this instance as the data type for *node*.
     */
   protected[Chisel] final def asTypeFor(node: Node): this.type = {
-    this assign node
-    setIsTypeNode
-    if(!node.isInstanceOf[Literal]) node.nameHolder = this
-    this
+    this assign node ; setIsTypeNode ; this
   }
 
   def fromInt(x: Int): this.type

@@ -101,13 +101,9 @@ abstract class Backend extends FileSystemUtilities{
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 
-  def markComponents {
-    Driver.components foreach (_.markComponent)
-  }
+  def markComponents { Driver.sortedComps foreach (_.markComponent) }
  
-  def verifyComponents {
-    Driver.components foreach (_.verify)
-  }
+  def verifyComponents { Driver.sortedComps foreach (_.verify) }
 
   def verifyAllMuxes {
     Driver.bfs { 
@@ -119,7 +115,7 @@ abstract class Backend extends FileSystemUtilities{
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
   def asValidName( name: String ): String = {
-    if (keywords.contains(name)) name + "_" else name;
+    if (keywords contains name) name + "_" else name;
   }
 
   def nameAll() {
@@ -274,6 +270,7 @@ abstract class Backend extends FileSystemUtilities{
   def checkModuleResolution {
     // check module resolution
     val comps = HashMap[Node, Module]()
+    val compSet = Driver.components.toSet
     Driver.dfs { node =>
       val nextComp = node match {
         case io: Bits if io.isIo && io.dir == OUTPUT => io.component
@@ -284,15 +281,15 @@ abstract class Backend extends FileSystemUtilities{
         input match {
           case _: Literal => // Skip the below check for Literals, which can safely be static
           //tmp fix, what happens if multiple componenets reference static nodes?
-          case _ if input.component == null || !(Driver.components contains input.component) =>
+          case _ if input.component == null || !(compSet contains input.component) =>
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
             assert(input.component == nextComp,
-              (if (input.name != null && !input.name.isEmpty) input.name else "?") +
+              (if (!input.name.isEmpty) input.name else "?") +
               "[" + input.getClass.getName + "] has no match between component " +
               (if (input.component == null ) "(null)" else input.component) +
               " and '" + nextComp + "' input of " +
-              (if (node.name != null && !node.name.isEmpty) node.name else "?"))
+              (if (!node.name.isEmpty) node.name else "?"))
           case _ =>
         }
         comps(input) = nextComp
@@ -347,7 +344,7 @@ abstract class Backend extends FileSystemUtilities{
 
   def checkPorts {
     for {
-      c <- Driver.components 
+      c <- Driver.sortedComps
       if c != topMod 
       n <- c.wires.unzip._2
       if n.inputs.isEmpty
@@ -401,17 +398,17 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def addDefaultResets {
-    Driver.components foreach (_.addDefaultReset)
+    Driver.sortedComps foreach (_.addDefaultReset)
   }
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
   def gatherClocksAndResets {
-    for (parent <- Driver.sortedComps ; child <- parent.children) {
+    for (parent <- Driver.sortedComps ; childSet = parent.children.toSet ; child <- parent.children) {
       child.clocks foreach (parent addClock _)
       for (reset <- child.resets.keys) {
         // create a reset pin in parent if reset does not originate in parent and
         // if reset is not an output from one of parent's children
-        if (reset.component != parent && !(parent.children contains reset.component))
+        if (reset.component != parent && !(childSet contains reset.component))
           parent addResetPin reset
         // special case for implicit reset
         if (reset == Driver.implicitReset && parent == topMod) 
@@ -684,7 +681,7 @@ abstract class Backend extends FileSystemUtilities{
 
   def flattenAll {
     // Reset indices for temporary nodes
-    Driver.components foreach (_.nindex = -1)
+    Driver.sortedComps foreach (_.nindex = None)
 
     // Flatten all signals
     for (c <- Driver.components ; if c != topMod) {
@@ -700,31 +697,26 @@ abstract class Backend extends FileSystemUtilities{
       roots += io
     for (b <- Driver.blackboxes)
       roots += b.io
-    for (node <- topMod.nodes) {
-      node match {
-        case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
-          roots += node
-        case _: Delay =>
-          roots += node
-        case _ =>
-    } }
+    topMod.nodes foreach {
+      case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty => roots += io
+      case d: Delay => roots += d
+      case _ =>
+    }
 
     // visit nodes and find ordering
-    val stack = Stack[(Int, Node)]()
+    val stack = Stack[(Node, Option[Int])]((roots.reverse map ((_, Some(0)))):_*)
     val walked = HashSet[Node]()
-    for (root <- roots) stack push ((0, root))
     while (!stack.isEmpty) {
-      val (depth, node) = stack.pop
-      if (depth == -1) Driver.orderedNodes += node
-      else {
-        node.depth = math.max(node.depth, depth)
-        if (!(walked contains node)) {
-          walked += node
-          stack push ((-1, node))
-          for (i <- node.inputs; if !(i == null)) {
-            i match {
+      stack.pop match {
+        case (node, None) => Driver.orderedNodes += node
+        case (node, Some(depth)) => { 
+          node.depth = math.max(node.depth, depth)
+          if (!(walked contains node)) {
+            walked += node
+            stack push ((node, None))
+            node.inputs filter (_ != null) foreach {
               case _: Delay =>
-              case _ => stack push ((depth + 1, i))
+              case i => stack push ((i, Some(depth+1)))
             }
           }
         }
@@ -789,9 +781,10 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
-    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    markComponents
+    ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
+    markComponents
+
     verifyComponents
 
     ChiselError.info("giving names")
@@ -885,7 +878,7 @@ abstract class Backend extends FileSystemUtilities{
     execute(c, analyses)
   }
 
-  def compile(c: Module, flags: String = null): Unit = { }
+  def compile(c: Module, flags: Option[String] = None): Unit = { }
 
   // Allow the backend to decide if this node should be recorded in the "object".
   def isInObject(n: Node): Boolean = false
