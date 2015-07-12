@@ -46,9 +46,9 @@ abstract class Param[+T] {
   def pname: String
   var index: Int = -2
   var gID: Int = -1
-  var register = Params.register(Module.getComponent, pname, this)
+  var register = Params.register(Module.getComponent.get, pname, this)
   //def register(pName: String) = { pname = pName; Params.register(jack.getComponent(), pname, this)}
-  def getValue: T = Params.getValue(Module.getComponent, pname, this).asInstanceOf[T]
+  def getValue: T = Params.getValue(Module.getComponent.get, pname, this).asInstanceOf[T]
 }
 
 case class ValueParam(pname:String, init: Any) extends Param[Any] {

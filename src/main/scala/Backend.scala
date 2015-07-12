@@ -159,7 +159,7 @@ abstract class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" && node.component != null =>
+        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       }
@@ -187,9 +187,12 @@ abstract class Backend extends FileSystemUtilities{
   def fullyQualifiedName( m: Node ): String = {
     m match {
       case l: Literal => l.toString;
-      case _ if m.name != "" && m.name != "reset" && m.component != null && m.component != topMod =>
-        /* Only modify name if it is not the reset signal or not in top component */
-        m.component.getPathName + "__" + m.name;
+      case _ if m.name != "" && m.name != "reset" => m.compOpt match {
+        case Some(p) if p != topMod => 
+          /* Only modify name if it is not the reset signal or not in top component */
+          m.component.getPathName + "__" + m.name
+        case _ => m.name
+      }
       case _ => m.name
     }
   }
@@ -243,26 +246,26 @@ abstract class Backend extends FileSystemUtilities{
 
   def collectNodesIntoComp(mod: Module) {
     Driver.sortedComps foreach (_.nodes.clear)
-    Driver.dfs { node =>
-      val curComp = node match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
-          node.component.parent
-        case _ =>
-          node.component
-      }
-      assert(node.component != null, "NULL NODE COMPONENT " + node.name)
-      if (!node.isTypeNode) node.component.nodes += node
-      for (input <- node.inputs ; if !input.isTypeNode) {
-        if (!(input.component == null || input.component == node.component) &&
-            !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+    Driver.dfs { node => node.compOpt match {
+      case None => throwException("NULL NODE COMPONENT " + node.name)
+      case Some(p) =>
+        val curComp = node match {
+          case io: Bits if io.isIo && io.dir == INPUT => p.parent
+          case _ => p
+        }
+        if (!node.isTypeNode) p.nodes += node
+        node.inputs filterNot (_.isTypeNode) foreach (input => input.compOpt match {
+          case None => input.compOpt = Some(curComp)
+          case Some(q) => if (p != q && !input.isLit &&
+            !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
             // ok if parent referring to any child nodes
             // not symmetric and only applies to direct children
             // READ BACK INPUT -- TODO: TIGHTEN THIS UP
             !isBitsIo(input, INPUT)) {
-          ChiselError.error(new ChiselError(() => {
-            "Illegal cross module reference between " + node + " and " + input }, node.line))
-        }
-        if (input.component == null) input.component = curComp
+            ChiselError.error(new ChiselError(() => {
+             "Illegal cross module reference between " + node + " and " + input }, node.line))
+          }
+        })
       }
     }
   }
@@ -277,23 +280,21 @@ abstract class Backend extends FileSystemUtilities{
         case io: Bits if io.isIo && io.dir == INPUT  => io.component.parent
         case _ => comps getOrElse (node, null)
       }
-      for (input <- node.inputs ; if !(input == null)) {
-        input match {
-          case _: Literal => // Skip the below check for Literals, which can safely be static
-          //tmp fix, what happens if multiple componenets reference static nodes?
-          case _ if input.component == null || !(compSet contains input.component) =>
+      node.inputs foreach { 
+        case _: Literal => // Skip the below check for Literals, which can safely be static
+        //tmp fix, what happens if multiple componenets reference static nodes?
+        case input: Node => input.compOpt match {
+          case Some(p) if compSet contains p =>
+          case _ => assert(input.component == nextComp, 
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
-            assert(input.component == nextComp,
-              (if (!input.name.isEmpty) input.name else "?") +
-              "[" + input.getClass.getName + "] has no match between component " +
-              (if (input.component == null ) "(null)" else input.component) +
-              " and '" + nextComp + "' input of " +
-              (if (!node.name.isEmpty) node.name else "?"))
-          case _ =>
+            (if (!input.name.isEmpty) input.name else "?") +
+            "[" + input.getClass.getName + "] has no match between component " +
+            ((input.compOpt map (_.toString)) getOrElse "(null)") +
+            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?"))
         }
-        comps(input) = nextComp
       }
+      comps ++= node.inputs map (_ -> nextComp)
     }
   }
 
@@ -485,13 +486,8 @@ abstract class Backend extends FileSystemUtilities{
         if( updated ) { nbUpdates = nbUpdates + 1  }
         done = done && !updated
       }
-
       count += 1
-
-      if(done){
-        verify
-        return count;
-      }
+      if(done){ verify ; return count }
     }
     verify
     count
@@ -530,10 +526,9 @@ abstract class Backend extends FileSystemUtilities{
         ChiselError.error("Real node required here, but 'type' node found - did you neglect to insert a node with a direction?", x.line)
       }
       count += 1
-      for (i <- 0 until x.inputs.length)
-        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = x.inputs(i).getNode
-        }
+      for ((input, i) <- x.inputs.zipWithIndex if input.isTypeNode) {
+        x.inputs(i) = input.getNode
+      }
     }
     count
   }
@@ -568,7 +563,7 @@ abstract class Backend extends FileSystemUtilities{
         //   and then having all subsequent logic use that
         if (io.dir == OUTPUT) {
           // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
-          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+          for (node <- io.consumers.toSet; if io.component != node.component.parent) {
             if(node match {
               case _ if io.component != node.component => true
               case b: Bits if (b.dir == INPUT) && io.component == node.component => true
@@ -586,7 +581,7 @@ abstract class Backend extends FileSystemUtilities{
         // INPUT logic is adjusted by having consumers use that input's producer
         else if (io.dir == INPUT && !io.inputs.isEmpty) {
           // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
-          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+          for (node <- io.consumers.toSet; if io.component != node.component.parent) {
             if(node match {
               case _ if io.component != node.component => true
               case b: Bits if (b.dir == INPUT) && io.component == node.component => true
@@ -629,7 +624,7 @@ abstract class Backend extends FileSystemUtilities{
       stack.push(n)
 
       for(i <- n.inputs) {
-        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
+        if(!i.isInstanceOf[Delay] && !i.isReg) {
           if(i.sccIndex == -1) {
             tarjanSCC(i)
             n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
@@ -641,7 +636,6 @@ abstract class Backend extends FileSystemUtilities{
 
       if(n.sccLowlink == n.sccIndex) {
         val scc = new ArrayBuffer[Node]
-
         var top: Node = null
         do {
           top = stack.pop()
@@ -714,7 +708,7 @@ abstract class Backend extends FileSystemUtilities{
           if (!(walked contains node)) {
             walked += node
             stack push ((node, None))
-            node.inputs filter (_ != null) foreach {
+            node.inputs foreach {
               case _: Delay =>
               case i => stack push ((i, Some(depth+1)))
             }

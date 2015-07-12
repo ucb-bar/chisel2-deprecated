@@ -117,8 +117,8 @@ object Driver extends FileSystemUtilities{
 
   def setTopComponent(mod: Module) {
     topComponent = Some(mod)
-    implicitReset.component = mod 
-    implicitClock.component = mod
+    implicitReset.compOpt = topComponent
+    implicitClock.compOpt = topComponent 
     mod._reset = Some(implicitReset)
     mod.clock = Some(implicitClock)
   }
@@ -144,27 +144,18 @@ object Driver extends FileSystemUtilities{
     }
 
     // Do BFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](queue:_*)
+    def walked(node: Node) = _walked contains node
+    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
+    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
-      walked += top
       visit(top)
       top match {
-        case b: Bundle =>
-          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
-            queue enqueue io
-            walked += io
-          }
-        case v: Vec[_] =>
-          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
-            queue enqueue e
-            walked += e
-          }
-        case _ =>
-      }
-      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
-        queue enqueue i
-        walked += i
+        case b: Bundle => enqueueElems(b)
+        case v: Vec[_] => enqueueElems(v) ; enqueueInputs(v)
+        case _ => enqueueInputs(top)
       }
     }
   }
@@ -189,33 +180,18 @@ object Driver extends FileSystemUtilities{
       stack push b.io
 
     // Do DFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](stack:_*)
+    def walked(node: Node) = _walked contains node
+    def pushNode(node: Node) { stack push node ; _walked += node }
+    def pushInputs(top: Node) { top.inputs.toList filterNot walked foreach pushNode }
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
-      walked += top
       visit(top)
       top match {
-        case b: Bundle =>
-          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
-            stack push io
-            walked += io
-          }
-        case v: Vec[_] => {
-          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
-            stack push e
-            walked += e
-          }
-          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
-        case _ => {
-          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
+        case b: Bundle => pushElems(b)
+        case v: Vec[_] => pushElems(v) ; pushInputs(v)
+        case _ => pushInputs(top)
       }
     }
   }
@@ -245,9 +221,8 @@ object Driver extends FileSystemUtilities{
       pushInitialNode(a)
     for(b <- blackboxes)
       pushInitialNode(b.io)
-    for(c <- components; (n, io) <- c.wires) {
+    for(c <- components; (n, io) <- c.wires)
       pushInitialNode(io)
-    }
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
       c._reset match {
@@ -266,6 +241,8 @@ object Driver extends FileSystemUtilities{
       stack.push((n, false))
     }
 
+    def visited(node: Node) = stacked contains node
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot visited foreach pushBareNode }
     // Walk the graph in depth-first order,
     //  visiting nodes as we do so.
     while (!stack.isEmpty) {
@@ -279,25 +256,12 @@ object Driver extends FileSystemUtilities{
         // Put this node back on the stack, with a flag indicating we've dealt with its children
         stack push ((top, true))
         top match {
-          case v: Vec[_] => {
-            for ((n, e) <- v.flatten;
-            if !(stacked contains e)) {
-              pushBareNode(e)
-            }
-          }
-          case b: Bundle => {
-            for ((n, e) <- b.flatten;
-            if !(stacked contains e)) {
-              pushBareNode(e)
-            }
-          }
+          case v: Vec[_] => pushElems(v)
+          case b: Bundle => pushElems(b)
           case _ => {}
         }
         // Push any un-visited children
-        for (c <- top.inputs;
-        if !(stacked contains c)) {
-          pushBareNode(c)
-        }
+        for (c <- top.inputs if !(stacked contains c)) { pushBareNode(c) }
       }
     }
   }

@@ -97,11 +97,8 @@ object Module {
   }
 
   // XXX Remove and instead call current()
-  def getComponent: Module = if (Driver.compStack.length != 0) Driver.compStack.top else null
-  def current = {
-    val comp = getComponent
-    if (comp == null) topMod else comp
-  }
+  def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
+  def current = getComponent getOrElse topMod
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
     Driver.modStackPushed = true
@@ -177,7 +174,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
     case None => {
       val r = Bool(INPUT)
       r.isIo = true
-      r.component = this
+      r.compOpt = Some(this)
       r setName ("reset")
       resetPin = Some(r)
       r
@@ -195,7 +192,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
       case _ => 
         val p = Bool(INPUT)
         p.isIo = true
-        p.component = this
+        p.compOpt = Some(this)
         p
     }
     resets getOrElseUpdate (r, pin)
@@ -228,7 +225,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
     from the outputs. */
   def debug(x: Node): Unit = {
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
-    x.getNode.component = this
+    x.getNode.compOpt = Some(this)
     debugs += x.getNode
   }
 
@@ -261,7 +258,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
     io match {
       case b: Bundle => {
         for ((n, io) <- gen.flatten) {
-          io.component = this
+          io.compOpt = Some(this)
           io.isIo = true
         }
         if (name != "") gen nameIt (name, true)
@@ -309,30 +306,18 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
       queue enqueue pin
 
     // Do BFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](queue:_*)
+    def walked(node: Node) = (_walked contains node) || node.isIo
+    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
+    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
-      walked += top
       visit(top)
       top match {
-        case v: Vec[_] =>
-          for ((n, e) <- v.flatten;
-          if !(e == null) && !(walked contains e) && !e.isIo) {
-            queue enqueue e
-            walked += e
-          }
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            queue enqueue i
-            walked += i
-          }
-        case _ => {
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            queue enqueue i
-            walked += i
-          }
-        }
+        case b: Bundle => enqueueElems(b)
+        case v: Vec[_] => enqueueElems(v) ; enqueueInputs(v)
+        case _ => enqueueInputs(top)
       }
     }
   }
@@ -350,31 +335,18 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
       stack push a
 
     // Do DFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](stack:_*)
+    def walked(node: Node) = (_walked contains node) || node.isIo
+    def pushNode(node: Node) { stack push node ; _walked += node }
+    def pushInputs(top: Node) { top.inputs filterNot walked foreach pushNode }
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
-      walked += top
       visit(top)
       top match {
-        case v: Vec[_] => {
-          for ((n, e) <- v.flatten;
-          if !(e == null) && !(walked contains e) && !e.isIo) {
-            stack push e
-            walked += e
-          }
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
-        case _ => {
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
+        case b: Bundle => pushElems(b)
+        case v: Vec[_] => pushElems(v) ; pushInputs(v)
+        case _ => pushInputs(top)
       }
     }
   }

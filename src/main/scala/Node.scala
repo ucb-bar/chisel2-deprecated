@@ -128,10 +128,11 @@ abstract class Node extends nameable {
   private[Chisel] var depth = 0
   var prune = false
   var driveRand = false
-  /* Assigned in Binding and Mod.reset */
-  var component: Module = Module.getComponent
   var isTypeNode = false
-  def componentOf = if (Driver.backend.isEmittingComponents && component != null) component else Module.topMod
+  /* Assigned in Binding and Mod.reset */
+  private[Chisel] var compOpt: Option[Module] = Module.getComponent
+  def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") } 
+  def componentOf = if (Driver.backend.isEmittingComponents && compOpt != None) component else Module.topMod
   // The semantics of width are sufficiently complicated that
   // it deserves its own class
   private[Chisel] var width_ = Width()

@@ -38,7 +38,7 @@ object Binding {
       case Some(res) => res
       case None => {
         val res = new Binding(m, ioComp)
-        res.component = c
+        res.compOpt = Some(c)
         res.init("", Node.widthOf(0), m)
         res.infer
         c.nodes += res
