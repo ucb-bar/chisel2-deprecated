@@ -40,7 +40,7 @@ object BitPat {
       width
     }
     val res = new BitPat(n.substring(1, n.length))
-    res.create(null, w)
+    res.create(NODIR, w)
     res
   }
   def apply(x: String, width: Int): BitPat = Lit(x, width){bitPatLit(x, width)}

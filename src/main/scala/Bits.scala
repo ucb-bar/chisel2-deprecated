@@ -73,8 +73,11 @@ abstract class Bits extends Data with proc {
     dir match {
       case INPUT if component == Module.current && (component.wires.unzip._2 contains this) =>
         ChiselError.error("assigning to your own input port " + this + " RHS: " + src)
-      case OUTPUT if component != Module.current && src.component != null && src.component.parent != component =>
-        ChiselError.error("assigning to a non parent module's output port: " + this + " RHS: " + src)
+      case OUTPUT if component != Module.current => src.compOpt match {
+        case Some(p) if p.parent != component =>
+          ChiselError.error("assigning to a non parent module's output port: " + this + " RHS: " + src)
+        case _ =>
+      }
       case _ if assigned =>
         ChiselError.error("reassignment to Wire " + this + " with inputs " + inputs(0) + " RHS: " + src)
       case _ =>
@@ -114,14 +117,14 @@ abstract class Bits extends Data with proc {
     // to it.
     var str = (
       "/*" + (if (name != "") name else "?")
-        + (if (component != null) (" in " + component) else "") + "*/ "
+        + ((compOpt map (" in " + _.toString)) getOrElse "?") + "*/ "
         + getClass.getName + "(" + dir + ", " + "width=" + width_
         + ", connect to " + inputs.length + " inputs: (")
     var sep = ""
     for( i <- inputs ) {
       str = (str + sep + (if (i.name != "") i.name else "?")
         + "[" + i.getClass.getName + "]"
-        + " in " + (if (i.component != null) i.component.getClass.getName else "?"))
+        + " in " + ((i.compOpt map (_.getClass.getName) getOrElse "?")))
       sep = ", "
     }
     str = str + "))"

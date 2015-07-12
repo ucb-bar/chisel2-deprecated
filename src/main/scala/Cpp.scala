@@ -590,7 +590,7 @@ class CppBackend extends Backend {
         // shadow registers, assume we need the shadow register copy.
         // Otherwise, if we're allocating only needed shadow registers and this register
         // needs a shadow, now is the time to use that shadow.
-	      val useShadow = if (allocateOnlyNeededShadowRegisters) {
+	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
           next.isReg
@@ -925,7 +925,7 @@ class CppBackend extends Backend {
     for (m <- nodes) {
       m match {
         case _: Literal =>
-        case _ if m.named && m.component != null =>
+        case _ if m.named && m.compOpt != None =>
           // only modify name if it is not the reset signal or not in top component
           if (m.name != "reset" || m.name != Driver.implicitReset.name || m.component != topMod)
             m.name = m.component.getPathName + "__" + m.name

@@ -37,7 +37,7 @@ object Flo {
   def apply(x: Float): Flo = Lit(java.lang.Float.floatToIntBits(x), 32){ Flo() }
   def apply(x: Double): Flo = Flo(x.toFloat);
 
-  def apply(dir: IODirection = null): Flo = {
+  def apply(dir: IODirection = NODIR): Flo = {
     val res = new Flo();
     res.dir = dir;
     res.init("", fixWidth(32))
@@ -102,7 +102,7 @@ object Dbl {
   def apply(x: Float): Dbl = Dbl(x.toDouble);
   def apply(x: Double): Dbl = Lit(java.lang.Double.doubleToLongBits(x), 64){ Dbl() }
 
-  def apply(dir: IODirection = null): Dbl = {
+  def apply(dir: IODirection = NODIR): Dbl = {
     val res = new Dbl();
     res.dir = dir;
     res.init("", fixWidth(64))

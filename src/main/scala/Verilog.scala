@@ -74,15 +74,11 @@ class VerilogBackend extends Backend {
     if (!memConfs.contains(configStr)) {
       /* Generates memory that are different in (depth, width, ports).
        All others, we return the previously generated name. */
-      val compName = if (mem.component != null) {
-        (if( !mem.component.moduleName.isEmpty ) {
-          Driver.moduleNamePrefix + mem.component.moduleName
-        } else {
-          extractClassName(mem.component)
-        } + "_")
+      val compName = (if( !mem.component.moduleName.isEmpty ) {
+        Driver.moduleNamePrefix + mem.component.moduleName
       } else {
-        Driver.moduleNamePrefix
-      }
+        extractClassName(mem.component)
+      }) + "_"
       // Generate a unique name for the memory module.
       val candidateName = compName + emitRef(mem)
       val memModuleName = if( compIndices contains candidateName ) {
@@ -130,9 +126,7 @@ class VerilogBackend extends Backend {
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, String)*): String =
-      ports.toList.filter(_._2 != null)
-        .map(p => "    ." + prefix + idx + p._1 + "(" + p._2 + ")")
-        .reduceLeft(_ + ",\n" + _)
+      ports.toList map (p => "    ." + prefix + idx + p._1 + "(" + p._2 + ")") reduceLeft (_ + ",\n" + _)
 
     m match {
       case r: MemSeqRead =>
@@ -253,10 +247,10 @@ class VerilogBackend extends Backend {
           if (node.inputs.length == 0) {
             ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
             "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
-          } else if (node.inputs(0) == null) {
+          } /* else if (node.inputs(0) == null) {
             ChiselError.warning("UNCONNECTED WIRE " + node + " IN " + node.component)
             "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
-          } else {
+          } */ else {
             "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
           }
         }
@@ -732,7 +726,7 @@ class VerilogBackend extends Backend {
       case x: Bits =>
         if (x.isIo && x.dir == INPUT) {
           true
-        } else if (node.inputs.length > 0 && node.inputs(0) != null) {
+        } else if (node.inputs.length > 0) {
           true
         } else {
           false

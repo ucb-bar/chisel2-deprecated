@@ -194,7 +194,7 @@ class FloBackend extends Backend {
     for (m <- nodes) {
       m match {
         case _: Literal =>
-        case _ if m.named && m.component != null =>
+        case _ if m.named && m.compOpt != None =>
           // only modify name if it is not the reset signal or not in top component
           if (m.name != "reset" || m.component != topMod)
             m.name = m.component.getPathName(":") + "::" + m.name

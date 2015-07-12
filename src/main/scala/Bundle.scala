@@ -53,7 +53,7 @@ object Bundle {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(val view: Seq[String] = null) extends Aggregate {
+class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
@@ -72,7 +72,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers) 
         && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
-        && (view == null || (view contains name)) && checkPort(m, name)) {
+        && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
         // Fetch the actual object
         val obj = m invoke this
         if(!(seen contains obj)) {

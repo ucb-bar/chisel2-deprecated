@@ -39,13 +39,9 @@ object Node {
     s
   }
 
-  def fixWidth(w: => Int): (=> Node) => Width = { (n) => {
-    if (n != null) {
-      assert(w != -1, ChiselError.error({"invalid width for fixWidth object"}));
-      Width(w)
-    } else {
-      Width()
-    }
+  def fixWidth(w: => Int): (=> Node) => Width = { n => {
+    assert(w != -1, ChiselError.error({"invalid width for fixWidth object"}))
+    Width(w)
   }}
 
   def widthOf(i: => Int): (=> Node) => Width = { (m) => {
@@ -65,10 +61,8 @@ object Node {
   // Compute the maximum width required for a node,
   def maxWidth(m: => Node): Width = {
     var w = Width(0)
-    for (i <- m.inputs)
-      if (!(i == null || i == m)) {
-        w = w.max(i.widthW)
-      }
+    for (i <- m.inputs if i != m)
+      w = w.max(i.widthW)
     w
   }
 
@@ -202,12 +196,10 @@ abstract class Node extends nameable {
   }
 
   lazy val chiselName = this match {
-    case l: Literal => "";
-    case any        =>
-      if (named && (name != "reset") && !(component == null))
+    case l: Literal => ""
+    case _ if named && name != "reset" && compOpt != None =>
         component.getPathName(".") + "." + name
-      else
-        ""
+    case _ => ""
   }
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
@@ -224,7 +216,6 @@ abstract class Node extends nameable {
   def <>(src: Node): Unit = throw new Exception("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 
-  def getLit: Literal = this.asInstanceOf[Literal]
   private var _isIo = false
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
@@ -302,11 +293,7 @@ abstract class Node extends nameable {
     writer.println("consumers.size: " + consumers.size)
     writer.println("line: " + line)
     for (in <- inputs) {
-      if (in == null) {
-        writer.println("null");
-      } else {
-        in.printTree(writer, depth-1, indent + "  ");
-      }
+      in.printTree(writer, depth-1, indent + "  ");
     }
   }
 
@@ -350,16 +337,8 @@ abstract class Node extends nameable {
   }
 
   private[Chisel] def removeTypeNodes() {
-    for(i <- 0 until inputs.length) {
-      if(inputs(i) == null){
-        val error = new ChiselError(() => {"NULL Input for " + this.getClass + " " + this + " in Module " + component}, this.line)
-        if (!ChiselError.contains(error)) {
-          ChiselError.error(error)
-        }
-      }
-      else if(inputs(i).isTypeNode) {
-        inputs(i) = inputs(i).getNode
-      }
+    for ((input, i) <- inputs.zipWithIndex) {
+      inputs(i) = input.getNode
     }
   }
 

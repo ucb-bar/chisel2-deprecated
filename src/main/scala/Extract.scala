@@ -73,10 +73,8 @@ object NodeExtract {
   }
 
   private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (=> Node) => Width) = {
-    val res = new Extract
+    val res = new Extract(hi, lo)
     res.init("", widthFunc, mod, hi, lo)
-    res.hi = hi
-    res.lo = lo
     res
   }
 }
@@ -105,10 +103,7 @@ object Extract {
   }
 }
 
-class Extract extends Node {
-  var lo: Node = null;
-  var hi: Node = null;
-
+class Extract(hi: Node, lo: Node) extends Node {
   override def toString: String =
     ("/*" + (if (name != null && !name.isEmpty) name else "?") + "*/ Extract("
       + inputs(0) + (if (hi == lo) "" else (", " + hi)) + ", " + lo + ")")
