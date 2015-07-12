@@ -132,7 +132,7 @@ abstract class Bits extends Data with proc {
     dir match {
       case INPUT => dir = OUTPUT
       case OUTPUT => dir = INPUT
-      case NODIR => throw new RuntimeException("Can't flip something that doesn't have a direction")
+      case NODIR => throwException("Can't flip something that doesn't have a direction")
     }
     this
   }

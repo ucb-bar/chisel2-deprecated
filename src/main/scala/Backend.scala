@@ -54,7 +54,7 @@ abstract class Backend extends FileSystemUtilities{
      lowered to simpler Ops. */
   val needsLowering = Set[String]()
 
-  def topMod = Driver.topComponent getOrElse (throw new RuntimeException("no top component"))
+  def topMod = Driver.topComponent getOrElse (throwException("no top component"))
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false

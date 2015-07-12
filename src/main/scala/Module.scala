@@ -32,7 +32,7 @@ package Chisel
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
 
 object Module {
-  def topMod = Driver.topComponent getOrElse (throw new RuntimeException("no top component"))
+  def topMod = Driver.topComponent getOrElse (throwException("no top component"))
 
   def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
@@ -50,7 +50,7 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
-      if (io.dir == null) {
+      if (io.dir == NODIR) {
         val io_str = "<" + n + " (" + io.getClass.getName + ")>"
         ChiselError.error(new ChiselError(() => {
            "All IO's must be ports (dir set): " + io_str + " in " + res }, io.line))

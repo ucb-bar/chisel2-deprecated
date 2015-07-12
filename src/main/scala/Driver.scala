@@ -338,8 +338,6 @@ object Driver extends FileSystemUtilities{
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
-    hasSRAM = false
-    sramMaxSize = 0
     backend = new CppBackend
     topComponent = None
     moduleNamePrefix = ""
@@ -509,8 +507,6 @@ object Driver extends FileSystemUtilities{
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false
-  var hasSRAM = false
-  var sramMaxSize = 0
   var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
   var moduleNamePrefix = ""

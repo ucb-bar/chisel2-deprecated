@@ -38,16 +38,11 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
 object Mem {
   def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
-                       clock: Clock = null): Mem[T] = {
+                       clock: Option[Clock] = None): Mem[T] = {
     val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
-    if (clock != null) res.clock = Some(clock)
-    Driver.hasMem = true
-    Driver.hasSRAM = Driver.hasSRAM | seqRead
-    if (seqRead) {
-      Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
-    }
+    res.clock = if (clock == null) None else clock
     res
   }
 }
@@ -83,19 +78,19 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   private val readPortCache = HashMap[UInt, T]()
   def read(addr: UInt): T = {
-    if (readPortCache.contains(addr)) {
-      return readPortCache(addr)
-    }
-
-    val addrIsReg = addr.getNode.isInstanceOf[Reg]
-    val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
-      (seqreads += new MemSeqRead(this, addr.getNode)).last
+    if (readPortCache contains addr) {
+      readPortCache(addr)
     } else {
-      (reads += new MemRead(this, addr)).last
+      val addrIsReg = addr.getNode.isInstanceOf[Reg]
+      val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
+        (seqreads += new MemSeqRead(this, addr.getNode)).last
+      } else {
+        (reads += new MemRead(this, addr)).last
+      }
+      val data = gen().fromNode(rd).asInstanceOf[T]
+      readPortCache += (addr -> data)
+      data
     }
-    val data = gen().fromNode(rd).asInstanceOf[T]
-    readPortCache += (addr -> data)
-    data
   }
 
   def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt): Unit = {
@@ -283,8 +278,6 @@ object SeqMem {
     Reg.validateGen(gen)
     val res = new SeqMem(() => gen, n)
     Driver.hasMem = true
-    Driver.hasSRAM = Driver.hasSRAM
-    Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
     res
   }
 }

@@ -1049,15 +1049,14 @@ class CppBackend extends Backend {
       }
 
       def addString(s: String) {
-        if (s == "") {
-          return
+        if (s != "") {
+          val lines = s.count(_ == '\n')
+          if (maxLines > 0 && lines + bodyLines > maxLines) {
+            newBody()
+          }
+          body.append(s)
+          bodyLines += lines
         }
-        val lines = s.count(_ == '\n')
-        if (maxLines > 0 && lines + bodyLines > maxLines) {
-          newBody()
-        }
-        body.append(s)
-        bodyLines += lines
       }
       def genCalls() {
         var offset = 0
@@ -1587,7 +1586,7 @@ class CppBackend extends Backend {
       def populate() {
         var nodeCount = 0
         def isNodeInIsland(node: Node, island: Island): Boolean = {
-          return island == null || nodeToIslandArray(node._id).contains(island)
+          island == null || nodeToIslandArray(node._id).contains(island)
         }
 
         // Return tuple of booleans if we actually added any clock code.

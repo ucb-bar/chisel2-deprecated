@@ -75,85 +75,71 @@ object Reg {
   }
 
   def validateGen[T <: Data](gen: => T) {
-    for ((n, i) <- gen.flatten)
-      if (!i.inputs.isEmpty)
-        throwException("Invalid Type Specifier for Reg")
+    for ((n, i) <- gen.flatten if !i.inputs.isEmpty)
+      throwException("Invalid Type Specifier for Reg")
   }
 
   /** *type_out* defines the data type of the register when it is read.
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: T = null, next: T = null, init: T = null, clock: Option[Clock] = None): T = {
-    var mType = outType
-    if(mType == null) {
-      mType = next
-    }
-    if(mType == null) {
-      mType = init
-    }
-    if(mType == null) {
-      throw new Exception("cannot infer type of Reg.")
-    }
-
-    val gen = mType.cloneType
+  def apply[T <: Data](outType: Option[T] = None, next: Option[T] = None, 
+                       init: Option[T] = None, clock: Option[Clock] = None): T = {
+    val gen = (outType match {case Some(t) => t case None => 
+      next match { case Some(t) => t case None => 
+      init match { case Some(t) => t case None =>
+        throw new Exception("cannot infer type of Reg.")}}}).cloneType
     validateGen(gen)
 
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
-
-    if (init != null) for (((res_n, res_i), (rval_n, rval_i)) <- res.flatten zip init.flatten) {
-      if (rval_i.getWidth < 0) ChiselError.error("Negative width to wire " + res_i)
-      val p = new RegReset
-      p.init("", regWidth(rval_i), p, rval_i)
-      res_i.inputs += p
-      res_i.comp = Some(p)
-    } else for ((res_n, res_i) <- res.flatten) {
-      val p = new Reg
-      val w = res_i.getWidthW()
-      p.init("", regWidth(w), p)
-      res_i.inputs += p
-      res_i.comp = Some(p)
-    }
-
-    if (next != null) for (((res_n, res_i), (next_n, next_i)) <- res.flatten zip next.flatten) {
-      res_i.comp match {
-        case None => // Todo: Error!
-        case Some(p) => p doProcAssign (next_i, Bool(true))
+    init match {
+      case None => for (r <- res.flatten.unzip._2) {
+        val p = new Reg
+        val w = r.getWidthW()
+        p.init("", regWidth(w), p)
+        r.inputs += p
+        r.comp = Some(p)
+      }
+      case Some(p) => for ((r, i) <- res.flatten.unzip._2 zip p.flatten.unzip._2) {
+        if (i.getWidth < 0) ChiselError.error("Negative width to wire " + res)
+        val p = new RegReset
+        p.init("", regWidth(i), p, i)
+        r.inputs += p
+        r.comp = Some(p)
       }
     }
-
+    next match {
+      case None =>
+      case Some(p) => for ((r, n) <- res.flatten.unzip._2 zip p.flatten.unzip._2) {
+        r.comp match {
+          case None => // Todo: Error!
+          case Some(p) => p doProcAssign (n, Bool(true))
+        }
+      }
+    }
     res.setIsTypeNode
-
     // set clock
-    for ((name, sig) <- res.flatten) {
-      sig.comp match { 
-        case None => sig.clock = clock
-        case Some(p) => p.clock = clock
-      }
-    }
-
+    res.flatten.unzip._2 foreach (sig => sig.comp match {
+      case None => sig.clock = clock
+      case Some(p) => p.clock = clock
+    })
     res
   }
 
   /* Without this method, the scala compiler is not happy
    when we declare registers as Reg(signal). */
-  def apply[T <: Data](outType: T): T = Reg[T](outType, null.asInstanceOf[T], null.asInstanceOf[T])
+  def apply[T <: Data](outType: T): T = Reg[T](Some(outType), None, None)
 }
 
 
 object RegNext {
-
-  def apply[T <: Data](next: T): T = Reg[T](next, next, null.asInstanceOf[T])
-
-  def apply[T <: Data](next: T, init: T): T = Reg[T](next, next, init)
-
+  def apply[T <: Data](next: T): T = Reg[T](Some(next), Some(next), None)
+  def apply[T <: Data](next: T, init: T): T = Reg[T](Some(next), Some(next), Some(init))
 }
 
 object RegInit {
-
-  def apply[T <: Data](init: T): T = Reg[T](init, null.asInstanceOf[T], init)
-
+  def apply[T <: Data](init: T): T = Reg[T](Some(init), None, Some(init))
 }
 
 class RegReset extends Reg {

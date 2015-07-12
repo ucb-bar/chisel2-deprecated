@@ -33,20 +33,17 @@ package Chisel
 object Bool {
   def apply(x: Boolean): Bool = Lit(if(x) 1 else 0, 1){Bool()}
 
-  def apply(dir: IODirection = null): Bool = {
-    val res = new Bool();
-    res.dir = dir;
+  def apply(dir: IODirection = NODIR): Bool = {
+    val res = new Bool()
+    res.dir = dir
     res.init("", 1)
     res
   }
-
   /** Factory method to create a don't-care.
     *  FIXME: This should remain a BitPat(), not a Bool().
     *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
     */
   def DC = Bool().fromNode(BitPat.DC(1))
-
-  implicit def toOption(b: Bool) = Option(b)
 }
 
 class Bool extends UInt {
@@ -67,9 +64,9 @@ class Bool extends UInt {
     case _ => {
       val gotWidth = src.getWidth()
       if (gotWidth < 1) {
-        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead");
+        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead")
       } else if (gotWidth > 1) {
-        throw new Exception("multi bit signal " + src + " converted to Bool");
+        throw new Exception("multi bit signal " + src + " converted to Bool")
       }
       super.colonEquals(src(0)) // We only have one bit in *src*.
     }

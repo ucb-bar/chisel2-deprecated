@@ -48,6 +48,10 @@ abstract trait Num[T <: Data] {
   def max(b: T): T = Mux(this < b, b, this.asInstanceOf[T])
 }
 
+object Data {
+  implicit def toOption[T <: Data](data: T): Option[T] = Option(data)
+}
+
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
   It is the root of the type system which includes composites (Bundle, Vec)
   and atomic types (UInt, SInt, etc.).
