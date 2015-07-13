@@ -65,7 +65,7 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: => Node) = r.litOf match { 
+  def regWidth(r: => Node) = r.litOpt match { 
     case Some(rl) if rl.hasInferredWidth => regMaxWidth _
     case _ => Node.fixWidth(r.getWidth)
   }
@@ -79,8 +79,10 @@ object Reg {
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: Option[T] = None, next: Option[T] = None, 
-                       init: Option[T] = None, clock: Option[Clock] = None): T = {
+  def apply[T <: Data](outType: T = null, next: T = null, init: T = null, clock: Clock = null): T =
+    apply(Option(outType), Option(next), Option(init), Option(clock))
+
+  def apply[T <: Data](outType: Option[T], next: Option[T], init: Option[T], clock: Option[Clock]): T = {
     val gen = (outType match {case Some(t) => t case None => 
       next match { case Some(t) => t case None => 
       init match { case Some(t) => t case None =>
@@ -125,17 +127,17 @@ object Reg {
 
   /* Without this method, the scala compiler is not happy
    when we declare registers as Reg(signal). */
-  def apply[T <: Data](outType: T): T = Reg[T](Some(outType), None, None)
+  def apply[T <: Data](outType: T): T = Reg[T](Some(outType), None, None, None)
 }
 
 
 object RegNext {
-  def apply[T <: Data](next: T): T = Reg[T](Some(next), Some(next), None)
-  def apply[T <: Data](next: T, init: T): T = Reg[T](Some(next), Some(next), Some(init))
+  def apply[T <: Data](next: T): T = Reg[T](Some(next), Some(next), None, None)
+  def apply[T <: Data](next: T, init: T): T = Reg[T](Some(next), Some(next), Some(init), None)
 }
 
 object RegInit {
-  def apply[T <: Data](init: T): T = Reg[T](Some(init), None, Some(init))
+  def apply[T <: Data](init: T): T = Reg[T](Some(init), None, Some(init), None)
 }
 
 class RegReset extends Reg {

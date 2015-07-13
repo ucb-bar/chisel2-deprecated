@@ -99,7 +99,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     val wmask = // remove constant-1 write masks
       wmaskIn match {
         case None => wmaskIn
-        case Some(mask) => mask.litOf match { 
+        case Some(mask) => mask.litOpt match { 
           case Some(lit) if lit.value == ((BigInt(1) << data.getWidth)-1) => None
           case _ => wmaskIn
       }

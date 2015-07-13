@@ -177,7 +177,7 @@ object Op {
       ChiselError.error("Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?")
     }
     def default = { 
-      (a.litOf, b.litOf) match { 
+      (a.litOpt, b.litOpt) match { 
         case (Some(al), Some(bl)) if al.isZ && bl.isZ => error
         case _ => 
       }
@@ -190,7 +190,7 @@ object Op {
       UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
     }
 
-    def LitOp = (a.litOf, b.litOf) match {
+    def LitOp = (a.litOpt, b.litOpt) match {
       case (Some(al), _) if name == "==" && al.isZ => zEquals(b, al)
       case (Some(al), _) if name == "!=" && al.isZ => !zEquals(b, al)
       case (Some(al), _) if (name == "<<" || name == ">>" || name == "s>>") && al.value == 0 => Literal(0)
@@ -223,7 +223,7 @@ object Op {
     }
 
     def FloDblOp = (a, b) match {
-      case (_: Flo, _: Flo) => (a.litOf, b.litOf) match {
+      case (_: Flo, _: Flo) => (a.litOpt, b.litOpt) match {
         case (Some(al), Some(bl)) if name == "f+" => Flo(al.floLitValue + bl.floLitValue)
         case (Some(al), Some(bl)) if name == "f-" => Flo(al.floLitValue - bl.floLitValue)
         case (Some(al), Some(bl)) if name == "f*" => Flo(al.floLitValue * bl.floLitValue)
@@ -247,7 +247,7 @@ object Op {
         case (_, Some(bl)) if name == "f%" && bl.floLitValue == 1.0 => a
         case _ => CppFloOp
       }
-      case (_: Dbl, _: Dbl) => (a.litOf, b.litOf) match {
+      case (_: Dbl, _: Dbl) => (a.litOpt, b.litOpt) match {
         case (Some(al), Some(bl)) if name == "d+" => Dbl(al.dblLitValue + bl.dblLitValue)
         case (Some(al), Some(bl)) if name == "d-" => Dbl(al.dblLitValue - bl.dblLitValue)
         case (Some(al), Some(bl)) if name == "d*" => Dbl(al.dblLitValue * bl.dblLitValue)
@@ -281,7 +281,7 @@ object Op {
     }
     def CppFloOp = Driver.backend match {
       case _: CppBackend | _: FloBackend => name match {
-        case "s<" | "s<=" if name != "s<" || b.litOf == None || b.litOf.get.value != 0 =>
+        case "s<" | "s<=" if name != "s<" || b.litOpt == None || b.litOf.value != 0 =>
           val fixA = a.asInstanceOf[SInt]
           val fixB = b.asInstanceOf[SInt]
           val msbA = fixA < SInt(0)
@@ -321,17 +321,17 @@ object Op {
 
   def OpGen1(makeObj: String => Op)(name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
     def default = { val res = makeObj(name) ; res.init("", widthInfer, a) ; res }
-    a.litOf match {
+    a.litOpt match {
       case Some(al) if al.isZ =>
         ChiselError.error("Operator " + name + " with input " + a + " does not support literals with ?")
       case _ =>
     }
-    a.litOf match {
+    a.litOpt match {
       case Some(al) if name == "~" =>
         val wa = al.needWidth() 
         Literal((-al.value-1)&((BigInt(1) << wa)-1), wa)
       case _ => a match {
-        case _: Flo => a.litOf match { 
+        case _: Flo => a.litOpt match { 
           case Some(al) => 
             val fa_val = al.floLitValue 
             name match {
@@ -351,7 +351,7 @@ object Op {
             }
           case None => default
         }
-        case _: Dbl => a.litOf match {
+        case _: Dbl => a.litOpt match {
           case Some(al) => 
             val fa_val = al.dblLitValue 
             name match {

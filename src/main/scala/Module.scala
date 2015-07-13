@@ -100,6 +100,8 @@ object Module {
   def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
   def current = getComponent getOrElse topMod
 
+  def backend = Driver.backend
+
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
     Driver.modStackPushed = true
     push(m)
@@ -405,7 +407,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
   private[Chisel] def markComponent {
-    import Driver.backend
+    import Module.backend
     ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.

@@ -53,7 +53,7 @@ class FloBackend extends Backend {
   override def emitRef(node: Node): String = { emitRef(node, node) }
 
   def emitRef(node: Node, cnode: Node): String = {
-    // if (node.litOf == None) {
+    // if (node.litOpt == None) {
       node match {
         case x: Literal =>
           "" + x.value + "'" + cnode.needWidth()
@@ -73,7 +73,7 @@ class FloBackend extends Backend {
   }
 
   def emitRef(node: Node, sum_to: Node, other: Node): String = {
-    // if (node.litOf == None) {
+    // if (node.litOpt == None) {
       node match {
         case x: Literal =>
           "" + x.value + "'" + (sum_to.needWidth() - other.needWidth())

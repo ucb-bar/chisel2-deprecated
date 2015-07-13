@@ -204,9 +204,10 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", Node.sumWidth _,  this, b );
-  final def isLit: Boolean = litOf ne None
-  def litOf: Option[Literal] = if (getNode != this) getNode.litOf else None
-  def litValue(default: BigInt = BigInt(-1)): BigInt = litOf match {
+  final def isLit: Boolean = litOpt ne None
+  private[Chisel] def litOpt: Option[Literal] = if (getNode != this) getNode.litOpt else None
+  def litOf: Literal = litOpt match { case Some(l) => l case None => throwException("no lit value for this node") }
+  def litValue(default: BigInt = BigInt(-1)): BigInt = litOpt match {
     case None => default case Some(l) => l.value }
   def floLitValue: Float = java.lang.Float.intBitsToFloat(litValue().toInt)
   def dblLitValue: Double = java.lang.Double.longBitsToDouble(litValue().toLong)

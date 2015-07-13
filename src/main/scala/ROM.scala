@@ -63,10 +63,10 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
 }
 
 class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
-  val w = elts.values.map(_.litOf.get.needWidth()).max
+  val w = elts.values.map(_.litOpt.get.needWidth()).max
   val sparseLits = {
     inferWidth = Node.fixWidth(w)
-    elts.mapValues(_.matchWidth(Width(w)).litOf.get)
+    elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {
     val dc = BitPat.DC(w).litOf

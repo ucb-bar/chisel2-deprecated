@@ -52,9 +52,9 @@ object MuxCase {
 
 object Multiplex {
   def apply (t: Node, c: Node, a: Node): Node = {
-    t.litOf match { 
+    t.litOpt match { 
       case Some(tl) => if (tl.value == 0) a else c 
-      case None if a != null => (c.litOf, a.litOf) match {
+      case None if a != null => (c.litOpt, a.litOpt) match {
         case (_, Some(al)) if a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0)) =>
           Multiplex(t, c, a.inputs(1))
         case (Some(cl), Some(al)) if cl.value == al.value => c

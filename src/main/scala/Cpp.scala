@@ -429,7 +429,7 @@ class CppBackend extends Backend {
         } else if (o.op == "|" || o.op == "&" || o.op == "^") {
           block((0 until words(o)).map(i => s"${emitWordRef(o, i)} = ${emitWordRef(o.inputs(0), i)} ${o.op} ${emitWordRef(o.inputs(1), i)}"))
         } else if (o.op == "s<") {
-          require(o.inputs(1).litOf.get.value == 0)
+          require(o.inputs(1).litOf.value == 0)
           val shamt = (o.inputs(0).needWidth()-1) % bpw
           "  " + emitLoWordRef(o) + " = (" + emitWordRef(o.inputs(0), words(o.inputs(0))-1) + " >> " + shamt + ") & 1;\n"
         } else if (o.op == "<" || o.op == "<=") {

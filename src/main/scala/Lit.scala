@@ -257,7 +257,7 @@ class Literal extends Node {
   var isZ = false
   var base = 'x'
   lazy val value: BigInt = Literal.stringToVal(base, name)
-  override def litOf: Option[Literal] = Some(this)
+  override def litOpt: Option[Literal] = Some(this)
   override def toString: String = name
   override lazy val isInVCD: Boolean = false
 
