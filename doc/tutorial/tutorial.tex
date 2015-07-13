@@ -1163,7 +1163,7 @@ class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
-    val rdy    = Bool(dir = OUTPUT) }
+    val valid    = Bool(dir = OUTPUT) }
   val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = 
     Enum(UInt(), 5)
   val state = Reg(init = s_idle)
@@ -1186,7 +1186,7 @@ class VendingMachine extends Module {
   when (state === s_ok) {
     state := s_idle
   }
-  io.rdy := (state === s_ok)
+  io.valid := (state === s_ok)
 }
 \end{scala}
 
@@ -1197,27 +1197,33 @@ class VendingMachine extends Module {
   val io = new Bundle {
     val nickel = Bool(dir = INPUT)
     val dime   = Bool(dir = INPUT)
-    val rdy    = Bool(dir = OUTPUT) }
-  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(UFIx(), 5)
+    val valid    = Bool(dir = OUTPUT)
+  }
+  val s_idle :: s_5 :: s_10 :: s_15 :: s_ok :: Nil = Enum(UInt(), 5)
   val state = Reg(init = s_idle)
+  
   switch (state) {
-      is (s_idle) {
+    is (s_idle) {
       when (io.nickel) { state := s_5 }
-      when (io.dime)   { state := s_10 }
-    } is (s_5) {
+      when (io.dime) { state := s_10 }
+    }
+    is (s_5) {
       when (io.nickel) { state := s_10 }
-      when (io.dime)   { state := s_15 }
-    } is (s_10) {
+      when (io.dime) { state := s_15 }
+    }
+    is (s_10) {
       when (io.nickel) { state := s_15 }
-      when (io.dime)   { state := s_ok }
-    } is (s_15) {
+      when (io.dime) { state := s_ok }
+    }
+    is (s_15) {
       when (io.nickel) { state := s_ok }
-      when (io.dime)   { state := s_ok }
-    } is (s_ok) {
+      when (io.dime) { state := s_ok }
+    }
+    is (s_ok) {
       state := s_idle
     }
   }
-  io.rdy := (state === s_ok)
+  io.valid := (state ===s_ok)
 }
 \end{scala}
 
@@ -1928,30 +1934,36 @@ signalB := s2
 \noindent
 Due to metastability issues, this technique is limited to communicating one bit data between domains.
 
-The second and more general way to send data between domains is by using an asynchronous queue:
+The second and more general way to send data between domains is by using an asynchronous fifo:
 
 \begin{scala}
-class AsyncQueue[T<:Data]
-    (gen: T, depth: Int, enq_clk: Clock, deq_clock: Clock)
+class AsyncFifo[T<:Data]
+    (gen: T, entries: Int, enq_clk: Clock, deq_clock: Clock)
   extends Module
 \end{scala}
 
 \noindent
-When get a version of signalA from clock domains clockA to clockB by specifying the standard queue parameters and the two clocks and then using the standard decoupled ready/valid signals:
+When get a version of signalA from clock domains clockA to clockB by
+specifying the standard fifo parameters and the two clocks and then using the
+standard decoupled ready/valid signals:
 
 \begin{scala}
-val queue = 
-  new AsyncQueue(Uint(width = 32), 2, clockA, clockB)
-fifo.enq.bits := signalA
-signalB       := fifo.deq.bits
-fifo.valid    := condA
-fifo.ready    := condB
+val fifo =
+  new AsyncFifo(Uint(width = 32), 2, clockA, clockB)
+fifo.io.enq.bits  := signalA
+signalB           := fifo.io.deq.bits
+fifo.io.enq.valid := condA
+fifo.io.deq.ready := condB
 ...
 \end{scala}
 
 \subsection{Backend Specific Multiple Clock Domains}
 
-Each Chisel backend requires the user to setup up and control multiple clocks in a backend specific manner.  For the purposes of showing how to drive a multi clock design, consider the example of hardware with two modules communicating using an AsyncQueue with each module on separate clocks: \verb+fastClock+ and \verb+slowClock+.  
+Each Chisel backend requires the user to setup up and control multiple clocks
+in a backend specific manner.  For the purposes of showing how to drive a
+multi clock design, consider the example of hardware with two modules
+communicating using an AsyncFifo with each module on separate clocks:
+\verb+fastClock+ and \verb+slowClock+.
 
 \subsubsection{C++}
 

@@ -47,14 +47,9 @@ class SeqMemSuite extends TestSuite {
       }
       val mem = SeqMem(UInt(width = 32), size)
       when(io.wEnable) {
-        mem(io.addr) := io.value
+        mem.write(io.addr, io.value)
       }
-      // Explicit read in when block.
-      // Can we grab the condition inside the read so we don't have to pass in the enable.
-      val rdata = Wire(UInt(width = 32), init = UInt(0,32))
-      when(io.rEnable) {
-        rdata := mem(io.addr)
-      }
+      val rdata = mem.read(io.addr, io.rEnable)
       io.out := rdata
     }
     

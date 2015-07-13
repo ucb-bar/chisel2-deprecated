@@ -34,30 +34,30 @@ import Literal._
 import ChiselError._
 
 /* Chisel3 compatibility */
-object MInt {
-  def mintLit(n: String, width: Int) = {
-    assert(n(0) == 'b', "BINARY MINTS ONLY")
+object BitPat {
+  def bitPatLit(n: String, width: Int) = {
+    assert(n(0) == 'b', "BINARY BitPats ONLY")
     val w = if (width == -1) {
       n.length - 1
     } else {
       width
     }
-    val res = new MInt(n.substring(1, n.length))
+    val res = new BitPat(n.substring(1, n.length))
     res.create(null, w)
     res
   }
-  def apply(x: String, width: Int): MInt = Lit(x, width){mintLit(x, width)}
-  def apply(x: String): MInt = apply(x, -1)
-//  def apply(value: String, width: Int): MInt = mintLit(value, width)
-//  def apply(value: String): MInt = apply(value, -1)
+  def apply(x: String, width: Int): BitPat = Lit(x, width){bitPatLit(x, width)}
+  def apply(x: String): BitPat = apply(x, -1)
+//  def apply(value: String, width: Int): BitPat = bitPatLit(value, width)
+//  def apply(value: String): BitPat = apply(value, -1)
 
-  def DC(width: Int): MInt = MInt("b" + "?"*width, width)
+  def DC(width: Int): BitPat = BitPat("b" + "?"*width, width)
 }
 
-class MInt(val value: String) extends UInt {
+class BitPat(val value: String) extends UInt {
   // Since we have a constructor parameter, we need a clone method.
-  override def cloneType: this.type = new MInt(value).asInstanceOf[this.type]
-  def fromInt(x: BigInt): MInt = MInt(x.toString(2)).asInstanceOf[this.type]
+  override def cloneType: BitPat.this.type = (new BitPat(value)).asInstanceOf[BitPat.this.type]
+  def fromInt(x: BigInt): BitPat = (BitPat(x.toString(2))).asInstanceOf[BitPat.this.type]
   val (bits, mask, swidth) = parseLit(value)
   def zEquals(other: Bits): Bool = 
     (Bits(toLitVal(mask, 2)) & other) === Bits(toLitVal(bits, 2))
@@ -65,21 +65,19 @@ class MInt(val value: String) extends UInt {
   override def != (other: Bits): Bool  = !zEquals(other)
 
   // Far too much magic happens here.
-  override def fromNode(n: Node): this.type = {
+  override def fromNode(n: Node): BitPat.this.type = {
     n match {
-      case m: MInt => this
-      case l: Literal if n.name.contains('?') => {
-        this.asTypeFor(n).asInstanceOf[this.type]
-      }
+      case m: BitPat => BitPat.this
+      case l: Literal => BitPat.this.asTypeFor(n).asInstanceOf[BitPat.this.type]
       case _ => {
-        ChiselError.error("Only literals (and other MInts), may be converted into MInts")
-        MInt("b0").asInstanceOf[this.type]
+        ChiselError.error("Only literals (and other BitPats), may be converted into BitPats")
+        (BitPat("b0")).asInstanceOf[BitPat.this.type]
       }
     }
   }
 
   def badOp(op: String) {
-    ChiselError.error("Operator %s is illegal for MInts".format(op))
+    ChiselError.error("Operator %s is illegal for BitPats".format(op))
   }
 
   def badOpUInt(op: String): UInt = {
@@ -97,9 +95,9 @@ class MInt(val value: String) extends UInt {
     Bool(false)
   }
 
-  def badOpThis(op: String): this.type = {
+  def badOpThis(op: String): BitPat.this.type = {
     badOp(op)
-    this
+    BitPat.this
   }
 
   // arithmetic operators
@@ -121,10 +119,10 @@ class MInt(val value: String) extends UInt {
   override def -&  (b: UInt): UInt = badOpUInt("-&") // chisel3 sub (width +1)
 
   // logical operators
-  override def & (b: Bits): this.type = badOpThis("&")
-  override def | (b: Bits): this.type = badOpThis("|")
-  override def ^ (b: Bits): this.type = badOpThis("^")
-  override def <<(b: UInt): this.type = badOpThis("<<")
+  override def & (b: Bits): BitPat.this.type = badOpThis("&")
+  override def | (b: Bits): BitPat.this.type = badOpThis("|")
+  override def ^ (b: Bits): BitPat.this.type = badOpThis("^")
+  override def <<(b: UInt): BitPat.this.type = badOpThis("<<")
  
   // order operators
   override def <  (b: UInt): Bool = badOpBool("<")

@@ -34,11 +34,11 @@ import org.junit.Ignore
 
 import Chisel._
 
-class MIntSuite extends TestSuite {
-  // MInt ? literals
-  @Test def testMInt() {
-    println("\ntestMInt...")
-    class MIntModule extends Module {
+class BitPatSuite extends TestSuite {
+  // BitPat ? literals
+  @Test def testBitPat() {
+    println("\ntestBitPat...")
+    class BitPatModule extends Module {
       val io = new Bundle {
         val in = UInt(INPUT,4)
         val out = Bool(OUTPUT)
@@ -46,11 +46,11 @@ class MIntSuite extends TestSuite {
       io.out := Bool(false)
       switch(io.in) {
         is(UInt(0)) { io.out := Bool(true) }
-        is(MInt("b???1")) { io.out := Bool(true) }
+        is(BitPat("b???1")) { io.out := Bool(true) }
       }
     }
 
-    class MIntModuleTests(m: MIntModule) extends Tester(m) {
+    class BitPatModuleTests(m: BitPatModule) extends Tester(m) {
       (0 until 8).map { i =>
         poke(m.io.in, i)
         step(1)
@@ -58,12 +58,12 @@ class MIntSuite extends TestSuite {
       }
     }
 
-    launchCppTester((m: MIntModule) => new MIntModuleTests(m))
+    launchCppTester((m: BitPatModule) => new BitPatModuleTests(m))
   }
 
-  @Test def testMIntBool() {
-    println("\ntestMIntBool...")
-    class MIntBoolModule extends Module {
+  @Test def testBitPatBool() {
+    println("\ntestBitPatBool...")
+    class BitPatBoolModule extends Module {
       val io = new Bundle {
         val in = Bool(INPUT)
         val out = Bool(OUTPUT)
@@ -76,7 +76,7 @@ class MIntSuite extends TestSuite {
       }
     }
 
-    class MIntBoolModuleTests(m: MIntBoolModule) extends Tester(m) {
+    class BitPatBoolModuleTests(m: BitPatBoolModule) extends Tester(m) {
       (0 until 8).map { i =>
         poke(m.io.in, i)
         step(1)
@@ -84,6 +84,6 @@ class MIntSuite extends TestSuite {
       }
     }
 
-    launchCppTester((m: MIntBoolModule) => new MIntBoolModuleTests(m))
+    launchCppTester((m: BitPatBoolModule) => new BitPatBoolModuleTests(m))
   }
 }
