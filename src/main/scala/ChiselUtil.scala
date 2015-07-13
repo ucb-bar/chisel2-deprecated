@@ -446,6 +446,13 @@ object Queue
   }
 }
 
+/** Asynchronous Fifo. Used to cross two clock domains.
+ *
+ * @param T the data to transmit
+ * @param entries size of fifo. The actual size will be arrounded in the upper 2^n (size = 1<<log2Up(entries))
+ * @param enq_clk clock for the writing side (input)
+ * @param deq_clk clock for the reading side (output)
+ */
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
@@ -492,7 +499,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(gen, entries, clock=enq_clk)
+  val mem = Mem(gen, 1 << asize, clock=enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }
