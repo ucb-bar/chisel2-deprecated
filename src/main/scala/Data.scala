@@ -150,42 +150,42 @@ abstract class Data extends Node {
   override def clone(): this.type = this.cloneType()
 
   def cloneType(): this.type = {
-    def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
+    def getCloneMethod(c: Class[_]): Option[java.lang.reflect.Method] = {
       val methodNames = c.getDeclaredMethods.map(_.getName())
       if (methodNames.contains("cloneType")) {
-        c.getDeclaredMethod("cloneType")
+        Some(c.getDeclaredMethod("cloneType"))
       } else if (methodNames.contains("clone")) {
-        c.getDeclaredMethod("clone")
+        Some(c.getDeclaredMethod("clone"))
       } else {
-        null
+        None
       }
     }
 
     try {
       val clazz = this.getClass
-      val cloneMethod = getCloneMethod(clazz)
-      if (cloneMethod != null) {
-        cloneMethod.invoke(this).asInstanceOf[this.type]
-      } else {
-        val constructor = clazz.getConstructors.head
-        if(constructor.getParameterTypes.size == 0) {
-          val obj = constructor.newInstance()
-          obj.asInstanceOf[this.type]
-        } else {
-          val params = constructor.getParameterTypes.toList
-          if(constructor.getParameterTypes.size == 1) {
-            val paramtype = constructor.getParameterTypes.head
-            // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
-            //    added by scalac for nested classes and closures. Thus, try faking the constructor
-            //    by not supplying said class or closure (pass null).
-            // CONSIDER: Don't try to create this
-            if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-              constructor.newInstance(null).asInstanceOf[this.type]
-            } else {
-              throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
-            }
+      getCloneMethod(clazz) match {
+        case Some(p) => p.invoke(this).asInstanceOf[this.type]
+        case _ => {
+          val constructor = clazz.getConstructors.head
+          if(constructor.getParameterTypes.size == 0) {
+            val obj = constructor.newInstance()
+            obj.asInstanceOf[this.type]
           } else {
-           throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+            val params = constructor.getParameterTypes.toList
+            if(constructor.getParameterTypes.size == 1) {
+              val paramtype = constructor.getParameterTypes.head
+              // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+              //    added by scalac for nested classes and closures. Thus, try faking the constructor
+              //    by not supplying said class or closure (pass null).
+              // CONSIDER: Don't try to create this
+              if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+                constructor.newInstance(null).asInstanceOf[this.type]
+              } else {
+                throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+              }
+            } else {
+             throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+            }
           }
         }
       }

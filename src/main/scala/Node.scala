@@ -204,11 +204,10 @@ abstract class Node extends nameable {
 
   // TODO: REMOVE WHEN LOWEST DATA TYPE IS BITS
   def ##(b: Node): Node  = Op("##", Node.sumWidth _,  this, b );
-  final def isLit: Boolean = litOf ne null
-  def litOf: Literal = if (getNode != this) getNode.litOf else null
-  def litValue(default: BigInt = BigInt(-1)): BigInt =
-    if (isLit) litOf.value
-    else default
+  final def isLit: Boolean = litOf ne None
+  def litOf: Option[Literal] = if (getNode != this) getNode.litOf else None
+  def litValue(default: BigInt = BigInt(-1)): BigInt = litOf match {
+    case None => default case Some(l) => l.value }
   def floLitValue: Float = java.lang.Float.intBitsToFloat(litValue().toInt)
   def dblLitValue: Double = java.lang.Double.longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
@@ -223,8 +222,8 @@ abstract class Node extends nameable {
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
   def initOf (n: String, widthfunc: (=> Node) => Width, ins: Iterable[Node]): Node = {
-    name = n;
-    inferWidth = widthfunc;
+    name = n
+    inferWidth = widthfunc
     inputs ++= ins
     this
   }
@@ -372,7 +371,6 @@ abstract class Node extends nameable {
   override def hashCode: Int = _id
   override def equals(that: Any): Boolean = that match {
     case n: Node => this eq n
-    case null => false
     case _ => ChiselError.error("can't compare Node " + this + " and non-Node " + that); false
   }
 

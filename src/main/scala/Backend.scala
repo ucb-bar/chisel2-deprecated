@@ -616,48 +616,45 @@ abstract class Backend extends FileSystemUtilities{
     val sccList = new ArrayBuffer[ArrayBuffer[Node]]
 
     def tarjanSCC(n: Node): Unit = {
-      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+      if (n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
 
       n.sccIndex = sccIndex
       n.sccLowlink = sccIndex
       sccIndex += 1
       stack.push(n)
 
-      for(i <- n.inputs) {
-        if(!i.isInstanceOf[Delay] && !i.isReg) {
-          if(i.sccIndex == -1) {
-            tarjanSCC(i)
-            n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
-          } else if(stack.contains(i)) {
-            n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
-          }
-        }
+      n.inputs foreach {
+        case _: Delay =>
+        case i if i.isReg =>
+        case i if i.sccIndex == -1 =>
+          tarjanSCC(i)
+          n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
+        case i =>
+          n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
       }
 
-      if(n.sccLowlink == n.sccIndex) {
+      if (n.sccLowlink == n.sccIndex) {
         val scc = new ArrayBuffer[Node]
-        var top: Node = null
         do {
-          top = stack.pop()
-          scc += top
-        } while (!(n == top))
+          scc += stack.pop
+        } while (!(n == scc.last))
         sccList += scc
       }
     }
 
-    Driver.bfs { node =>
-      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
-        tarjanSCC(node)
-      }
+    Driver.bfs { 
+      case _: Delay =>
+      case node if node.isReg || node.sccIndex == -1 =>
+      case node => tarjanSCC(node)
     }
 
     // check for combinational loops
     var containsCombPath = false
     for (nodelist <- sccList) {
-      if(nodelist.length > 1) {
+      if (nodelist.length > 1) {
         containsCombPath = true
         ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for((node, ind) <- nodelist zip nodelist.indices) {
+        for ((node, ind) <- nodelist zip nodelist.indices) {
           ChiselError.error("  (" + ind +  ")", node.line)
         }
       }

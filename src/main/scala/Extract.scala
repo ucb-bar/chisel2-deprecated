@@ -48,12 +48,10 @@ object NodeExtract {
     // Currently, we don't restrict literals to their width,
     // so we can't use the literal directly if it overflows its width.
     val wmod = mod.widthW
-    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) {
-      mod
-    } else if (bits_lit != null) {
-      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
-    } else {
-      makeExtract(mod, Literal(hi), Literal(lo), Node.fixWidth(w))
+    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) mod
+    else bits_lit match {
+      case Some(l) => Literal((l.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
+      case None => makeExtract(mod, Literal(hi), Literal(lo), Node.fixWidth(w))
     }
   }
 
@@ -62,13 +60,13 @@ object NodeExtract {
     val hiLit = hi.litOf
     val loLit = lo.litOf
     val widthInfer = if (width == -1) Node.widthOf(0) else Node.fixWidth(width)
-    if (hiLit != null && loLit != null) {
-      apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
-    } else { // avoid extracting from constants and avoid variable part selects
-      val rsh = Op(">>", widthInfer, mod, lo)
-      val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
-      val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
-      Op("&", widthInfer, rsh, mask)
+    (hiLit, loLit) match {
+      case (Some(hl), Some(ll)) => apply(mod, hl.value.toInt, ll.value.toInt, width)
+      case _ =>
+        val rsh = Op(">>", widthInfer, mod, lo)
+        val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
+        val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
+        Op("&", widthInfer, rsh, mask)
     }
   }
 
@@ -105,16 +103,18 @@ object Extract {
 
 class Extract(hi: Node, lo: Node) extends Node {
   override def toString: String =
-    ("/*" + (if (name != null && !name.isEmpty) name else "?") + "*/ Extract("
+    ("/*" + (if (!name.isEmpty) name else "?") + "*/ Extract("
       + inputs(0) + (if (hi == lo) "" else (", " + hi)) + ", " + lo + ")")
 
   def validateIndex(x: Node) {
-    val lit = x.litOf
     val w0 = inputs(0).widthW
-    assert(lit == null || lit.value >= 0 && lit.value < w0.needWidth(),
-           ChiselError.error("Extract(" + lit.value + ")" +
-                    " out of range [0," + (w0.needWidth()-1) + "]" +
-                    " of " + inputs(0), line))
+    x.litOf match {
+      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(), 
+        ChiselError.error("Extract(" + l.value + ")" +
+          " out of range [0," + (w0.needWidth()-1) + "]" +
+          " of " + inputs(0), line))
+      case _ => 
+    }
   }
 
   override def canCSE: Boolean = true
@@ -131,12 +131,12 @@ class Extract(hi: Node, lo: Node) extends Node {
      */
     val hi_lit = inputs(1).litOf
     val lo_lit = inputs(2).litOf
-    if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
-        hi_lit.value == (lo_lit.value - 1)) {
-      setWidth(0)
-      modified = true
-    } else {
-      ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
+    (hi_lit, lo_lit) match {
+      case (Some(hl), Some(ll)) if inputs(0).getWidth == 0 && hl.value == (ll.value-1) =>
+        setWidth(0)
+        modified = true
+      case _ =>
+        ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
             " W0Wtransform", line)
     }
   }

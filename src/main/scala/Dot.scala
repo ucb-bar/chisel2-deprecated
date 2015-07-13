@@ -39,20 +39,15 @@ class DotBackend extends Backend {
 
   override def emitRef(node: Node): String = {
     node match {
-      case r: Reg =>
-        if (r.name == "") {
-          r.name = "R" + r.emitIndex
-        }
       // If we're explicitly outputting literal nodes, make sure they have a legitimate name and not just a number.
-      case l: Literal => if (allDottable) {
-        return "L" + l.toString
-      }
+      case l: Literal if (allDottable) => "L" + l.toString
+      case r: Reg =>
+        if (r.name == "") r.name = "R" + r.emitIndex
+        fullyQualifiedName(node)
       case _ =>
-        if(node.name == "") {
-          node.name = "T" + node.emitIndex
-        }
+        if(node.name == "") node.name = "T" + node.emitIndex
+        fullyQualifiedName(node)
     }
-    fullyQualifiedName(node)
   }
 
   private def isDottable (m: Node): Boolean = {

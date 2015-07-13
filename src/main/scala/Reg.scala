@@ -65,13 +65,9 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: => Node) = {
-    val rLit = r.litOf
-    if (rLit != null && rLit.hasInferredWidth) {
-      regMaxWidth _
-    } else {
-      Node.fixWidth(r.getWidth)
-    }
+  def regWidth(r: => Node) = r.litOf match { 
+    case Some(rl) if rl.hasInferredWidth => regMaxWidth _
+    case _ => Node.fixWidth(r.getWidth)
   }
 
   def validateGen[T <: Data](gen: => T) {

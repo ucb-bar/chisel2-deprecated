@@ -31,15 +31,12 @@
 package Chisel
 import scala.util.Properties
 
-class TestIO(val format: String, val args: Seq[Data] = null)
-
+class TestIO(val format: String, val args: Seq[Data] = Seq())
 object Scanner {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
+  def apply (format: String, args: Data*): TestIO = new TestIO(format, args.toList)
 }
 object Printer {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
+  def apply (format: String, args: Data*): TestIO = new TestIO(format, args.toList)
 }
 
 /**

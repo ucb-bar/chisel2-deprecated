@@ -46,7 +46,7 @@ class BitsSuite extends TestSuite {
   @Test def testExtractConstantFixed() {
     val res = UInt(5)(0)
     assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    assertTrue( res.litValue() == 1 )
   }
 
   /** Extract from a constant a fixed range of bits */
@@ -59,7 +59,7 @@ class BitsSuite extends TestSuite {
   @Test def testEql() {
     val res = Bits(2) === Bits(2)
     assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    assertTrue( res.litValue() == 1 )
   }
 
   @Test def testEqlBundle() {
@@ -75,7 +75,7 @@ class BitsSuite extends TestSuite {
   @Test def testNeg() {
     val res = ~Bits(2)
     assertTrue( res.getWidth == 2 )
-    assertTrue( res.litOf.value == 1 )
+    assertTrue( res.litValue() == 1 )
   }
 
   /* AND Reduction */
@@ -100,28 +100,28 @@ class BitsSuite extends TestSuite {
   @Test def testNeq() {
     val res = Bits(5) != Bits(4)
     assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    assertTrue( res.litValue() == 1 )
   }
 
   /* bitwise and */
   @Test def testAnd() {
     val res = Bits(5) & Bits(4)
     assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 4 )
+    assertTrue( res.litValue() == 4 )
   }
 
   /* bitwise or */
   @Test def testOr() {
     val res = Bits(5) | Bits(4)
     assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 5 )
+    assertTrue( res.litValue() == 5 )
   }
 
   /* bitwise xor */
   @Test def testXor() {
     val res = Bits(5) ^ Bits(4)
     assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 1 )
+    assertTrue( res.litValue() == 1 )
   }
 
   /* Concatenation */
@@ -129,7 +129,7 @@ class BitsSuite extends TestSuite {
     try {
     val res = Bits(5) ## Bits(4)
     assertTrue( res.getWidth == 6 )
-    assertTrue( res.litOf.value == 44 )
+    assertTrue( res.litValue() == 44 )
     } catch {
       case e : Throwable => e.printStackTrace()
     }

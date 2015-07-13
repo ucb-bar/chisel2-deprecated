@@ -89,18 +89,12 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   }
 
   def argWidth: (=> Node) => Width = { (x) => {
-    if (x != null) {
-      var unknown = false
-      val argLength = formats.zip(inputs).map{case (a,b) => {
-        lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
-      }}.sum
-      if (unknown)
-        Width()
-      else
-        Width(8*(format.length - 2*formats.length + argLength))
-    } else {
-      Width()
-    }
+    var unknown = false
+    val argLength = formats.zip(inputs).map{case (a,b) => {
+      lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
+    }}.sum
+    if (unknown) Width()
+    else Width(8*(format.length - 2*formats.length + argLength))
   }}
   inferWidth = argWidth
 
