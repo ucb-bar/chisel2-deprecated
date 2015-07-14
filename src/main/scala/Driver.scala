@@ -121,6 +121,8 @@ object Driver extends FileSystemUtilities{
     implicitClock.compOpt = topComponent 
     mod._reset = Some(implicitReset)
     mod.clock = Some(implicitClock)
+    mod.hasExplicitReset = true
+    mod.hasExplicitClock = true
   }
 
   def bfs (visit: Node => Unit) = {

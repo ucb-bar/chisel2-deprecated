@@ -150,28 +150,21 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
   private[Chisel] def hasWhenCond: Boolean = !whenConds.isEmpty
   private[Chisel] def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
+  var verilog_parameters = "";
   //Parameter Stuff
   lazy val params = Module.params
   params.path = this.getClass :: params.path
 
-  if (clock == null) clock = None
-  if (_reset == null) _reset = None
   Driver.components += this
   Module.push(this)
 
-  var verilog_parameters = "";
-
+  if (clock == null) clock = None
+  if (_reset == null) _reset = None
   private[Chisel] val clocks = ArrayBuffer[Clock]()
   private[Chisel] val resets = HashMap[Bool, Bool]()
   private[Chisel] var resetPin: Option[Bool] = None
-  private[Chisel] def hasExplicitClock = (this eq Module.topMod) || (clock match {
-    case None => false
-    case Some(c) => c ne Driver.implicitClock 
-  })
-  private[Chisel] def hasExplicitReset = (this eq Module.topMod) || (_reset match {
-    case None => false
-    case Some(r) => r ne Driver.implicitReset
-  })
+  private[Chisel] var hasExplicitClock = clock != None
+  private[Chisel] var hasExplicitReset = _reset != None
   def reset = resetPin match {
     case None => {
       val r = Bool(INPUT)
