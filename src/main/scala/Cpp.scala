@@ -243,7 +243,7 @@ class CppBackend extends Backend {
   }
   def block(s: Seq[String]): String =
     if (s.length == 0) ""
-    else s"  {${s.map(" " + _ + ";\n").reduceLeft(_ + _)}}\n"
+    else s"  {${s.map(" " + _ + ";").reduceLeft(_ + _)}}\n"
   def emitDatRef(x: Node): String = {
     val gotWidth = x.needWidth()
     if (x.isInObject) emitRef(x)
