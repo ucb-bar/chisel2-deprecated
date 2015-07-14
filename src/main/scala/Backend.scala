@@ -44,6 +44,20 @@ trait FileSystemUtilities {
     val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
   }
+
+  def copyToTarget(filename: String) = {
+    val resourceStream = getClass().getResourceAsStream("/" + filename)
+    if( resourceStream != null ) {
+      val classFile = createOutputFile(filename)
+      while(resourceStream.available > 0) {
+        classFile.write(resourceStream.read())
+      }
+      classFile.close()
+      resourceStream.close()
+    } else {
+      println(s"WARNING: Unable to copy '$filename'" )
+    }
+  }
 }
 
 abstract class Backend extends FileSystemUtilities{

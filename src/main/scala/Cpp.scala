@@ -1816,19 +1816,6 @@ class CppBackend extends Backend {
 
     out_cpps.clear()
 
-    def copyToTarget(filename: String) = {
-      val resourceStream = getClass().getResourceAsStream("/" + filename)
-      if( resourceStream != null ) {
-        val classFile = createOutputFile(filename)
-        while(resourceStream.available > 0) {
-          classFile.write(resourceStream.read())
-        }
-        classFile.close()
-        resourceStream.close()
-      } else {
-        println(s"WARNING: Unable to copy '$filename'" )
-      }
-    }
     /* Copy the emulator headers into the targetDirectory. */
     copyToTarget("emulator_mod.h")
     copyToTarget("emulator_api.h")

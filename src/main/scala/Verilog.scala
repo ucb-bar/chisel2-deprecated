@@ -34,7 +34,6 @@ import scala.collection.immutable.ListSet
 import sys.process.stringSeqToProcess
 
 object VerilogBackend {
-
   val keywords = Set[String](
     "always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1",
     "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
@@ -52,8 +51,6 @@ object VerilogBackend {
     "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
     "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
     "SYNTHESIS", "PRINTF_COND", "VCS")
-
-  var traversalIndex = 0
 }
 
 class VerilogBackend extends Backend {
@@ -125,40 +122,40 @@ class VerilogBackend extends Backend {
     "{" + ((node.needWidth()+31)/32) + "{$random}}"
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
-    def str(prefix: String, ports: (String, String)*): String =
-      ports.toList.filter(_._2 != null)
-        .map(p => "    ." + prefix + idx + p._1 + "(" + p._2 + ")")
+    def str(prefix: String, ports: (String, Option[String])*): String =
+      ports.toList.filter(_._2 != None)
+        .map(p => "    ." + prefix + idx + p._1 + "(" + p._2.get + ")")
         .reduceLeft(_ + ",\n" + _)
 
     m match {
       case r: MemSeqRead =>
-        val addr = ("A", emitRef(r.addr))
-        val en = ("E", emitRef(r.cond))
-        val out = ("O", emitTmp(r))
+        val addr = ("A", Some(emitRef(r.addr)))
+        val en = ("E", Some(emitRef(r.cond)))
+        val out = ("O", Some(emitTmp(r)))
         str("R", addr, en, out)
 
       case w: MemWrite =>
-        val addr = ("A", emitRef(w.addr))
-        val en = ("E", emitRef(w.cond))
-        val data = ("I", emitRef(w.data))
-        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+        val addr = ("A", Some(emitRef(w.addr)))
+        val en = ("E", Some(emitRef(w.cond)))
+        val data = ("I", Some(emitRef(w.data)))
+        val mask = ("M", if (w.isMasked) Some(emitRef(w.mask)) else None)
         str("W", addr, en, data, mask)
 
       case rw: MemReadWrite =>
         val (r, w) = (rw.read, rw.write)
-        val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr))
-        val en = ("E", emitRef(r.cond) + " || " + emitRef(w.cond))
-        val write = ("W", emitRef(w.cond))
-        val data = ("I", emitRef(w.data))
-        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
-        val out = ("O", emitTmp(r))
+        val addr = ("A", Some(emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr)))
+        val en = ("E", Some(emitRef(r.cond) + " || " + emitRef(w.cond)))
+        val write = ("W", Some(emitRef(w.cond)))
+        val data = ("I", Some(emitRef(w.data)))
+        val mask = ("M", if (w.isMasked) Some(emitRef(w.mask)) else None)
+        val out = ("O", Some(emitTmp(r)))
         str("RW", addr, en, write, data, mask, out)
     }
   }
 
   def emitDef(c: Module): String = {
-    val spacing = (if(c.verilog_parameters != "") " " else "");
-    var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
+    val spacing = (if(c.verilog_parameters != "") " " else "")
+    var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "("
     if (c.clocks.length > 0) {
       res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     }
@@ -166,73 +163,57 @@ class VerilogBackend extends Backend {
       if (c.clocks.length > 0) res = res + ", "
       res = res + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
     }
-    var isFirst = true;
+    var isFirst = true
     val portDecs = new ArrayBuffer[StringBuilder]
-    for ((n, w) <- c.wires) {
-      if(n != "reset" && n != Driver.implicitReset.name) {
-        var portDec = "." + n + "( ";
-        w match {
-          case io: Bits  =>
-            if (io.dir == INPUT) { // if reached, then input has consumers
-              if (io.inputs.length == 0) {
-                  // if (Driver.saveConnectionWarnings) {
-                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component);
-                  // } removed this warning because pruneUnconnectedIOs should have picked it up
-                portDec = "//" + portDec
-              } else if (io.inputs.length > 1) {
-                  if (Driver.saveConnectionWarnings) {
-                    ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
-                  }
-                portDec = "//" + portDec
-              /* } else if (!c.isWalked.contains(w)){
-                  if (Driver.saveConnectionWarnings) {
-                    ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED");
-                  }
-                portDec = "//" + portDec // I don't think this is necessary */
-              } else {
-                portDec += emitRef(io.inputs(0));
-              }
-            } else if(io.dir == OUTPUT) {
-              if (io.consumers.size == 0) {
-                  // if (Driver.saveConnectionWarnings) {
-                  //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io));
-                  // } removed this warning because pruneUnconnectedsIOs should have picked it up
-                portDec = "//" + portDec
-              } else {
-                c.parent.findBinding(io) match {
-                  case None => {
-                    if (Driver.saveConnectionWarnings) {
-                      ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + 
-                                          io.consumers.size + ") IN " + c.parent)
-                    }
-                    portDec = "//" + portDec
-                  }
-                  case Some(consumer) => {
-                    if (io.prune)
-                      portDec = "//" + portDec + emitRef(consumer)
-                    else
-                      portDec += emitRef(consumer); // TODO: FIX THIS?
-                  }
-                }
-              }
-            }
+    for ((n, io) <- c.wires if n != "reset" && n != Driver.implicitReset.name) {
+      var portDec = "." + n + "( "
+      io.dir match {
+        case INPUT if io.inputs.isEmpty =>
+          // if (Driver.saveConnectionWarnings) {
+          //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component)
+          // } removed this warning because pruneUnconnectedIOs should have picked it up
+          portDec = "//" + portDec
+        case INPUT if io.inputs.size > 1 =>
+          if (Driver.saveConnectionWarnings) {
+            ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length)
+          }
+          portDec = "//" + portDec
+        /* case INPUT if !(c.isWalked conatins io) =>
+          if (Driver.saveConnectionWarnings) {
+            ChiselError.warning(" UNUSED INPUT " + io + " OF " + c + " IS REMOVED")
+          }
+          portDec = "//" + portDec // I don't think this is necessary */
+        case INPUT =>
+          portDec += emitRef(io.inputs(0))
+        case OUTPUT if io.consumers.isEmpty =>
+          // if (Driver.saveConnectionWarnings) {
+          //   ChiselError.warning("" + io + " UNCONNECTED IN " + io.component + " BINDING " + c.findBinding(io))
+          // } removed this warning because pruneUnconnectedsIOs should have picked it up
+          portDec = "//" + portDec
+        case OUTPUT => c.parent.findBinding(io) match {
+          case None => 
+            if (Driver.saveConnectionWarnings) {
+              ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + 
+                                  io.consumers.size + ") IN " + c.parent) }
+            portDec = "//" + portDec
+          case Some(consumer) => 
+            if (io.prune) portDec = "//" + portDec + emitRef(consumer)
+            else portDec += emitRef(consumer) // TODO: FIX THIS?
         }
-        portDec += " )"
-        portDecs += new StringBuilder(portDec)
       }
+      portDec += " )"
+      portDecs += new StringBuilder(portDec)
     }
     val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
     portDecs.map(_.insert(0, "       "))
     if (c.clocks.length > 0 || c.resets.size > 0) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
-    res += "\n  );\n";
+    res += "\n  );\n"
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
       res += if_not_synthesis
-      for ((n, w) <- c.wires) {
-        if (w.driveRand) {
-          res += "    assign " + c.name + "." + n + " = " + emitRand(w) + ";\n"
-        }
+      for ((n, w) <- c.wires if w.driveRand) {
+        res += "    assign " + c.name + "." + n + " = " + emitRand(w) + ";\n"
       }
       res += endif_not_synthesis
     }
@@ -242,23 +223,18 @@ class VerilogBackend extends Backend {
   override def emitDef(node: Node): String = {
     val res =
     node match {
+      case x: Bits if x.isIo && x.dir == INPUT => ""
+      case x: Bits if node.inputs.isEmpty => 
+        ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
+        "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
       case x: Bits =>
-        if (x.isIo && x.dir == INPUT) {
-          ""
-        } else {
-          if (node.inputs.length == 0) {
-            ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
-            "  assign " + emitTmp(node) + " = " + emitRand(node) + ";\n"
-          } else {
-            "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
-          }
-        }
+        "  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)) + ";\n"
 
       case x: Mux =>
         "  assign " + emitTmp(x) + " = " + emitRef(x.inputs(0)) + " ? " + emitRef(x.inputs(1)) + " : " + emitRef(x.inputs(2)) + ";\n"
 
       case o: Op =>
-        val c = o.component;
+        val c = o.component
         "  assign " + emitTmp(o) + " = " +
         (if (o.op == "##") {
           "{" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + "}"
@@ -291,48 +267,36 @@ class VerilogBackend extends Backend {
           }
         }
 
-      case m: Mem[_] =>
-        if(!m.isInline) {
-          def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
-          def find_gran(x: Node) : Int = {
-            if (x.isInstanceOf[Literal])
-              return x.needWidth()
-            else if (x.isInstanceOf[UInt])
-              return if (x.inputs.length>0) find_gran(x.inputs(0)) else 1
-            else if (x.isInstanceOf[Mux])
-              return gcd(find_gran(x.inputs(1)), find_gran(x.inputs(2)))
-            else if (x.isInstanceOf[Op])
-              return (x.inputs.map(find_gran(_))).reduceLeft(_ max _)
-            else
-              return 1
-          }
-          val mask_writers = m.writeAccesses.filter(_.isMasked)
-          val mask_grans = mask_writers.map(x => find_gran(x.mask))
-          val mask_gran = if (!mask_grans.isEmpty && mask_grans.forall(_ == mask_grans(0))) mask_grans(0) else 1
-          val configStr =
-          (" depth " + m.n +
-            " width " + m.needWidth() +
-            " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
-            (if (mask_gran != 1) " mask_gran " + mask_gran else "") +
-            "\n")
-          val name = getMemName(m, configStr)
-          ChiselError.info("MEM " + name)
+      case m: Mem[_] if !m.isInline => 
+        def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
+        def find_gran(x: Node) : Int = x match {
+          case _: Literal => x.needWidth()
+          case _: UInt => if (x.inputs.isEmpty) 1 else find_gran(x.inputs(0))
+          case _: Mux => gcd(find_gran(x.inputs(1)), find_gran(x.inputs(2)))
+          case _: Op => x.inputs map (find_gran(_)) reduceLeft (_ max _)
+          case _ => 1
+        }
+        val mask_writers = m.writeAccesses.filter(_.isMasked)
+        val mask_grans = mask_writers.map(x => find_gran(x.mask))
+        val mask_gran = if (!mask_grans.isEmpty && mask_grans.forall(_ == mask_grans(0))) mask_grans(0) else 1
+        val configStr =
+        (" depth " + m.n +
+         " width " + m.needWidth() +
+         " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
+         (if (mask_gran != 1) " mask_gran " + mask_gran else "") +
+         "\n")
+        val name = getMemName(m, configStr)
+        ChiselError.info("MEM " + name)
 
-          val clk = "    .CLK(" + emitRef(m.clock.get) + ")"
-          val portdefs = for (i <- 0 until m.ports.size)
-            yield emitPortDef(m.ports(i), i)
-          "  " + name + " " + emitRef(m) + " (\n" +
-            (clk +: portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
-          "  );\n"
-        } else {
-          ""
-        }
-      case m: MemRead =>
-        if (m.mem.isInline) {
-          "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
-        } else {
-          ""
-        }
+        val clk = "    .CLK(" + emitRef(m.clock.get) + ")"
+        val portdefs = for (i <- 0 until m.ports.size)
+          yield emitPortDef(m.ports(i), i)
+        "  " + name + " " + emitRef(m) + " (\n" +
+          (clk +: portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
+        "  );\n"
+
+      case m: MemRead if m.mem.isInline =>
+        "  assign " + emitTmp(node) + " = " + emitRef(m.mem) + "[" + emitRef(m.addr) + "];\n"
 
       case r: ROMRead =>
         val inits = new StringBuilder
@@ -366,12 +330,7 @@ class VerilogBackend extends Backend {
     val gotWidth = node.needWidth()
     val res =
     node match {
-      case x: Bits =>
-        if(!x.isIo) {
-          emitDecBase(node)
-        } else {
-          ""
-        }
+      case x: Bits if x.isIo => ""
 
       case _: Assert =>
         "  reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n"
@@ -385,12 +344,9 @@ class VerilogBackend extends Backend {
       case _: ROMRead =>
         emitDecReg(node)
 
-      case m: Mem[_] =>
-        if (m.isInline) {
-          "  reg [" + (m.needWidth()-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
-        } else {
-          ""
-        }
+      case m: Mem[_] if !m.isInline => ""
+      case m: Mem[_] => 
+        "  reg [" + (m.needWidth()-1) + ":0] " + emitRef(m) + " [" + (m.n-1) + ":0];\n"
 
       case x: MemAccess =>
         x.referenced = true
@@ -422,7 +378,7 @@ class VerilogBackend extends Backend {
   }
 
   def genHarness(c: Module, name: String) {
-    val harness  = createOutputFile(name + "-harness.v");
+    val harness  = createOutputFile(name + "-harness.v")
     val printNodes = for ((n, io) <- c.wires ; if io.dir == OUTPUT) yield io
     val scanNodes = for ((n, io) <- c.wires ; if io.dir == INPUT) yield io
     val mainClk = Driver.implicitClock
@@ -548,7 +504,7 @@ class VerilogBackend extends Backend {
     }
     harness.write("endmodule\n")
 
-    harness.close();
+    harness.close()
   }
 
   def harnessAPIs (mainClk: Clock, clocks: ListSet[Clock], resets: List[Bool]) = {
@@ -818,16 +774,17 @@ class VerilogBackend extends Backend {
           case m: Mux => (cond(m.inputs(0)) + sep + assign(r, m.inputs(1))) :: traverseMuxes(r, m.inputs(2))
           case _ => if (x eq r) Nil else List(uncond + sep + assign(r, x))
         }
-        if (!reg.next.isInstanceOf[Mux]) "    " + assign(reg, reg.next)
-        else "    " + traverseMuxes(reg, reg.next).reduceLeft(_ + "    end else " + _) + "    end\n"
-
-      case m: MemWrite =>
-        if (m.mem.isInline) {
-          "    if (" + emitRef(m.cond) + ")\n" +
-          "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
-        } else {
-          ""
+        reg.next match { 
+          case _: Mux =>  
+            "    " + traverseMuxes(reg, reg.next).reduceLeft(_ + "    end else " + _) + "    end\n"
+          case _ => 
+            "    " + assign(reg, reg.next)
         }
+
+      case m: MemWrite if m.mem.isInline =>
+        "    if (" + emitRef(m.cond) + ")\n" +
+        "      " + emitRef(m.mem) + "[" + emitRef(m.addr) + "] <= " + emitRef(m.data) + ";\n"
+
       case _ =>
         ""
     }
@@ -853,13 +810,13 @@ class VerilogBackend extends Backend {
     res
   }
 
-  def emitModuleText(c: Module): String = {
-    if (c.isInstanceOf[BlackBox])
-      return ""
+  def emitModuleText(c: Module): String = c match {
+    case _: BlackBox => ""
+    case _ =>
 
     val res = new StringBuilder()
-    var first = true;
-    var nl = "";
+    var first = true
+    var nl = ""
     if (c.clocks.length > 0 || c.resets.size > 0)
       res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
@@ -869,28 +826,26 @@ class VerilogBackend extends Backend {
         case io: Bits => {
           val prune = if (io.prune && c != topMod) "//" else ""
           if (io.dir == INPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "input " +
-                                       emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "input " + emitWidth(io) + " " + emitRef(io))
           } else if(io.dir == OUTPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "output" +
-                                       emitWidth(io) + " " + emitRef(io));
+            ports += new StringBuilder(nl + "    " + prune + "output" + emitWidth(io) + " " + emitRef(io))
           }
         }
-      };
+      }
     }
     val uncommentedPorts = ports.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
     if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
-    res.append("\n);\n\n");
-    res.append(emitDecs(c));
-    res.append("\n");
-    res.append(emitInits(c));
-    res.append("\n");
-    res.append(emitDefs(c));
+    res.append("\n);\n\n")
+    res.append(emitDecs(c))
+    res.append("\n")
+    res.append(emitInits(c))
+    res.append("\n")
+    res.append(emitDefs(c))
     res.append(emitRegs(c))
-    res.append("endmodule\n\n");
-    res.result();
+    res.append("endmodule\n\n")
+    res.result()
   }
 
   def flushModules(
@@ -901,9 +856,9 @@ class VerilogBackend extends Backend {
       var index = 0
       for ( (text, comps) <- modules) {
         val moduleName = if( modules.size > 1 ) {
-          className + "_" + index.toString;
+          className + "_" + index.toString
         } else {
-          className;
+          className
         }
         index = index + 1
         for( flushComp <- comps ) {
@@ -921,27 +876,26 @@ class VerilogBackend extends Backend {
 
   def emitChildren(top: Module,
     defs: LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module] ]],
-    out: java.io.FileWriter, depth: Int): Unit =
-  {
-    if (top.isInstanceOf[BlackBox])
-      return
+    out: java.io.FileWriter, depth: Int): Unit = top match {
+    case _: BlackBox =>
+    case _ =>
 
     // First, emit my children
     for (child <- top.children) {
-      emitChildren(child, defs, out, depth + 1);
+      emitChildren(child, defs, out, depth + 1)
     }
 
     // Now, find and emit me
     // Note: emittedModules used to ensure modules only emitted once
     //    regardless of how many times used (e.g. when folded)
-    val className = extractClassName(top);
+    val className = extractClassName(top)
     for{
       (text, comps) <- defs(className)
       if comps contains top
       if !(emittedModules contains top.moduleName)
     } {
       out.append(s"module ${top.moduleName}(")
-      out.append(text);
+      out.append(text)
       emittedModules += top.moduleName
       return
     }
@@ -953,11 +907,11 @@ class VerilogBackend extends Backend {
        the generated text of their module.
        We use a LinkedHashMap such that later iteration is predictable. */
     val defs = LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module]]]()
-    var level = 0;
+    var level = 0
     for (c <- Driver.sortedComps) {
       ChiselError.info(depthString(depth) + "COMPILING " + c
         + " " + c.children.size + " CHILDREN"
-        + " (" + c.level + "," + c.traversal + ")");
+        + " (" + c.level + "," + c.traversal + ")")
       ChiselError.checkpoint()
 
       if( c.level > level ) {
@@ -968,24 +922,24 @@ class VerilogBackend extends Backend {
          If that were not the case, we could flush modules as soon as
          the source text for all components at a certain level in the tree
          has been generated. */
-        flushModules(defs, level);
+        flushModules(defs, level)
         level = c.level
       }
-      val res = emitModuleText(c);
-      val className = extractClassName(c);
+      val res = emitModuleText(c)
+      val className = extractClassName(c)
       if( !(defs contains className) ) {
-        defs += (className -> LinkedHashMap[String, ArrayBuffer[Module] ]());
+        defs += (className -> LinkedHashMap[String, ArrayBuffer[Module] ]())
       }
       if( defs(className) contains res ) {
         /* We have already outputed the exact same source text */
-        defs(className)(res) += c;
-        ChiselError.info("\t" + defs(className)(res).length + " components");
+        defs(className)(res) += c
+        ChiselError.info("\t" + defs(className)(res).length + " components")
       } else {
-        defs(className) += (res -> ArrayBuffer[Module](c));
+        defs(className) += (res -> ArrayBuffer[Module](c))
       }
     }
-    flushModules(defs, level);
-    emitChildren(top, defs, out, depth);
+    flushModules(defs, level)
+    emitChildren(top, defs, out, depth)
   }
 
   override def elaborate(c: Module) {
@@ -1003,28 +957,15 @@ class VerilogBackend extends Backend {
 
     if (!memConfs.isEmpty) {
       val out_conf = createOutputFile(n + ".conf")
-      out_conf.write(getMemConfString);
-      out_conf.close();
+      out_conf.write(getMemConfString)
+      out_conf.close()
     }
     if (Driver.isGenHarness) {
-      genHarness(c, n);
+      genHarness(c, n)
     }
   }
 
   override def compile(c: Module, flags: Option[String]) {
-    def copyToTarget(filename: String) = {
-          val resourceStream = getClass().getResourceAsStream("/" + filename)
-          if( resourceStream != null ) {
-            val classFile = createOutputFile(filename)
-            while(resourceStream.available > 0) {
-              classFile.write(resourceStream.read())
-            }
-            classFile.close()
-            resourceStream.close()
-          } else {
-            println(s"WARNING: Unable to copy '$filename'" )
-          }
-    }
     copyToTarget("vpi_user.cc")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     def run(cmd: String): Boolean = {
