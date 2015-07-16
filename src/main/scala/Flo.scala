@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import sys.process.stringSeqToProcess
 
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
@@ -190,7 +188,7 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(nodes: ArrayBuffer[Node]) {
+  def renameNodes(nodes: Seq[Node]) {
     for (m <- nodes) {
       m match {
         case _: Literal =>
@@ -224,25 +222,19 @@ class FloBackend extends Backend {
 
   override def compile(c: Module, flagsIn: Option[String]) {
     val flags = flagsIn getOrElse "-O2" 
-    val chiselENV = java.lang.System.getenv("CHISEL")
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
-    def run(cmd: String) {
-      val bashCmd = Seq("bash", "-c", cmd)
-      val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
-    }
     def build(name: String) {
-      val mweCmd = ArrayBuffer("flo-mwe", "--width", "32", "--depth", "64", "--input", dir + name + ".flo", "--output", dir + name + ".mwe.flo")
+      val mweCmd = List("flo-mwe", "--width", "32", "--depth", "64", "--input", dir + name + ".flo", "--output", dir + name + ".mwe.flo")
       println("EXPANDING WITH " + mweCmd)
       run(mweCmd.mkString(" "))
-      val cmd = ArrayBuffer(floDir + "lay", "-is-console")
-      cmd ++= ArrayBuffer(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString())
-      cmd ++= ArrayBuffer("<", dir + name + ".mwe.flo", "|")
-      cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
+      val cmd = List(floDir + "lay", "-is-console") ++
+        List(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString()) ++
+        List("<", dir + name + ".mwe.flo", "|") ++
+        List(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")
       println("BUILDING " + cmdString)
-      run(cmdString)
+      if (!run(cmdString)) throw new Exception("failed to build flo")
     }
     build(c.name)
   }

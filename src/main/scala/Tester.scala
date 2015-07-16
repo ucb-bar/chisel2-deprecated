@@ -30,44 +30,39 @@
 
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashMap}
+import scala.collection.immutable.ListSet
 import scala.util.Random
-import java.io.{File, IOException, InputStream, OutputStream, PrintStream}
+import java.io._
 import scala.sys.process.{Process, ProcessIO}
 
-case class Poke(val node: Node, val index: Int, val value: BigInt);
-
-class Snapshot(val t: Int) {
-  val pokes = new ArrayBuffer[Poke]()
-}
-
-class ManualTester[+T <: Module]
-    (val c: T, val isT: Boolean = true) {
-  var testIn:  InputStream  = null
-  var testOut: OutputStream = null
-  var testErr: InputStream  = null
-  val sb = new StringBuilder()
+class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
+  var testIn: Option[InputStream] = None
+  var testErr: Option[InputStream] = None
+  var testOut: Option[OutputStream] = None
+  lazy val reader: BufferedReader = new BufferedReader(new InputStreamReader(testIn.get))
+  lazy val writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(testOut.get))
+  var t = 0 // simulation time
   var delta = 0
-  var t = 0
-  var isTrace = isT
   var testOutputString = "" // output available to test code.
+  val sb = new StringBuilder()
+  val pokeMap = HashMap[Bits, BigInt]()
+  val peekMap = HashMap[Bits, BigInt]()
+  val (inputs: ListSet[Bits], outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
 
+  object SIM_CMD extends Enumeration { val RESET, STEP, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
    * to the way Process works. TODO: FIXME.
    */
   def waitForStreams() = {
     var waited = 0
-    while (testOut == null || testIn == null || testErr == null) {
+    while (testIn == None || testOut == None || testErr == None) {
       Thread.sleep(100)
       if (waited % 10 == 0 && waited > 30) {
-        println("waiting for emulator process treams to be valid ...")
+        ChiselError.info("waiting for emulator process streams to be valid ...")
       }
     }
-  }
-
-  def puts(str: String) = {
-    while (testOut == null) { Thread.sleep(100) }
-    for (e <- str) testOut.write(e);
+    ChiselError.info("emulator launched after %d trials".format(waited))
   }
 
   /**
@@ -75,6 +70,7 @@ class ManualTester[+T <: Module]
    * The standard protocol treats a single line as a command, which always
    * returns a single line of reply.
    */
+  // TODO: deprecated
   def emulatorCmd(str: String): String = {
     // validate cmd
     if (str contains "\n") {
@@ -85,22 +81,20 @@ class ManualTester[+T <: Module]
     waitForStreams()
 
     // send command to emulator
-    for (e <- str) testOut.write(e);
-    testOut.write('\n');
-    testOut.flush()
+    for (e <- str) testOut.get.write(e);
+    testOut.get.write('\n');
+    testOut.get.flush()
 
     // read output from emulator
-    var c = testIn.read
+    var c = testIn.get.read
     sb.clear()
     while (c != '\n' && c != -1) {
-      if (c == 0) {
-        Thread.sleep(100)
-      }
+      if (c == 0) Thread.sleep(100)
       sb += c.toChar
       // Look for a "PRINT" command.
       if (sb.length == 6 && sb.startsWith("PRINT ")) {
         do {
-          c = testIn.read
+          c = testIn.get.read
           sb += c.toChar
         } while (c != ' ')
         // Get the PRINT character count.
@@ -108,7 +102,7 @@ class ManualTester[+T <: Module]
         val printCommand(nChars) = sb.toString
         sb.clear()
         for (i <- 0 until nChars.toInt) {
-          c = testIn.read
+          c = testIn.get.read
           sb += c.toChar
         }
         // Put any generated output somewhere we can access it.
@@ -116,13 +110,13 @@ class ManualTester[+T <: Module]
         sb.clear()
         System.out.print(testOutputString)
       }
-      c   = testIn.read
+      c = testIn.get.read
     }
 
     // drain errors
     try {
-      while(testErr.available() > 0) {
-        System.err.print(Character.toChars(testErr.read()))
+      while(testErr.get.available() > 0) {
+        System.err.print(Character.toChars(testErr.get.read()))
       }
     } catch {
       case e : IOException => testErr = null; println("ERR EXCEPTION")
@@ -137,19 +131,19 @@ class ManualTester[+T <: Module]
 
   def setClocks(clocks: HashMap[Clock, Int]) {
     var cmd = "set_clocks"
-    for (clock <- Driver.clocks ; if clock.srcClock == None) {
-      val s = BigInt(clocks(clock)).toString(16)
-      cmd = cmd + " " + s
+    for (clock <- Driver.clocks) {
+      if (clock.srcClock == null) {
+        val s = BigInt(clocks(clock)).toString(16)
+        cmd = cmd + " " + s
+      }
     }
     emulatorCmd(cmd)
     // TODO: check for errors in return
   }
 
-  def dumpName(data: Node): String = {
-    if (Driver.backend.isInstanceOf[FloBackend]) {
-      data.name
-    } else
-      data.chiselName
+  def dumpName(data: Node): String = Driver.backend match {
+    case _: FloBackend => data.name
+    case _ => data.chiselName
   }
 
   def peekBits(data: Node, off: Int = -1): BigInt = {
@@ -186,24 +180,19 @@ class ManualTester[+T <: Module]
   }
 
   def peek(data: Bits): BigInt = {
-    signed_fix(data, peekBits(data.getNode))
+    val x = signed_fix(data, peekMap getOrElse (data, peekBits(data.getNode)))
+    if (isTrace) println("  PEEK " + dumpName(data) + " -> " + x)
+    x 
   }
 
   def peek(data: Aggregate /*, off: Int = -1 */): Array[BigInt] = {
     data.flatten.map(x => x._2).map(peek(_))
   }
 
-  def reset(n: Int = 1) = {
-    emulatorCmd("reset " + n)
-    // TODO: check for errors in return
-    if (isTrace) println("RESET " + n)
-  }
-
   def doPokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
     if (dumpName(data) == "") {
       println("Unable to poke data " + data)
     } else {
-
       var cmd = ""
       if (off != -1) {
         cmd = "mem_poke " + dumpName(data) + " " + off;
@@ -234,7 +223,11 @@ class ManualTester[+T <: Module]
   }
 
   def poke(data: Bits, x: BigInt): Unit = {
-    pokeBits(data.getNode, x)
+    if (isTrace) println("  POKE " + dumpName(data) + " -> " + x)
+    if (inputs contains data) 
+      pokeMap(data) = x
+    else 
+      pokeBits(data.getNode, x)
   }
 
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -243,11 +236,49 @@ class ManualTester[+T <: Module]
       poke(x, y)
   }
 
+  private def writeln(str: String) {
+    writer write str
+    writer.newLine
+    writer.flush
+  }
+
+  private def readln: String = {
+    reader.readLine
+  }
+
+  private def sendCmd(cmd: SIM_CMD.Value) {
+    writeln(cmd.id.toString)
+  }
+
+  private def readOutputs {
+    peekMap.clear
+    outputs foreach (x => peekMap(x) = BigInt(readln, 16))
+  }
+ 
+  private def writeInputs {
+    inputs foreach ( x => 
+      writeln((pokeMap getOrElse (x, BigInt(0))).toString(16)) )
+  }
+
+  def reset(n: Int = 1) {
+    if (isTrace) println("RESET " + n)
+    for (i <- 0 until n) {
+      sendCmd(SIM_CMD.RESET)
+      readOutputs
+    }
+  }
+
+
   def step(n: Int) = {
     val target = t + n
-    val s = emulatorCmd("step " + n)
-    delta += s.toInt
+    // val s = emulatorCmd("step " + n)
+    // delta += s.toInt
     if (isTrace) println("STEP " + n + " -> " + target)
+    for (i <- 0 until n) {
+      sendCmd(SIM_CMD.STEP)
+      writeInputs
+      readOutputs
+    }
     t += n
   }
 
@@ -255,7 +286,7 @@ class ManualTester[+T <: Module]
   def int(x: Int): BigInt = x
   def int(x: Bits): BigInt = x.litValue()
 
-  var ok = true;
+  var ok = true
   var failureTime = -1
 
   def expect (good: Boolean, msg: String): Boolean = {
@@ -310,114 +341,47 @@ class ManualTester[+T <: Module]
   }
 
   val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()
-  var process: Process = null
-
-  def start(): Process = {
+  val process: Process = {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val target = Driver.targetDir + "/" + n
     // If the caller has provided a specific command to execute, use it.
     val cmd = Driver.testCommand match {
       case Some(name: String) => name
-      case None => {
-        if (Driver.backend.isInstanceOf[FloBackend]) {
-         val dir = Driver.backend.asInstanceOf[FloBackend].floDir
-         val command = ArrayBuffer(dir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
-         if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
-         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
-         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
-         command.mkString(" ")
-        } else {
-           target + (if (Driver.backend.isInstanceOf[VerilogBackend]) " -q +vcs+initreg+0 " else "")
-        }
+      case None => Driver.backend match {
+        case b: FloBackend =>
+          val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
+          if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+          if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
+          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
+          command.mkString(" ")
+        case b: VerilogBackend => target + " -q +vcs+initreg+0 "
+        case _ => ""
       }
     }
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
-    val pio = new ProcessIO(in => testOut = in, out => testIn = out, err => testErr = err)
-    process = processBuilder.run(pio)
+    val pio = new ProcessIO(
+      in => testOut = Option(in), out => testIn = Option(out), err => testErr = Option(err))
+    val process = processBuilder.run(pio)
     waitForStreams()
     t = 0
-    reset(5)
-    // Skip vpd message
-    if (Driver.backend.isInstanceOf[VerilogBackend] && Driver.isDebug) {
-      var vpdmsg = testIn.read
-      while (vpdmsg != '\n' && vpdmsg != -1)
-        vpdmsg = testIn.read
+    Driver.backend match {
+      case _: VerilogBackend if Driver.isVCD => readln
+      case _ =>
     }
+    readOutputs
+    reset(5)
     process
   }
 
-  def finish(): Boolean = {
-    if (process != null) {
-      emulatorCmd("quit")
-
-      if (testOut != null) {
-        testOut.flush()
-        testOut.close()
-      }
-      if (testIn != null) {
-        testIn.close()
-      }
-      if (testErr != null) {
-        testErr.close()
-      }
-
-      process.destroy()
-    }
-    println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else { "FAILED FIRST AT CYCLE " + failureTime }))
-    ok
+  def finish {
+    sendCmd(SIM_CMD.FIN)
+    testIn match { case Some(in) => in.close case None => }
+    testErr match { case Some(err) => err.close case None => }
+    testOut match { case Some(out) => { out.flush ; out.close } case None => }
+    process.destroy()
+    println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else "FAILED FIRST AT CYCLE " + failureTime))
+    if(!ok) throwException("Module under test FAILED at least one test vector.")
   }
 }
-
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends ManualTester(c, isTrace) with FileSystemUtilities {
-  start()
-}
-
-class MapTester[+T <: Module](c: T, val testNodes: Array[Node]) extends Tester(c, false) {
-  def splitFlattenNodes(args: Seq[Node]): (Seq[Node], Seq[Node]) = {
-    if (args.length == 0) {
-      (Array[Node](), Array[Node]())
-    } else {
-      val testNodes = args.map(i => i.maybeFlatten).reduceLeft(_ ++ _).map(x => x.getNode);
-      (c.keepInputs(testNodes), c.removeInputs(testNodes))
-    }
-  }
-  val (ins, outs) = splitFlattenNodes(testNodes)
-  val testInputNodes    = ins.toArray;
-  val testNonInputNodes = outs.toArray
-  def step(svars: HashMap[Node, Node],
-           ovars: HashMap[Node, Node] = new HashMap[Node, Node],
-           isTrace: Boolean = true): Boolean = {
-    if (isTrace) { println("---"); println("INPUTS") }
-    for (n <- testInputNodes) {
-      val v = svars.getOrElse(n, null)
-      val i = if (v == null) BigInt(0) else v.litValue() // TODO: WARN
-      pokeBits(n, i)
-    }
-    if (isTrace) println("OUTPUTS")
-    var isSame = true
-    step(1)
-    for (o <- testNonInputNodes) {
-      val rv = peekBits(o)
-      if (isTrace) println("  READ " + o + " = " + rv)
-      if (!svars.contains(o)) {
-        ovars(o) = Literal(rv)
-      } else {
-        val tv = svars(o).litValue()
-        if (isTrace) println("  EXPECTED: " + o + " = " + tv)
-        if (tv != rv) {
-          isSame = false
-          if (isTrace) println("  *** FAILURE ***")
-        } else {
-          if (isTrace) println("  SUCCESS")
-        }
-      }
-    }
-    isSame
-  }
-  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
-  def defTests(body: => Boolean) = body
-
-}
-

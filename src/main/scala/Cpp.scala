@@ -31,7 +31,6 @@
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap}
 import java.io.{BufferedReader, InputStreamReader}
-import sys.process.stringSeqToProcess
 
 object CString {
   def apply(s: String): String = {
@@ -743,41 +742,18 @@ class CppBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: Option[String]) {
-    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
-    val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
-    val chiselENV = java.lang.System.getenv("CHISEL")
-
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
     val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
-    val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
-    val allFlags = cppFlags + " " + cxxFlags
+    val cppFlags = CPPFLAGS + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = List(cppFlags, cxxFlags).mkString(" ")
     val dir = Driver.targetDir + "/"
-    val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     val parallelMakeJobs = Driver.parallelMakeJobs
-
-    def run(cmd: String) {
-      val bashCmd = Seq("bash", "-c", cmd)
-      val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
-    }
-    def linkOne(name: String) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
-      run(ac)
-    }
-    def linkMany(name: String, objects: Seq[String]) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
-      run(ac)
-    }
-    def cc(name: String, flags: String = allFlags) {
-      val cmd = CXX + " -c -o " + dir + name + ".o " + flags + " " + dir + name + ".cpp"
-      run(cmd)
-    }
 
     def make(args: String) {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
       val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
-      run(cmd)
+      if (!run(cmd)) throw new Exception("make failed...")
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {
@@ -862,7 +838,7 @@ class CppBackend extends Backend {
         make("-C " + Driver.targetDir + " " + nJobs)
       } else {
         // No make. Compile everything discretely.
-        cc(n + "-emulator")
+        cc(n + "-emulator", allFlags)
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
           "no unoptmized files to compile for '--compileMultipleCppFiles'")
@@ -882,17 +858,18 @@ class CppBackend extends Backend {
           }
           objects += basename
         }
-        linkMany(n, objects)
+        objects += (n + "-emulator.o")
+        link(dir, n, objects)
       }
     } else {
-      cc(n + "-emulator")
-      cc(n)
-      linkOne(n)
+      cc(n + "-emulator", allFlags)
+      cc(n, allFlags)
+      link(dir, n, List(n, n + "-emulator"))
     }
   }
 
   def emitDefLos(c: Module): String = {
-    var res = "";
+    var res = ""
     for ((n, w) <- c.wires) {
       w match {
         case io: Bits  =>

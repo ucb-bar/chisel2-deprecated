@@ -47,10 +47,9 @@ object Driver extends FileSystemUtilities{
     }
   }
 
-  def apply[T <: Module](args: Array[String], gen: () => T,
-                         ftester: T => Tester[T], wrapped:Boolean): T = {
+  def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T], wrapped:Boolean): T = {
     val mod = apply(args, gen, wrapped)
-    if (isTesting) test(mod, ftester)
+    if (isTesting) ftester(mod).finish
     mod
   }
 
@@ -98,19 +97,6 @@ object Driver extends FileSystemUtilities{
       }
     }
     c
-  }
-
-  private def test[T <: Module](mod: T, ftester: T => Tester[T]): Unit = {
-    var res = false
-    var tester: Tester[T] = null
-    try {
-      tester = ftester(mod)
-    } finally {
-      if (tester != null && tester.process != null)
-        res = tester.finish()
-    }
-    println(if (res) "PASSED" else "*** FAILED ***")
-    if(!res) throwException("Module under test FAILED at least one test vector.")
   }
 
   def elapsedTime: Long = System.currentTimeMillis - startTime

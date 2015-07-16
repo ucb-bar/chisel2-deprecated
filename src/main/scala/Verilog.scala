@@ -31,7 +31,6 @@
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap}
 import scala.collection.immutable.ListSet
-import sys.process.stringSeqToProcess
 
 object VerilogBackend {
   val keywords = Set[String](
@@ -379,298 +378,53 @@ class VerilogBackend extends Backend {
 
   def genHarness(c: Module, name: String) {
     val harness  = createOutputFile(name + "-harness.v")
-    val printNodes = for ((n, io) <- c.wires ; if io.dir == OUTPUT) yield io
-    val scanNodes = for ((n, io) <- c.wires ; if io.dir == INPUT) yield io
+    val ins = for ((n, io) <- c.wires if io.dir == INPUT) yield io
+    val outs = for ((n, io) <- c.wires if io.dir == OUTPUT) yield io
     val mainClk = Driver.implicitClock
-    val clocks = ListSet(mainClk) ++ c.clocks
+    val clocks = c.clocks
     val resets = c.resets.values.toList
 
-    harness.write("module test;\n")
-    for (node <- scanNodes) {
-      val gotWidth = node.needWidth()
-      harness.write("  reg [" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n")
-    }
-    for (node <- printNodes) {
-      val gotWidth = node.needWidth()
-      harness.write("  wire [" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n")
-    }
-    for (rst <- resets)
-      harness.write("  reg %s;\n".format(rst.name))
+    harness write "module test;\n"
+    ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
+    outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
+    clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name)) 
+    resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name)) 
 
-    // Diffent code generation for clocks
+    harness write "  always #`CLOCK_PERIOD %s = ~%s;\n\n".format(mainClk.name, mainClk.name)
+
+    harness write "  /*** DUT instantiation ***/\n"
+    harness write "  %s %s(\n".format(c.moduleName, c.name)
+    clocks foreach (clk => harness write "    .%s(%s),\n".format(clk.name, clk.name)) 
+    resets foreach (rst => harness write "    .%s(%s),\n".format(rst.name, rst.name)) 
+    
+    harness write ((ins ++ outs) map (node => "    .%s(%s)".format(emitRef(node), emitRef(node))) reduceLeft (_ + ",\n" + _))
+    harness write ");\n\n"
+
+    harness write "  initial begin\n"
     if (Driver.isCompiling) {
-      harness.write("  reg %s = 0;\n".format(mainClk.name))
-      if (clocks.size > 1) {
-        for (clk <- clocks) {
-          val clkLength = clk.srcClock match {
-            case None => "0"
-            case Some(src) => src.name + "_length " + clk.initStr
-          }
-          harness.write("  integer %s_length = %s;\n".format(clk.name, clkLength))
-          harness.write("  integer %s_cnt = 0;\n".format(clk.name))
-          harness.write("  reg %s_fire = 0;\n".format(clk.name))
-        }
-      }
-      harness.write("  always #`CLOCK_PERIOD %s = ~%s;\n\n".format(mainClk.name, mainClk.name))
-    } else {
-      for (clk <- clocks) {
-        val clkLength = clk.srcClock match {
-          case None => "`CLOCK_PERIOD"
-          case Some(src) => src.name + "_length " + clk.initStr
-        }
-        harness.write("  reg %s = 1;\n".format(clk.name))
-        harness.write("  parameter %s_length = %s;\n".format(clk.name, clkLength))
-      }
-      for (clk <- clocks) {
-        harness.write("  always #%s_length %s = ~%s;\n".format(clk.name, clk.name, clk.name))
-      }
+      if (!resets.isEmpty)
+        harness write "    $init_rsts(" + (resets map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
+      if (!ins.isEmpty)
+        harness write "    $init_ins(" + (ins map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
+      if (!outs.isEmpty)
+        harness write "    $init_outs(" + (outs map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
     }
 
-    harness.write("  /*** DUT instantiation ***/\n")
-    harness.write("    " + c.moduleName + "\n")
-    harness.write("      " + c.name + "(\n")
-    if (Driver.isCompiling) {
-      if (c.clocks.size == 1) {
-        harness.write("        .%s(%s),\n".format(mainClk.name, mainClk.name))
-      } else {
-        for (clk <- c.clocks)
-          harness.write("        .%s(%s && %s_fire),\n".format(
-            clk.name, mainClk.name, clk.name)
-         )
-      }
-    } else {
-      for (clk <- c.clocks)
-        harness.write("        .%s(%s),\n".format(clk.name, clk.name))
+    if (Driver.isVCD) {
+      harness write "    /*** VPD dump ***/\n"
+      harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
+      harness write "    $vcdpluson(0, %s);\n".format("test"/*c.name*/)
     }
-    for (rst <- resets)
-      harness.write("        .%s(%s),\n".format(rst.name, rst.name))
-    var first = true
-    for (node <- (scanNodes ++ printNodes))
-      if(node.isIo && node.component == c) {
-        if (first) {
-          harness.write("        ." + emitRef(node) + "(" + emitRef(node) + ")")
-          first = false
-        } else {
-          harness.write(",\n        ." + emitRef(node) + "(" + emitRef(node) + ")")
-        }
-      }
-    harness.write("\n")
-    harness.write(" );\n\n")
+    if (Driver.isVCDMem) harness write "  $vcdplusmemon;\n"
+    harness write "  end\n\n"
 
-    // collect Chisel nodes for VCD dump
-    val dumpvars = new ArrayBuffer[Node]
-    for (m <- Driver.components ; node <- m.nodes ; if node.isInVCD) {
-      node match {
-        case io: Bits if m != c => {
-          var included = true
-          if (io.dir == INPUT) {
-            if (io.inputs.length == 0 || io.inputs.length > 1)
-              included = false
-          }
-          else if (io.dir == OUTPUT) {
-            if (io.consumers.size == 0 || m.parent.findBinding(io) == None || io.prune)
-              included = false
-          }
-          if (included) dumpvars += io
-        }
-        case _ => dumpvars += node
-      }
-    }
+    harness write "  always @(posedge %s) begin\n".format(mainClk.name)
+    if (Driver.isCompiling) harness write "    $tick();\n"
+    harness write "  end\n\n"
 
-    harness.write("  /*** VCD / VPD dumps ***/\n")
-    harness.write("  initial begin\n")
-    if (Driver.isDebug) {
-      harness.write("    /*** Debuggin with VPD dump ***/\n")
-      harness.write("    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name))
-      harness.write("    $vcdpluson(0, %s);\n".format(c.name))
-      if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
-    }
-    if (!Driver.isDebug && Driver.isVCD) {
-      harness.write("    /*** VCD dump ***/\n")
-      var first = true
-      for (dumpvar <- dumpvars) {
-        val pathName = dumpvar.component.getPathName(".") + "." + emitRef(dumpvar)
-        harness.write("    $dumpvars(1, %s);\n".format(pathName))
-      }
-      harness.write("    $dumpfile(\"%s.vcd\");\n".format(Driver.targetDir+c.name))
-      harness.write("    $dumpon;\n")
-    }
-    harness.write("  end\n\n")
+    harness write "endmodule\n"
 
-    if (Driver.isCompiling) {
-      harness write harnessAPIs(mainClk, clocks, resets) 
-    } else {
-      harness write harnessBase(mainClk, resets, scanNodes, printNodes)
-    }
-    harness.write("endmodule\n")
-
-    harness.close()
-  }
-
-  def harnessAPIs (mainClk: Clock, clocks: ListSet[Clock], resets: List[Bool]) = {
-    val apis = new StringBuilder
-
-    apis.append("\n  /*** API variables ***/\n")
-    apis.append("  reg[20*8:0] cmd;    // API command\n")
-    apis.append("  reg[1000*8:0] node; // Chisel node name;\n")
-    apis.append("  reg[2047:0] value;   // 'poked' value\n")
-    apis.append("  integer offset;     // mem's offset\n")
-    apis.append("  integer steps;      // number of steps\n")
-    apis.append("  integer delta;      // number of steps\n")
-    apis.append("  integer min = (1 << 31 -1);\n")
-    apis.append("  reg is_stale = 0;\n")
-
-    apis.append("\n  integer count;\n")
-
-    def fscanf(form: String, args: String*) =
-      "count = $fscanf('h80000000, \"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
-    def display(form: String, args: String*) =
-      "$display(\"%s\", %s);\n".format(form, (args.tail foldLeft args.head) (_ + ", " + _))
-
-    apis.append("  initial begin\n")
-    apis.append("  /*** API interpreter ***/\n")
-    apis.append("  forever begin\n")
-    for (rst <- resets)
-      apis.append("    %s = 0;\n".format(rst.name))
-    apis.append("    "+ fscanf("%s", "cmd"))
-    apis.append("    case (cmd)\n")
-
-    apis.append("      // < reset >\n")
-    apis.append("      // inputs: # cycles the reset consumes\n")
-    apis.append("      // return: none\n")
-    apis.append("      \"reset\": begin\n")
-    apis.append("        " + fscanf("%d", "steps"))
-    for (rst <- resets)
-      apis.append("        %s = 1;\n".format(rst.name))
-    apis.append("        repeat (steps) @(negedge %s) begin\n".format(mainClk.name))
-    apis.append("        delta = delta + min;\n")
-    if (clocks.size > 1) {
-      for (clk <- clocks)
-        apis.append("      %s_fire = 1;\n".format(clk.name, clk.name))
-    } 
-    apis.append("        end")
-    apis.append("        // return delta\n")
-    apis.append("        " + display("%1d", "delta"))
-    apis.append("        delta = 0;\n")
-    for (rst <- resets)
-      apis.append("        %s = 0;\n".format(rst.name))
-    apis.append("      end\n")
-
-    apis.append("      // < wire_peek >\n")
-    apis.append("      // inputs: wire's name\n")
-    apis.append("      // return: wire's value\n")
-    apis.append("      \"wire_peek\": begin\n")
-    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
-    apis.append("        " + fscanf("%s", "node"))
-    apis.append("        $wire_peek(node);\n")
-    apis.append("      end\n")
-
-    apis.append("      // < mem_peek >\n")
-    apis.append("      // inputs: mem's name\n")
-    apis.append("      // return: mem's value\n")
-    apis.append("      \"mem_peek\": begin\n")
-    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
-    apis.append("        " + fscanf("%s %d", "node", "offset"))
-    apis.append("        $mem_peek(node, offset);\n")
-    apis.append("      end\n")
-
-    apis.append("      // < wire_poke >\n")
-    apis.append("      // inputs: wire's name\n")
-    apis.append("      // return: \"ok\" or \"error\"\n")
-    apis.append("      \"wire_poke\": begin\n")
-    apis.append("        " + fscanf("%s 0x%x", "node", "value"))
-    apis.append("        $wire_poke(node, value);\n")
-    apis.append("        is_stale = 1;\n")
-    apis.append("      end\n")
-
-    apis.append("      // < mem_poke >\n")
-    apis.append("      // inputs: wire's name\n")
-    apis.append("      // return: \"ok\" or \"error\"\n")
-    apis.append("      \"mem_poke\": begin\n")
-    apis.append("        " + fscanf("%s %d 0x%x", "node", "offset", "value"))
-    apis.append("        $mem_poke(node, offset, value);\n")
-    apis.append("        is_stale = 1;\n")
-    apis.append("      end\n")
-
-    apis.append("      // < step > \n")
-    apis.append("      // inputs: # cycles\n")
-    apis.append("      // return: # cycles the target will proceed\n")
-    apis.append("      \"step\": begin\n")
-    apis.append("        " + fscanf("%d", "steps"))
-    apis.append("        if (is_stale) #0.1 is_stale = 0;\n")
-    apis.append("        repeat (steps) @(negedge %s) begin\n".format(mainClk.name))
-    if (clocks.size > 1) {
-      for (clk <- clocks)
-        apis.append("          if (%s_length < min) min = %s_cnt;\n".format(clk.name, clk.name))
-      for (clk <- clocks)
-        apis.append("          %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
-      for (clk <- clocks) {
-        apis.append("          if (%s_cnt == 0) %s_fire = 1;\n".format(clk.name, clk.name))
-        apis.append("          else %s_fire = 0;\n".format(clk.name))
-      }
-      for (clk <- clocks)
-        apis.append("          if (%s_cnt == 0) %s_cnt = %s_length;\n".format(clk.name, clk.name, clk.name))
-    }
-    apis.append("          delta = delta + min;\n")
-    apis.append("        end\n")
-    apis.append("        // return delta\n")
-    apis.append("        " + display("%1d", "delta"))
-    apis.append("        delta = 0;\n")
-    apis.append("      end\n")
-
-    if (clocks.size > 1) {
-      apis.append("      // <set_clocks> \n")
-      apis.append("      // inputs: clocks' length\n")
-      apis.append("      // return: \"ok\" or \"error\"\n")
-      apis.append("      \"set_clocks\": begin\n")
-      val clkFormat = ((clocks filter (_.srcClock == None)).toList map (x => "%x"))
-      val clkFires  = ((clocks filter (_.srcClock == None)) map (_.name + "_length")).toList
-      apis.append("        " + fscanf((clkFormat foldLeft "")(_ + " " + _), clkFires:_*) )
-      apis.append("        " + display("%s", "\"ok\""))
-      for (clk <- clocks) {
-        apis.append("        %s_cnt = %s_length;\n".format(clk.name, clk.name))
-      }
-      apis.append("      end\n")
-    }
-
-    apis.append("      // < quit>: finish simulation\n")
-    apis.append("      \"quit\": $finish;\n")
-    apis.append("      // default return: \"error\"\n")
-    apis.append("      default: " + display("%s", "\"error\""))
-    apis.append("    endcase\n")
-    apis.append("    end\n\n")
-
-    apis.append("    if (count == -1) $finish(1);\n\n")
-    apis.append("  end\n\n")
-    apis.result
-  }
-
-  def harnessBase (mainClk: Clock, resets: List[Bool], scanNodes: Array[Bits], printNodes: Array[Bits]) = {
-    val base = new StringBuilder
-    val printFormat = printNodes.map(a => a.chiselName + ": 0x%x, ").fold("")((y,z) => z + " " + y)
-    val scanFormat = scanNodes.map(a => "%x").fold("")((y,z) => z + " " + y)
-
-    if (!resets.isEmpty) {
-      base.append("  parameter reset_period = `CLOCK_PERIOD * 4;\n")
-      base.append("  initial begin\n")
-      for (rst <- resets) base.append("    %s = 1;\n".format(rst.name))
-      base.append("    #reset_period;\n")
-      for (rst <- resets) base.append("    %s = 0;\n".format(rst.name))
-      base.append("  end\n\n")
-    }
-
-    base.append("  always @(posedge %s) begin\n".format(mainClk.name))
-    if (!resets.isEmpty)
-      base.append("    if (%s)\n".format(
-        (resets.tail foldLeft ("!" + resets.head.name))(_ + " || !" + _.name)))
-    base.append("      $display(\"" + printFormat.slice(0,printFormat.length-1) + "\"")
-    for (node <- printNodes) {
-      base.append(", " + emitRef(node))
-    }
-    base.append(");\n")
-    base.append("  end\n\n")
-
-    base.result
+    harness.close
   }
 
   // Is the specified node synthesizeable?
@@ -966,27 +720,17 @@ class VerilogBackend extends Backend {
   }
 
   override def compile(c: Module, flags: Option[String]) {
-    copyToTarget("vpi_user.cc")
+    copyToTarget("vpi.cpp")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    def run(cmd: String): Boolean = {
-      val bashCmd = Seq("bash", "-c", cmd)
-      val c = bashCmd.!
-      if (c == 0) {
-        ChiselError.info(cmd + " RET " + c)
-        true
-      } else {
-        ChiselError.error(cmd + " RET " + c)
-        false
-      }
-    }
     val dir = Driver.targetDir + "/"
-    val src = n + "-harness.v " + n + ".v"
-    val cmd =  "cd " + dir + " && vcs -full64 -quiet +v2k -Mdir=" + n + ".csrc " +
-              "-timescale=1ns/1ps +define+CLOCK_PERIOD=120 +vpi -use_vpiobj vpi_user.cc " +
-              "+vcs+initreg+random " + src + " -o " + n + " -debug_pp"
-    if (!run(cmd)) {
-      throwException("vcs command failed")
-    }
+    val ccFlags = List("-I$VCS_HOME/include", "-fPIC", "-std=c++11") mkString " "
+    val vcsFlags = List("-full64", "-quiet", "+v2k", "-debug_pp", "-Mdir=" + n + ".csrc",
+      "-timescale=1ns/1ps", "+define+CLOCK_PERIOD=10", "+vcs+initreg+random", "+vpi") mkString " "
+    val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
+    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
+    cc(dir, "vpi", ccFlags)
+    link(dir, "vpi.so", List("vpi.o"), isLib=true)
+    if (!run(cmd)) throw new Exception("vcs command failed")
   }
 
   private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"

@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue=>ScalaQueue}
+import sys.process.stringSeqToProcess
 
 trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
@@ -57,6 +58,35 @@ trait FileSystemUtilities {
     } else {
       println(s"WARNING: Unable to copy '$filename'" )
     }
+  }
+
+  import scala.util.Properties.envOrElse
+  protected val CC = envOrElse("CC", "g++" )
+  protected val CXX = envOrElse("CXX", "g++" )
+  protected val CCFLAGS = envOrElse("CCFLAGS", "")
+  protected val CXXFLAGS = envOrElse("CXXFLAGS", "")
+  protected val CPPFLAGS = envOrElse("CPPFLAGS", "")
+  protected val LDFLAGS = envOrElse("LDFLAGS", "")
+  protected val chiselENV = envOrElse("CHISEL", "")
+
+  def run(cmd: String) = {
+    val bashCmd = Seq("bash", "-c", cmd)
+    val c = bashCmd.!
+    ChiselError.info(cmd + " RET " + c)
+    c == 0
+  }
+
+  def cc(dir: String, name: String, flags: String = "", isCC: Boolean = false) {
+    val compiler = if (isCC) CC else CXX
+    val cmd = List(compiler, "-c", "-o", dir + name + ".o", flags, dir + name + ".cpp").mkString(" ")
+    if (!run(cmd)) throw new Exception("failed to compile " + name + ".cpp")
+  }
+
+  def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
+    val compiler = if (isCC) CC else CXX
+    val shared = if (isLib) "-shared" else ""
+    val ac = (List(compiler, LDFLAGS, shared, "-o", dir + target) ++ (objects map (dir + _))).mkString(" ")
+    if (!run(ac)) throw new Exception("failed to link " + objects.mkString(", "))
   }
 }
 
