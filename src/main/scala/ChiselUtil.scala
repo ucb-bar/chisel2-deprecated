@@ -602,6 +602,6 @@ object Wire
       }
     }
     res.setIsWired(true)
-    res
+    res.asDirectionless
   }
 }
