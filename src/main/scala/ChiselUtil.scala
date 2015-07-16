@@ -274,7 +274,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   val io = new ArbiterIO(gen, n)
   val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
-  val chosen = UInt(width = log2Up(n))
+  val chosen = Wire(UInt(width = log2Up(n)))
 
   for ((g, i) <- grant.zipWithIndex)
     io.in(i).ready := Mux(locked, lockIdx === UInt(i), g) && io.out.ready
