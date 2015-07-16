@@ -147,4 +147,7 @@ class Extract extends Node {
             " W0Wtransform", line)
     }
   }
+
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }
