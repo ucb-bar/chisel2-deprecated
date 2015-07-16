@@ -151,7 +151,16 @@ class VerilogParameters {
     for ( field <- myFields ) {
       field.setAccessible(true)
       val fieldName = field.toString().split(" ").last.split('.').last
-      val verilogStr = "    ." + fieldName + "(" + field.get(this) + ")"
+      val fieldVal = field.get(this)
+      val fieldStr = {
+        if (fieldVal.isInstanceOf[Boolean]) {
+          if ( fieldVal.asInstanceOf[Boolean] ) "TRUE" else "FALSE"
+        } else if (fieldVal.isInstanceOf[String])
+          "\"" + fieldVal + "\""
+        else
+          fieldVal
+      }
+      val verilogStr = "    ." + fieldName + "(" + fieldStr + ")"
       if ( myFields.last == field )
         paramStr += verilogStr
       else
