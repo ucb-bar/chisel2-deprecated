@@ -174,7 +174,12 @@ class VerilogBackend extends Backend {
     val spacing = (if(c.verilog_parameters != "") " " else "");
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "(";
     if (c.clocks.length > 0) {
-      res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+      if ( c.isInstanceOf[BlackBox] ) {
+        val bb = c.asInstanceOf[BlackBox]
+        res = res + (c.clocks).map(x => "." + bb.mapClock(emitRef(x)) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+      }
+      else
+        res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
     }
     if (c.resets.size > 0 ) {
       if (c.clocks.length > 0) res = res + ", "
