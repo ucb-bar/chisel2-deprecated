@@ -119,7 +119,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         System.err.print(Character.toChars(testErr.get.read()))
       }
     } catch {
-      case e : IOException => testErr = null; println("ERR EXCEPTION")
+      case e : IOException => testErr = None; println("ERR EXCEPTION")
     }
 
     if (sb == "error") {
@@ -267,7 +267,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       readOutputs
     }
   }
-
 
   def step(n: Int) = {
     val target = t + n

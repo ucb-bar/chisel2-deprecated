@@ -364,12 +364,9 @@ class VerilogBackend extends Backend {
   def emitInit(node: Node): String = node match {
     case r: Reg =>
       "    " + emitRef(r) + " = " + emitRand(r) + ";\n"
-    case m: Mem[_] =>
-      if (m.isInline)
-        "    for (initvar = 0; initvar < " + m.n + "; initvar = initvar+1)\n" +
-        "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
-      else
-        ""
+    case m: Mem[_] if m.isInline =>
+      "    for (initvar = 0; initvar < " + m.n + "; initvar = initvar+1)\n" +
+      "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
     case a: Assert =>
       "    " + emitRef(a) + " = 1'b0;\n"
     case _ =>
@@ -385,8 +382,10 @@ class VerilogBackend extends Backend {
     val resets = c.resets.values.toList
 
     harness write "module test;\n"
+    harness write "parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;"
     ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
+    if (clocks.isEmpty) harness write "  reg %s = 0;\n".format(mainClk.name)
     clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name)) 
     resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name)) 
 
@@ -413,13 +412,13 @@ class VerilogBackend extends Backend {
     if (Driver.isVCD) {
       harness write "    /*** VPD dump ***/\n"
       harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
-      harness write "    $vcdpluson(0, %s);\n".format("test"/*c.name*/)
+      harness write "    $vcdpluson(0, %s);\n".format(c.name)
+      if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
     }
-    if (Driver.isVCDMem) harness write "  $vcdplusmemon;\n"
     harness write "  end\n\n"
 
-    harness write "  always @(posedge %s) begin\n".format(mainClk.name)
-    if (Driver.isCompiling) harness write "    $tick();\n"
+    harness write "  always @(negedge %s) begin\n".format(mainClk.name)
+    if (Driver.isCompiling) harness write "    #CLOCK_DELAY $tick();\n"
     harness write "  end\n\n"
 
     harness write "endmodule\n"
@@ -574,17 +573,14 @@ class VerilogBackend extends Backend {
     if (c.clocks.length > 0 || c.resets.size > 0)
       res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
-    for ((n, w) <- c.wires) {
+    for ((n, io) <- c.wires) {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
-      w match {
-        case io: Bits => {
-          val prune = if (io.prune && c != topMod) "//" else ""
-          if (io.dir == INPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "input " + emitWidth(io) + " " + emitRef(io))
-          } else if(io.dir == OUTPUT) {
-            ports += new StringBuilder(nl + "    " + prune + "output" + emitWidth(io) + " " + emitRef(io))
-          }
-        }
+      val prune = if (io.prune && c != topMod) "//" else ""
+      io.dir match {
+        case INPUT =>
+          ports += new StringBuilder(nl + "    " + prune + "input " + emitWidth(io) + " " + emitRef(io))
+        case OUTPUT =>
+          ports += new StringBuilder(nl + "    " + prune + "output" + emitWidth(io) + " " + emitRef(io))
       }
     }
     val uncommentedPorts = ports.filter(!_.result.contains("//"))
