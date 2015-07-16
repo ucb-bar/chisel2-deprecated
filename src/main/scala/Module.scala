@@ -216,7 +216,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       }
     }
     // io naming
-    io nameIt ("io", true)
+    io nameIt ("", true)
   }
 
   def findBinding(m: Node) = bindings find (_.inputs(0) == m)

@@ -38,7 +38,7 @@ object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
     initChisel(args)
     try {
-      if(wrapped) execute(gen) else executeUnwrapped(gen)
+      if(wrapped) execute(gen) else executeUnwrapped(gen) 
     } finally {
       ChiselError.report
       if (ChiselError.hasErrors && !getLineNumbers) {
@@ -370,7 +370,7 @@ object Driver extends FileSystemUtilities{
     chiselConfigMode = None
     chiselConfigDump = false
     startTime = System.currentTimeMillis
-
+    onlyRunTester = false
     readArgs(args)
   }
 
@@ -422,6 +422,7 @@ object Driver extends FileSystemUtilities{
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
         case "--testCommand" => testCommand = Some(args(i + 1)); i += 1
+        case "--onlyTest" => onlyRunTester = true
         case "--targetDir" => targetDir = args(i + 1); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
@@ -540,6 +541,7 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  var onlyRunTester:Boolean = false
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
     if(s1.isEmpty && s2.isEmpty) "" else {

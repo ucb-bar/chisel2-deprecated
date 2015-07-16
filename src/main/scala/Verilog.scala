@@ -1016,10 +1016,12 @@ class VerilogBackend extends Backend {
     findConsumers(c)
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val out = createOutputFile(n + ".v")
-    doCompile(c, out, 0)
-    ChiselError.checkpoint()
-    out.close()
+    if (!Driver.onlyRunTester) {
+      val out = createOutputFile(n + ".v")
+      doCompile(c, out, 0)
+      ChiselError.checkpoint()
+      out.close()
+    }
 
     if (!memConfs.isEmpty) {
       val out_conf = createOutputFile(n + ".conf")

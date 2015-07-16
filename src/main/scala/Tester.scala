@@ -293,11 +293,13 @@ class ManualTester[+T <: Module]
 
   var ok = true;
   var failureTime = -1
+  var nfails = 0
+  var npass = 0
 
   def expect (good: Boolean, msg: String): Boolean = {
     if (isTrace)
       println(msg + " " + (if (good) "PASS" else "FAIL"))
-    if (!good) { ok = false; if (failureTime == -1) failureTime = t; }
+    if (!good) { ok = false; if (failureTime == -1) failureTime = t; nfails = nfails + 1 } else {npass = npass + 1}
     good
   }
 
@@ -306,7 +308,7 @@ class ManualTester[+T <: Module]
     val got = peek(data)
 
     expect((got & mask) == (expected & mask),
-       "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
+       "EXPECT " + dumpName(data) + " <- " + got.toString(16) + " == " + expected.toString(16))
   }
 
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
@@ -410,6 +412,9 @@ class ManualTester[+T <: Module]
       process.destroy()
     }
     println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else { "FAILED FIRST AT CYCLE " + failureTime }))
+    if (!ok) {
+      println("FAILED " + nfails + " OUT OF " + (nfails + npass))
+    }
     ok
   }
 }

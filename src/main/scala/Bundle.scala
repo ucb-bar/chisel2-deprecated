@@ -141,7 +141,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       && (name.isEmpty
         || (!path.isEmpty && name != path)) ) {
       name = path
-      val prefix = if (name.length > 0) name + "_" else ""
+      val prefix = if (name.length > 0) name + "$" else ""
       for ((n, i) <- elements) {
         i.nameIt(prefix + n, isNamingIo)
       }
