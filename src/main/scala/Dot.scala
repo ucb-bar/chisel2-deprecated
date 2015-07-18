@@ -218,51 +218,46 @@ class DotBackend extends Backend {
       islands = createIslands()
     }
     var gn = -1;
-    val out_cd = createOutputFile(c.name + "_c.dot");
-    out_cd.write("digraph TopTop {\n");
-    out_cd.write("rankdir = LR;\n");
-    def genNum: Int = { gn += 1; gn };
+    val out_cd = createOutputFile(c.name + "_c.dot")
+    out_cd.write("digraph TopTop {\n")
+    out_cd.write("rankdir = LR;\n")
+    def genNum: Int = { gn += 1; gn }
     def dumpComponent (c: Module): Unit = {
-      out_cd.write("subgraph cluster" + c.name + "{\n");
-      out_cd.write("label = \"" + c.name + "\";\n");
-      def dumpIo (n: String, d: Data): Unit = {
-        d match {
-          case b: Bundle =>
-            out_cd.write("subgraph cluster" + n + "__" + genNum + "{\n");
-            out_cd.write("node [shape=box];\n");
-            out_cd.write("label = \"" + n + "\";\n");
-            for ((cn, cd) <- b.elements)
-              dumpIo(cn, cd);
-            out_cd.write("}\n");
-          case o =>
-            out_cd.write(emitRef(d) + "[label=\"" + n + "\"];\n");
-            for (in <- d.inputs)
-              if (isDottable(in)) {
-                out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.needWidth() + "\"];\n");
-              }
-        }
+      out_cd.write("subgraph cluster" + c.name + "{\n")
+      out_cd.write("label = \"" + c.name + "\";\n")
+      def dumpIo (n: String, d: Data): Unit = d match {
+        case b: Bundle =>
+          out_cd.write("subgraph cluster" + n + "__" + genNum + "{\n")
+          out_cd.write("node [shape=box];\n")
+          out_cd.write("label = \"" + n + "\";\n")
+          b.elements foreach { case (cn, cd) => dumpIo(cn, cd) }
+          out_cd.write("}\n")
+        case o =>
+          out_cd.write(emitRef(d) + "[label=\"" + n + "\"];\n")
+          for (in <- d.inputs if isDottable(in)) {
+            out_cd.write(emitRef(in) + " -> " + emitRef(d) + "[label=\"" + in.needWidth() + "\"];\n")
+          }
       }
-      dumpIo("io", c.io);
-      for (cc <- c.children)
-        dumpComponent(cc);
+      dumpIo("io", c.io)
+      c.children foreach (dumpComponent(_))
       out_cd.write("}\n");
     }
-    dumpComponent(c);
-    out_cd.write("}");
-    out_cd.close();
+    dumpComponent(c)
+    out_cd.write("}")
+    out_cd.close()
 
-    val out_d = createOutputFile(c.name + ".dot");
-    out_d.write("digraph " + c.name + "{\n");
-    out_d.write("rankdir = LR;\n");
+    val out_d = createOutputFile(c.name + ".dot")
+    out_d.write("digraph " + c.name + "{\n")
+    out_d.write("rankdir = LR;\n")
     val (innertext, innercrossings) = emitModuleText(c, 0)
-    out_d.write(innertext);
+    out_d.write(innertext)
     if (Driver.partitionIslands && innercrossings.length > 0) {
-      out_d.write(innercrossings);
+      out_d.write(innercrossings)
     } else {
       Predef.assert(innercrossings.length == 0,
         {println("length:" + innercrossings.length + ", " + innercrossings)})
     }
-    out_d.write("}");
-    out_d.close();
+    out_d.write("}")
+    out_d.close()
   }
 }

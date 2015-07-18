@@ -716,10 +716,12 @@ class VerilogBackend extends Backend {
   }
 
   override def compile(c: Module, flags: Option[String]) {
+    copyToTarget("sim_api.h")
+    copyToTarget("vpi.h")
     copyToTarget("vpi.cpp")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val dir = Driver.targetDir + "/"
-    val ccFlags = List("-I$VCS_HOME/include", "-fPIC", "-std=c++11") mkString " "
+    val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
     val vcsFlags = List("-full64", "-quiet", "+v2k", "-debug_pp", "-Mdir=" + n + ".csrc",
       "-timescale=1ns/1ps", "+define+CLOCK_PERIOD=10", "+vcs+initreg+random", "+vpi") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "

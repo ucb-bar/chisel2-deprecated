@@ -354,7 +354,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
           command ++= ArrayBuffer(":target-dir", Driver.targetDir)
           command.mkString(" ")
         case b: VerilogBackend => target + " -q +vcs+initreg+0 "
-        case _ => ""
+        case _ => target
       }
     }
     println("SEED " + Driver.testerSeed)

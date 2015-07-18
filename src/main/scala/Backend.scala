@@ -228,17 +228,28 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def fullyQualifiedName( m: Node ): String = {
-    m match {
-      case l: Literal => l.toString;
-      case _ if m.name != "" && m.name != "reset" => m.compOpt match {
-        case Some(p) if p != topMod => 
-          /* Only modify name if it is not the reset signal or not in top component */
-          m.component.getPathName + "__" + m.name
-        case _ => m.name
-      }
+  /** Ensures each node such that it has a unique name across the whole
+    hierarchy by prefixing its name by a component path (except for "reset"
+    and all nodes in *c*). */
+  def renameNodes(nodes: Seq[Node], sep: String = "_") = nodes foreach {
+    case _: Literal =>
+    case m if m.named && (m.name != "reset" || m.name != Driver.implicitReset.name) => m.compOpt match {
+      case Some(p) if p != topMod =>
+        m.name = m.component.getPathName(sep) + sep + sep + m.name
+      case _ =>
+    }
+    case _ =>
+  }
+
+  def fullyQualifiedName( m: Node ): String = m match {
+    case l: Literal => l.toString;
+    case _ if m.name != "" && m.name != "reset" => m.compOpt match {
+      case Some(p) if p != topMod => 
+        /* Only modify name if it is not the reset signal or not in top component */
+        m.component.getPathName + "__" + m.name
       case _ => m.name
     }
+    case _ => m.name
   }
 
   def emitTmp(node: Node): String =

@@ -188,26 +188,13 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(nodes: Seq[Node]) {
-    for (m <- nodes) {
-      m match {
-        case _: Literal =>
-        case _ if m.named && m.compOpt != None =>
-          // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.component != topMod)
-            m.name = m.component.getPathName(":") + "::" + m.name
-        case _ =>
-      }
-    }
-  }
-
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
     flattenAll
     ChiselError.checkpoint()
 
-    renameNodes(Driver.orderedNodes)
+    renameNodes(Driver.orderedNodes, ":")
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = findGraphDims
       // ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
