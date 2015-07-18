@@ -233,8 +233,8 @@ abstract class Backend extends FileSystemUtilities{
     and all nodes in *c*). */
   def renameNodes(nodes: Seq[Node], sep: String = "_") = nodes foreach {
     case _: Literal =>
-    case m if m.named && (m.name != "reset" || m.name != Driver.implicitReset.name) => m.compOpt match {
-      case Some(p) if p != topMod =>
+    case m if m.named => m.compOpt match {
+      case Some(p) if (p != topMod || m.name != "reset" || m.name != Driver.implicitReset.name) =>
         m.name = m.component.getPathName(sep) + sep + sep + m.name
       case _ =>
     }
