@@ -48,8 +48,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   val pokeMap = HashMap[Bits, BigInt]()
   val peekMap = HashMap[Bits, BigInt]()
   val (inputs: ListSet[Bits], outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
+  var isStale = false
 
-  object SIM_CMD extends Enumeration { val RESET, STEP, FIN = Value }
+  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
    * to the way Process works. TODO: FIXME.
@@ -62,7 +63,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         ChiselError.info("waiting for emulator process streams to be valid ...")
       }
     }
-    ChiselError.info("emulator launched after %d trials".format(waited))
   }
 
   /**
@@ -180,8 +180,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   def peek(data: Bits): BigInt = {
+    if (isStale) update
     val x = signed_fix(data, peekMap getOrElse (data, peekBits(data.getNode)))
-    if (isTrace) println("  PEEK " + dumpName(data) + " -> " + x)
+    if (isTrace) println("  PEEK " + dumpName(data) + " -> " + x.toString(16))
     x 
   }
 
@@ -221,19 +222,24 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def pokeAt[T <: Bits](data: Mem[T], x: BigInt, off: Int): Unit = {
     pokeBits(data, x, off)
   }
-
-  def poke(data: Bits, x: BigInt): Unit = {
-    if (isTrace) println("  POKE " + dumpName(data) + " -> " + x)
+  def poke(data: Bits, x: Boolean) { this.poke(data, int(x)) }
+  def poke(data: Bits, x: Int)     { this.poke(data, int(x)) }
+  def poke(data: Bits, x: Long)    { this.poke(data, int(x)) }
+  def poke(data: Bits, x: BigInt)  {
+    val value = if (x >= 0) x else {
+      val cnt = (data.needWidth() - 1) >> 6
+      ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
+    }
+    if (isTrace) println("  POKE " + dumpName(data) + " -> " + value.toString(16))
     if (inputs contains data) 
-      pokeMap(data) = x
+      pokeMap(data) = value
     else 
-      pokeBits(data.getNode, x)
+      pokeBits(data.getNode, value)
+    isStale = true
   }
-
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
-    val kv = (data.flatten.map(x => x._2), x.reverse).zipped;
-    for ((x, y) <- kv)
-      poke(x, y)
+    val kv = (data.flatten.map(x => x._2), x.reverse).zipped
+    for ((x, y) <- kv) poke(x, y)
   }
 
   private def writeln(str: String) {
@@ -254,10 +260,15 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     peekMap.clear
     outputs foreach (x => peekMap(x) = BigInt(readln, 16))
   }
- 
+
+  private val writeMask = int(-1L) 
   private def writeInputs {
-    inputs foreach ( x => 
-      writeln((pokeMap getOrElse (x, BigInt(0))).toString(16)) )
+    inputs foreach { x =>
+      val value = pokeMap getOrElse (x, BigInt(0))
+      for (i <- ((x.needWidth - 1) >> 6) to 0 by -1) {
+        writeln(((value >> (64 * i)) & writeMask).toString(16))
+      }
+    }
   }
 
   def reset(n: Int = 1) {
@@ -268,7 +279,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  def step(n: Int) = {
+  def update {
+    sendCmd(SIM_CMD.UPDATE)
+    writeInputs
+    readOutputs
+    isStale = false
+  }
+
+  def step(n: Int) {
     val target = t + n
     // val s = emulatorCmd("step " + n)
     // delta += s.toInt
@@ -279,11 +297,13 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       readOutputs
     }
     t += n
+    isStale = false
   }
 
   def int(x: Boolean): BigInt = if (x) 1 else 0
-  def int(x: Int): BigInt = x
-  def int(x: Bits): BigInt = x.litValue()
+  def int(x: Int):     BigInt = (BigInt(x >>> 1) << 1) | x & 1
+  def int(x: Long):    BigInt = (BigInt(x >>> 1) << 1) | x & 1
+  def int(x: Bits):    BigInt = x.litValue()
 
   var ok = true
   var failureTime = -1
@@ -297,10 +317,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   def expect (data: Bits, expected: BigInt): Boolean = {
     val mask = (BigInt(1) << data.needWidth) - 1
-    val got = peek(data)
-
-    expect((got & mask) == (expected & mask),
-       "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
+    val got = peek(data) & mask
+    val exp = expected & mask
+    expect(got == exp, "EXPECT " + dumpName(data) + " <- " + got.toString(16) + " == " + exp.toString(16))
   }
 
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
@@ -314,10 +333,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /* We need the following so scala doesn't use our "tolerant" Float version of expect.
    */
   def expect (data: Bits, expected: Int): Boolean = {
-    expect(data, BigInt(expected))
+    expect(data, int(expected))
   }
   def expect (data: Bits, expected: Long): Boolean = {
-    expect(data, BigInt(expected))
+    expect(data, int(expected))
   }
 
   /* Compare the floating point value of a node with an expected floating point value.

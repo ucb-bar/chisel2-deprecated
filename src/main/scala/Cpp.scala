@@ -1626,8 +1626,10 @@ class CppBackend extends Backend {
     clkDomains.outputAllClkDomains()
 
     // Generate API methods
-    createCppFile()
-    val nSimMethods = if (Driver.isGenHarness) genInitSimDataMethod(c) else 0
+    val nSimMethods = if (Driver.isGenHarness) {
+      createCppFile()
+      genInitSimDataMethod(c) 
+    } else 0
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)

@@ -58,19 +58,27 @@ private:
     vpi_control(vpiFinish, 0);
   }
 
-  virtual void consume_inputs() {
+  virtual void step() {
     // Consumes input tokens (in hex)
     for (size_t i = 0 ; i < sim_data.inputs.size() ; i++) {
+      vpiHandle in_handle = sim_data.inputs[i];
       std::string value;
-      std::cin >> value;
+      for (size_t k = 0 ; k < ((vpi_get(vpiSize, in_handle) - 1) >> 6) + 1 ; k++) {
+        // 64 bit chunks are given
+        std::string v;
+        std::cin >> v;
+        value += v;
+      }
       s_vpi_value value_s;
       value_s.format = vpiHexStrVal;
       value_s.value.str = (PLI_BYTE8*) value.c_str();
-      vpi_put_value(sim_data.inputs[i], &value_s, NULL, vpiNoDelay);
+      vpi_put_value(in_handle, &value_s, NULL, vpiNoDelay);
     }
   }
 
-  virtual void generate_outputs() {
+  virtual void update() { step(); }
+
+  virtual void gen_tokens() {
     // Generate output tokens (in hex)
     for (size_t i = 0 ; i < sim_data.outputs.size() ; i++) {
       s_vpi_value value_s;

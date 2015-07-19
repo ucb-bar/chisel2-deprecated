@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 
-enum SIM_CMD { RESET, STEP, FIN };
+enum SIM_CMD { RESET, STEP, UPDATE, FIN };
 
 template<class T> 
 struct sim_data_t {
@@ -18,7 +18,7 @@ public:
   void tick() {
     static bool is_reset = false;
     // First, Generates output tokens  (in hex)
-    generate_outputs();
+    gen_tokens();
     if (is_reset) {
       start();
       is_reset = false;
@@ -31,7 +31,8 @@ public:
       std::cin >> cmd;
       switch ((SIM_CMD) cmd) {
         case RESET: reset(); is_reset = true; exit = true; break;
-        case STEP: consume_inputs(); exit = true; break;
+        case STEP: step(); exit = true; break;
+        case UPDATE: update(); exit = true; break;
         case FIN:  finish(); exit = true; break;
         default: break;
       }
@@ -40,9 +41,10 @@ public:
 private:
   virtual void reset() = 0;
   virtual void start() = 0; 
-  virtual void finish() = 0; 
-  virtual void consume_inputs() = 0;
-  virtual void generate_outputs() = 0;
+  virtual void finish() = 0;
+  virtual void update() = 0; 
+  virtual void step() = 0;
+  virtual void gen_tokens() = 0;
 };
 
 #endif //__SIM_API_H

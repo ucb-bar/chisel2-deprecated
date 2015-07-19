@@ -1600,6 +1600,7 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   size_t first_digit, last_digit, comment;
 
   // Scan for the hex data bounds.
+  bool neg = hex_line[offset] == '-';
   comment = hex_line.find_first_of("/", offset);
   first_digit = hex_line.find_first_of("0123456789abcdefABCDEF", offset);
   if (first_digit == std::string::npos) return 0;
@@ -1630,7 +1631,10 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
   }
   if (bit != 0) {
     res.values[w_index] = word_accum;
+    w_index++;
   }
+  while(w_index < res.n_words) res.values[w_index++] = 0L;
+  if (neg) res = res - 1;
   // Return a pointer to the character after the converted value.
   return last_digit + 1;
 }
@@ -1690,9 +1694,8 @@ template <int w, int d> mem_t<w,d> MEM( void );
 
 class mod_t {
  public:
-  mod_t(): dumpfile(NULL) /*is_stale(false), printStream() */ {}
+  mod_t(): dumpfile(NULL) { }
   virtual ~mod_t() {}
-  // std::vector< mod_t* > children;
   virtual void init ( val_t rand_init=false ) = 0;
   virtual void clock_lo ( dat_t<1> reset ) = 0;
   virtual void clock_hi ( dat_t<1> reset ) = 0;
@@ -1712,32 +1715,8 @@ class mod_t {
     timestep += 1;
   }
 
-  /*
-  int has_output(void) { return printStream.tellp(); }
-
-  std::string drain_output(void) {
-    std::string result = printStream.str();
-    printStream.clear();
-    printStream.str(std::string());
-    return result;
-  }
-  */
-
-  // Since we have an element with a deleted copy constructor - printStream,
-  // we need to provide our own explicit copy constructor.
-  /*
-  mod_t(const mod_t& src) {
-    children = src.children;
-    timestep = src.timestep;
-    is_stale = src.is_stale;
-    dumpfile = src.dumpfile;
-  }
-  */
-
  protected:
-  // bool is_stale;
   FILE* dumpfile;
-  // std::basic_ostringstream< char > printStream;
 };
 
 #define ASSERT(cond, msg) { \
