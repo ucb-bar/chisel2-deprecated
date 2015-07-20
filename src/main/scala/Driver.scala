@@ -402,6 +402,7 @@ object Driver extends FileSystemUtilities{
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
         case "--v" => backendName = "v"
+        case "--fir" => backendName = "fir"
         case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
@@ -474,6 +475,7 @@ object Driver extends FileSystemUtilities{
       case "null" => new NullBackend
       case "sysc" => new SysCBackend
       case "v" => new VerilogBackend
+      case "fir" => new LoFIRRTLBackend
       case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
     }
   }

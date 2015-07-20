@@ -539,8 +539,19 @@ class LoFIRRTLBackend extends Backend {
     }
   }
 
-  def emitDecs(c: Module): StringBuilder =
-    c.nodes.map(emitDec(_)).addString(new StringBuilder)
+  def emitDecs(c: Module): StringBuilder = {
+    //c.nodes.map(emitDec(_)).addString(new StringBuilder)
+    val nonMemDecs = new StringBuilder()
+    val memDecs = new StringBuilder()
+    for ( x <- c.nodes) {
+      x match {
+        case m:Mem[_] => memDecs.append(emitDec(m))
+        case other => nonMemDecs.append(emitDec(other))
+      }
+    }
+    nonMemDecs.addString(memDecs)
+  }
+      
 
   //def emitInits(c: Module): StringBuilder = {
     //val sb = new StringBuilder
@@ -571,11 +582,16 @@ class LoFIRRTLBackend extends Backend {
     if (c.resets.size > 0)
       res.append((c.resets.values.toList).map(x => "    input " + emitRef(x) + " : UInt<1>\n").reduce(_ + _))
     val ports = new ArrayBuffer[StringBuilder]
+    val pruned = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       // if(first && !hasReg) {first = false; nl = "\n"} else nl = ",\n";
       w match {
         case io: Bits => {
-          val prune = if (io.prune && c != Driver.topComponent) "//" else ""
+          //val prune = if (io.prune && c != Driver.topComponent) "//" else ""
+          if (io.prune) {
+            pruned += new StringBuilder("    " + emitRef(io) + " := UInt(0)")
+          }
+          val prune = ""
           if (io.dir == INPUT) {
             ports += new StringBuilder(nl + "    " + prune + "input " +
                                        emitRef(io) + " : UInt" + emitWidth(io));
@@ -590,6 +606,8 @@ class LoFIRRTLBackend extends Backend {
     //uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
     //if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result + "\n").reduceLeft(_ + _))
+    res.append("\n");
+    res.append(pruned.map(_.result + "\n").reduceLeftOption(_ + _).getOrElse(""));
     res.append("\n");
     res.append(emitDecs(c));
     res.append("\n");
