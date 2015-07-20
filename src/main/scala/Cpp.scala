@@ -154,45 +154,35 @@ class CppBackend extends Backend {
   // Returns a list of tuples (type, name) of variables needed by a node
   protected[this] def nodeVars(node: Node): List[(String, String)] = {
     node match {
-      case x: Binding =>
-        List()
-      case l: Literal =>
-        if (isInObject(l) && words(l) > 1) {
-          // Are we maintaining a constant pool?
-          if (coalesceConstants) {
-            // Is this the node that actually defines the constant?
-            // If so, output the definition (we must do this only once).
-            if (constantPool.contains(l.name) && constantPool(l.name) == l) {
-              List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
-            } else {
-              List()
-            }
-          } else {
+      case x: Binding => List()
+      case l: Literal if isInObject(l) && words(l) > 1 =>
+        // Are we maintaining a constant pool?
+        if (coalesceConstants) {
+          // Is this the node that actually defines the constant?
+          // If so, output the definition (we must do this only once).
+          if (constantPool.contains(l.name) && constantPool(l.name) == l) {
             List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
+          } else {
+            List()
           }
         } else {
-          List()
+          List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
         }
-      case x: Reg =>
-        List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
-          if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
-            // Add an entry for the shadow register in the main object.
-            if (shadowRegisterInObject) {
-              List((s" dat_t<${node.needWidth()}>", emitRef(node) + s"__shadow"))
-            } else {
-              Nil
-            }
-          } else {
-            Nil
-          }
+      case l: Literal => List()
+      case x: Reg => List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
+        if ((!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) && shadowRegisterInObject) {
+          // Add an entry for the shadow register in the main object.
+          List((s" dat_t<${node.needWidth()}>", emitRef(node) + s"__shadow"))
+        } else {
+          Nil
         }
+      }
       case m: Mem[_] =>
         List((s"mem_t<${m.needWidth()},${m.n}>", emitRef(m)))
       case r: ROMData =>
         List((s"mem_t<${r.needWidth()},${r.n}>", emitRef(r)))
       case c: Clock =>
-        List(("int", emitRef(node)),
-             ("int", emitRef(node) + "_cnt"))
+        List(("int", emitRef(node)), ("int", emitRef(node) + "_cnt"))
       case _ =>
         List((s"dat_t<${node.needWidth()}>", emitRef(node)))
     }
@@ -528,16 +518,12 @@ class CppBackend extends Backend {
       case x: Clock =>
         ""
 
-      case x: Bits =>
-        if (x.isInObject && x.inputs.length == 1) {
-          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = " + emitWordRef(x.inputs(0), i)))
-        } else if (x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT)) {
-          emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
-            (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
-        } else {
-          ""
-        }
+      case x: Bits if x.isInObject && x.inputs.length == 1 => 
+        emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
+          + " = " + emitWordRef(x.inputs(0), i)))
+      case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
+        emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
+          (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
 
       case m: MemRead =>
         emitTmpDec(m) + block((0 until words(m)).map(i => emitWordRef(m, i)
@@ -564,17 +550,9 @@ class CppBackend extends Backend {
           + ");\n"
           + "#endif\n")
 
-      case l: Literal =>
+      case l: Literal if !l.isInObject && words(l) > 1 =>
         // Have we already allocated this literal in the main class definition?
-        if (!l.isInObject) {
-          if (words(l) == 1) {
-            ""
-          } else {
-            s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
-          }
-        } else {
-          ""
-        }
+        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
 
       case _ =>
         ""
@@ -640,11 +618,9 @@ class CppBackend extends Backend {
         }
         res.toString
 
-      case u: Bits =>
-        if (u.driveRand && u.isInObject)
+      case u: Bits if u.driveRand && u.isInObject =>
           s"   ${emitRef(node)}.randomize(&__rand_seed);\n"
-        else
-          ""
+
       case _ =>
         ""
     }
@@ -866,31 +842,18 @@ class CppBackend extends Backend {
   }
 
   def emitDefLos(c: Module): String = {
-    var res = ""
-    for ((n, w) <- c.wires) {
-      w match {
-        case io: Bits  =>
-          if (io.dir == INPUT) {
-            res += "  " + emitRef(c) + "->" + n + " = " + emitRef(io.inputs(0)) + ";\n";
-          }
-      };
+    val res = new StringBuilder
+    for ((n, io) <- c.wires if io.dir == INPUT) {
+      res append ("  " + emitRef(c) + "->" + n + " = " + emitRef(io.inputs(0)) + ";\n")
     }
-    res += emitRef(c) + "->clock_lo(reset);\n";
-    for ((n, w) <- c.wires) {
-      w match {
-        case io: Bits =>
-          if (io.dir == OUTPUT) {
-            res += "  " + emitRef(io.consumers.head) + " = " + emitRef(c) + "->" + n + ";\n";
-          }
-      };
+    res append (emitRef(c) + "->clock_lo(reset);\n")
+    for ((n, io) <- c.wires if io.dir == OUTPUT) {
+      res append ("  " + emitRef(io.consumers.head) + " = " + emitRef(c) + "->" + n + ";\n")
     }
-    res
+    res.result
   }
 
-  def emitDefHis(c: Module): String = {
-    var res = emitRef(c) + "->clock_hi(reset);\n";
-    res
-  }
+  def emitDefHis(c: Module): String = emitRef(c) + "->clock_hi(reset);\n"
 
   override def elaborate(c: Module): Unit = {
     val minimumLinesPerFile = Driver.minimumLinesPerFile
@@ -1691,19 +1654,17 @@ class CppBackend extends Backend {
 
   // Return true if we want this node to be included in the main object.
   // The Driver (and node itself) may also help determine this.
-  override def isInObject(n: Node): Boolean = {
-    n match {
-      // Should we put multiword literals in the object?
-      case l: Literal if multiwordLiteralInObject && words(n) > 1 => {
-        multiwordLiterals += l
-        true
-      }
-      // Should we put disconnected inputs in the object (we will generated random values for them)
-      case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
-        unconnectedInputs += b
-        true
-      }
-      case _ => false
+  override def isInObject(n: Node): Boolean = n match {
+    // Should we put multiword literals in the object?
+    case l: Literal if multiwordLiteralInObject && words(n) > 1 => {
+      multiwordLiterals += l
+      true
     }
+    // Should we put disconnected inputs in the object (we will generated random values for them)
+    case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
+      unconnectedInputs += b
+      true
+    }
+    case _ => false
   }
 }

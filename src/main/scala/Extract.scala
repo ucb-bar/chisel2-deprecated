@@ -40,7 +40,7 @@ object NodeExtract {
   def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
     if (hi < lo) {
       if (!((hi == lo - 1) && Driver.isSupportW0W)) {
-        ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+        ChiselError.error("Extract " + mod.getNode.name + "(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
       }
     }
     val w = if (width == -1) hi - lo + 1 else width

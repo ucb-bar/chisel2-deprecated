@@ -655,7 +655,7 @@ class VerilogBackend extends Backend {
     val defs = LinkedHashMap[String, LinkedHashMap[String, ArrayBuffer[Module]]]()
     var level = 0
     for (c <- Driver.sortedComps) {
-      ChiselError.info(depthString(depth) + "COMPILING " + c
+      ChiselError.info(genIndent(depth) + "COMPILING " + c
         + " " + c.children.size + " CHILDREN"
         + " (" + c.level + "," + c.traversal + ")")
       ChiselError.checkpoint()
@@ -718,8 +718,8 @@ class VerilogBackend extends Backend {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
-    val vcsFlags = List("-full64", "-quiet", "+v2k", "-debug_pp", "-Mdir=" + n + ".csrc",
-      "-timescale=1ns/1ps", "+define+CLOCK_PERIOD=10", "+vcs+initreg+random", "+vpi") mkString " "
+    val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc", 
+     "+v2k", "+vpi", "+define+CLOCK_PERIOD=10", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
     val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)

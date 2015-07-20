@@ -36,22 +36,22 @@ import java.io._
 import scala.sys.process.{Process, ProcessIO}
 
 class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
-  private var testIn: Option[InputStream] = None
-  private var testErr: Option[InputStream] = None
-  private var testOut: Option[OutputStream] = None
-  private lazy val reader: BufferedReader = new BufferedReader(new InputStreamReader(testIn.get))
-  private lazy val writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(testOut.get))
-  private lazy val logger: BufferedReader = new BufferedReader(new InputStreamReader(testErr.get))
+  private var _testIn: Option[InputStream] = None
+  private var _testErr: Option[InputStream] = None
+  private var _testOut: Option[OutputStream] = None
+  private lazy val _reader: BufferedReader = new BufferedReader(new InputStreamReader(_testIn.get))
+  private lazy val _writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(_testOut.get))
+  private lazy val _logger: BufferedReader = new BufferedReader(new InputStreamReader(_testErr.get))
   var t = 0 // simulation time
   var delta = 0
-  val pokeMap = HashMap[Bits, BigInt]()
-  val peekMap = HashMap[Bits, BigInt]()
-  lazy val signalMap = Driver.signalMap
-  val (inputs: ListSet[Bits], outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
-  var isStale = false
-  private val logs = ScalaQueue[String]()
+  private val _pokeMap = HashMap[Bits, BigInt]()
+  private val _peekMap = HashMap[Bits, BigInt]()
+  lazy val _signalMap = Driver.signalMap
+  val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
+  private var isStale = false
+  val _logs = ScalaQueue[String]()
   def testOutputString = {
-    if(logs.isEmpty) "" else logs.dequeue
+    if(_logs.isEmpty) "" else _logs.dequeue
   }
 
   object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, FIN = Value }
@@ -61,7 +61,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
    */
   def waitForStreams() = {
     var waited = 0
-    while (testIn == None || testOut == None || testErr == None) {
+    while (_testIn == None || _testOut == None || _testErr == None) {
       Thread.sleep(100)
       if (waited % 10 == 0 && waited > 30) {
         ChiselError.info("waiting for emulator process streams to be valid ...")
@@ -70,22 +70,22 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def writeln(str: String) {
-    writer write str
-    writer.newLine
-    writer.flush
+    _writer write str
+    _writer.newLine
+    _writer.flush
   }
 
   private def dumpLogs = {
-    while (logger.ready) {
-      logs enqueue logger.readLine
+    while (_logger.ready) {
+      _logs enqueue _logger.readLine
     }
   }
 
   private def readln: String = {
-    Option(reader.readLine) match {
+    Option(_reader.readLine) match {
       case None =>
         dumpLogs
-        while (!logs.isEmpty)
+        while (!_logs.isEmpty)
           println(testOutputString)
         throw new Exception("Errors occurred in simulation")
       case Some(ln) => ln
@@ -129,11 +129,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   def peekBits(data: Node, off: Option[Int] = None) = {
-    if (signalMap contains data) {
-      val id = signalMap(data) + (off getOrElse 0)
+    if (_signalMap contains data) {
+      val id = _signalMap(data) + (off getOrElse 0)
       sendCmd(SIM_CMD.PEEK)
       writeln(id.toString)
-      BigInt(readln, 16)
+      try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
     } else {
       BigInt(0)
     }
@@ -146,7 +146,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = signed_fix(data, peekMap getOrElse (data, peekBits(data.getNode)))
+    val value = signed_fix(data, _peekMap getOrElse (data, peekBits(data.getNode)))
     if (isTrace) println("  PEEK " + data.getNode.chiselName + " -> " + value.toString(16))
     value
   }
@@ -154,8 +154,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     data.flatten.map(x => x._2) map (peek(_))
   }
 
-  private def pokeBits(data: Node, v: BigInt, off: Option[Int] = None): Unit = {
-    val id = signalMap(data) + (off getOrElse 0)
+  def pokeBits(data: Node, v: BigInt, off: Option[Int] = None): Unit = {
+    val id = _signalMap(data) + (off getOrElse 0)
     sendCmd(SIM_CMD.POKE)
     writeln(id.toString)
     writeValue(data, v)
@@ -173,9 +173,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
     if (isTrace) println("  POKE " + data.getNode.chiselName + " <- " + value.toString(16))
-    if (inputs contains data) 
-      pokeMap(data) = value
-    else if (signalMap contains data.getNode)
+    if (_inputs contains data) 
+      _pokeMap(data) = value
+    else if (_signalMap contains data.getNode)
       pokeBits(data.getNode, value)
     else 
       println("  POKE is not suppoted for " + data.getNode.chiselName)
@@ -187,12 +187,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def readOutputs {
-    peekMap.clear
-    outputs foreach (x => peekMap(x) = try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) })
+    _peekMap.clear
+    _outputs foreach (x => _peekMap(x) = try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) })
   }
 
   private def writeInputs {
-    inputs foreach (x => writeValue(x, pokeMap getOrElse (x, BigInt(0))))
+    _inputs foreach (x => writeValue(x, _pokeMap getOrElse (x, BigInt(0))))
   }
 
   def reset(n: Int = 1) {
@@ -203,23 +203,25 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  private def update {
+  protected def update {
     sendCmd(SIM_CMD.UPDATE)
     writeInputs
     readOutputs
     isStale = false
   }
 
+  protected def takeStep {
+    sendCmd(SIM_CMD.STEP)
+    writeInputs
+    readOutputs
+    dumpLogs
+    isStale = false
+  }
+
   def step(n: Int) {
     if (isTrace) println("STEP " + n + " -> " + (t + n))
-    for (i <- 0 until n) {
-      sendCmd(SIM_CMD.STEP)
-      writeInputs
-      readOutputs
-      dumpLogs
-    }
+    (0 until n) foreach (_ => takeStep)
     t += n
-    isStale = false
   }
 
   def int(x: Boolean): BigInt = if (x) 1 else 0
@@ -302,7 +304,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     println("STARTING " + cmd)
     val processBuilder = Process(cmd)
     val pio = new ProcessIO(
-      in => testOut = Option(in), out => testIn = Option(out), err => testErr = Option(err))
+      in => _testOut = Option(in), out => _testIn = Option(out), err => _testErr = Option(err))
     val process = processBuilder.run(pio)
     waitForStreams()
     t = 0
@@ -317,9 +319,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   def finish {
     sendCmd(SIM_CMD.FIN)
-    testIn match { case Some(in) => in.close case None => }
-    testErr match { case Some(err) => err.close case None => }
-    testOut match { case Some(out) => { out.flush ; out.close } case None => }
+    _testIn match { case Some(in) => in.close case None => }
+    _testErr match { case Some(err) => err.close case None => }
+    _testOut match { case Some(out) => { out.flush ; out.close } case None => }
     process.destroy()
     println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else "FAILED FIRST AT CYCLE " + failureTime))
     if(!ok) throwException("Module under test FAILED at least one test vector.")

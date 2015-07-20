@@ -103,22 +103,11 @@ abstract class Backend extends FileSystemUtilities{
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
 
-  def depthString(depth: Int): String = {
-    var res = ""
-    for (i <- 0 until depth)
-      res += "  "
-    res
-  }
-
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');
     Driver.moduleNamePrefix + (
       if (dotPos >= 0) cname.substring(dotPos + 1) else cname);
-  }
-
-  protected def genIndent(x: Int): String = {
-    if(x == 0) "" else "    " + genIndent(x-1);
   }
 
   def sortComponents {
@@ -364,39 +353,38 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.wires.filter(_._2.dir == INPUT)
-    val outputs = m.wires.filter(_._2.dir == OUTPUT)
-
-    for ((name, i) <- inputs) {
-      if (i.inputs.length == 0 && m != topMod)
-        if (i.consumers.size > 0) {
+  def pruneUnconnectedIOs = for (m <- Driver.sortedComps) {
+    val (inputs, outputs) = m.wires.unzip._2 partition (_.dir == INPUT)
+    if (m != topMod) {
+      for (i <- inputs if i.inputs.isEmpty) {
+        if (i.consumers.isEmpty) {
           if (Driver.warnInputs)
-            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
-                                 " has consumers"})
-          i.driveRand = true
-        } else {
-          if (Driver.warnInputs)
-            ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
+            ChiselError.warning("FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component)
           i.prune = true
-        }
-    }
-
-    for ((name, o) <- outputs) {
-      if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
-        if (o.consumers.size > 0) {
-          if (Driver.warnOutputs)
-            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component +
-                                 " has consumers on line " + o.consumers.head.line})
-          o.driveRand = true
         } else {
-          if (Driver.warnOutputs)
-            ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
-          o.prune = true
+          if (Driver.warnInputs)
+            ChiselError.warning("UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + 
+                                i.component + " has consumers")
+          i.driveRand = true
         }
       }
     }
-  }
+    m match {
+      case _: BlackBox =>
+      case _ => for (o <- outputs if o.inputs.isEmpty) {
+        if (o.consumers.isEmpty) {
+          if (Driver.warnOutputs)
+            ChiselError.warning("FLOATING OUTPUT " + emitRef(o) + " in component " + o.component)
+          o.prune = true
+        } else {
+          if (Driver.warnOutputs)
+            ChiselError.warning("UNCONNECTED OUTPUT " + emitRef(o) + " in component " + 
+                                o.component + " has consumers")
+          o.driveRand = true
+        }
+      }
+    }
+  } 
 
   def checkPorts {
     for {
@@ -405,11 +393,10 @@ abstract class Backend extends FileSystemUtilities{
       n <- c.wires.unzip._2
       if n.inputs.isEmpty
     } {
-      val dir = if (n.dir == INPUT) "Input" else "Output"
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
-      ChiselError.warning(dir + " port " + portName
+      ChiselError.warning(n.dir + " port " + portName
         + " is unconnected in module " + compInstName + " " + compName)
     }
   }
@@ -717,12 +704,11 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def genIndent(x: Int): String = (0 until x) map ("    ") mkString ""
   protected def printStack {
-    var res = ""
-    for((i, c) <- Driver.printStackStruct){
-      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
-    }
-    ChiselError.info(res)
+    ChiselError.info(Driver.printStackStruct map {
+      case (i, c) => "%s%s %s\n".format(genIndent(i), c.moduleName, c.name)
+    } mkString "") 
   }
 
   def flattenAll {
@@ -835,17 +821,13 @@ abstract class Backend extends FileSystemUtilities{
       id += off
     }
     Driver.bfs { 
-      case m: Mem[_] => 
-        dump(m, m.n)
-      case node if node.named && node.isInObject && !node.isTopLevelIO =>
-        dump(node, 1)
-      case node if node.isTopLevelIO => 
-        val temp = node.chiselName // a hack to get its original name
+      case m: Mem[_] => dump(m, m.n)
+      case node if node.prune || node.driveRand =>
+      case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => dump(node, 1)
       case _ =>
     }
     file.close
   }
-
 
   def elaborate(c: Module): Unit = {
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
@@ -919,10 +901,7 @@ abstract class Backend extends FileSystemUtilities{
     } 
 
     ChiselError.info("pruning unconnected IOs")
-    for (comp <- Driver.sortedComps) {
-      // remove unconnected outputs
-      pruneUnconnectedIOs(comp)
-    }
+    pruneUnconnectedIOs
 
     if (Driver.isCheckingPorts) {
       ChiselError.info("checking for unconnected ports")
