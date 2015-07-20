@@ -68,6 +68,8 @@ private:
   virtual void reset() {
     module->clock_lo(LIT<1>(1));
     module->clock_hi(LIT<1>(1));
+    // TODO: should call twice to get the output for now
+    module->clock_lo(LIT<1>(0));
   }
 
   virtual void start() { }
@@ -78,6 +80,7 @@ private:
 
   virtual void step() {
     module->dump();
+    module->print(std::cerr);
     module->clock_lo(LIT<1>(0));
     module->clock_hi(LIT<1>(0));
     // TODO: should call twice to get the output for now

@@ -29,28 +29,30 @@
 */
 
 package Chisel
-import scala.collection.mutable.{ArrayBuffer, HashMap}
+import scala.collection.mutable.{ArrayBuffer, HashMap, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import scala.util.Random
 import java.io._
 import scala.sys.process.{Process, ProcessIO}
 
 class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
-  var testIn: Option[InputStream] = None
-  var testErr: Option[InputStream] = None
-  var testOut: Option[OutputStream] = None
-  lazy val reader: BufferedReader = new BufferedReader(new InputStreamReader(testIn.get))
-  lazy val writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(testOut.get))
-  lazy val errReader: BufferedReader = new BufferedReader(new InputStreamReader(testErr.get))
+  private var testIn: Option[InputStream] = None
+  private var testErr: Option[InputStream] = None
+  private var testOut: Option[OutputStream] = None
+  private lazy val reader: BufferedReader = new BufferedReader(new InputStreamReader(testIn.get))
+  private lazy val writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(testOut.get))
+  private lazy val logger: BufferedReader = new BufferedReader(new InputStreamReader(testErr.get))
   var t = 0 // simulation time
   var delta = 0
-  var testOutputString = "" // output available to test code.
-  val sb = new StringBuilder()
   val pokeMap = HashMap[Bits, BigInt]()
   val peekMap = HashMap[Bits, BigInt]()
   lazy val signalMap = Driver.signalMap
   val (inputs: ListSet[Bits], outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   var isStale = false
+  private val logs = ScalaQueue[String]()
+  def testOutputString = {
+    if(logs.isEmpty) "" else logs.dequeue
+  }
 
   object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, FIN = Value }
   /**
@@ -73,18 +75,19 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     writer.flush
   }
 
-  private def dumpErrors = {
-    var err: Option[String] = None
-    do {
-      err = Option(errReader.readLine)
-      println(err getOrElse "")
-    } while (err != None)
-    throw new Exception("Errors occurred in simulation")
+  private def dumpLogs = {
+    while (logger.ready) {
+      logs enqueue logger.readLine
+    }
   }
 
   private def readln: String = {
     Option(reader.readLine) match {
-      case None => dumpErrors 
+      case None =>
+        dumpLogs
+        while (!logs.isEmpty)
+          println(testOutputString)
+        throw new Exception("Errors occurred in simulation")
       case Some(ln) => ln
     }
   }
@@ -185,7 +188,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   private def readOutputs {
     peekMap.clear
-    outputs foreach (x => peekMap(x) = BigInt(readln, 16))
+    outputs foreach (x => peekMap(x) = try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) })
   }
 
   private def writeInputs {
@@ -213,6 +216,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       sendCmd(SIM_CMD.STEP)
       writeInputs
       readOutputs
+      dumpLogs
     }
     t += n
     isStale = false

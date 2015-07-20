@@ -1154,6 +1154,10 @@ class CppBackend extends Backend {
         out_h.write("  void setClocks ( std::vector< int >& periods );\n")
       }
 
+      // For backwards compatibility, output both stream and FILE-based code.
+      out_h.write("  void print ( FILE* f );\n")
+      out_h.write("  void print ( std::ostream& s );\n")
+
       // If we're generating multiple dump methods, wrap them in private/public.
       if (nDumpMethods > 1) {
         out_h.write(" private:\n")
@@ -1267,6 +1271,38 @@ class CppBackend extends Backend {
                     emitRef(clock) + ";\n")
       }
       writeCppFile("  return min;\n")
+      writeCppFile("}\n")
+    }
+
+    def genPrintMethod() {
+      writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
+      for (cc <- Driver.components; p <- cc.printfs) {
+        hasPrintfs = true
+        writeCppFile("#if __cplusplus >= 201103L\n"
+          + "  if (" + emitLoWordRef(p.cond)
+          + ") dat_fprintf<" + p.needWidth() + ">(f, "
+          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + ");\n"
+          + "#endif\n")
+      }
+      if (hasPrintfs) {
+        writeCppFile("fflush(f);\n");
+      }
+      writeCppFile("}\n")
+
+      writeCppFile("void " + c.name + "_t::print ( std::ostream& s ) {\n")
+      for (cc <- Driver.components; p <- cc.printfs) {
+        hasPrintfs = true
+        writeCppFile("#if __cplusplus >= 201103L\n"
+          + "  if (" + emitLoWordRef(p.cond)
+          + ") dat_prints<" + p.needWidth() + ">(s, "
+          + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _)
+          + ");\n"
+          + "#endif\n")
+      }
+      if (hasPrintfs) {
+        writeCppFile("s.flush();\n");
+      }
       writeCppFile("}\n")
     }
 
@@ -1611,6 +1647,10 @@ class CppBackend extends Backend {
     // generate clock(...) method
     createCppFile()
     genClockMethod()
+
+    // generate print(...) method.
+    createCppFile()
+    genPrintMethod()
 
     createCppFile()
     val nDumpInitMethods = genDumpInitMethod(vcd)
