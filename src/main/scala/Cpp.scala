@@ -1313,18 +1313,23 @@ class CppBackend extends Backend {
       val method = CMethod(CTypedName("void", "init_sim_data"), Array[CTypedName](), c.name + "_api_t")
       val codePrefix = s"  sim_data.inputs.clear();\n" +
                  s"  sim_data.outputs.clear();\n" +
-                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n" +
-                 s"  assert(mod_typed);\n"
+                 s"  sim_data.signals.clear();\n" +
+                 s"  ${c.name}_t* mod = dynamic_cast<${c.name}_t*>(module);\n" +
+                 s"  assert(mod);\n"
       val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
-      inputs foreach { in =>
-        val name = in.chiselName
-        llm addString s"""  sim_data.inputs.push_back(new dat_api<${in.needWidth()}>(&mod_typed->${emitRef(in)}, "${name}", ""));\n"""
-      }
-      outputs foreach { out =>
-        val name = out.chiselName
-        llm addString s"""  sim_data.outputs.push_back(new dat_api<${out.needWidth()}>(&mod_typed->${emitRef(out)}, "${name}", ""));\n"""
-      }
+      llm addString (inputs map (in =>
+        "  sim_data.inputs.push_back(new dat_api<%d>(&mod->%s));\n".format(in.needWidth, emitRef(in))) mkString "")
+      llm addString (outputs map (out =>
+        "  sim_data.outputs.push_back(new dat_api<%d>(&mod->%s));\n".format(out.needWidth, emitRef(out))) mkString "")
+      llm addString (Driver.signalMap.unzip._1 map {
+        case mem: Mem[_] => (0 until mem.n) map (
+          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[%d]));\n".format(mem.needWidth, emitRef(mem), _)) mkString ""
+        
+        case node =>
+          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node))
+      } mkString "")
+
       llm.done()
       val nMethods = llm.bodies.length
       writeCppFile(llm.getBodies)
@@ -1627,6 +1632,7 @@ class CppBackend extends Backend {
 
     // Generate API methods
     val nSimMethods = if (Driver.isGenHarness) {
+      advanceCppFile()
       createCppFile()
       genInitSimDataMethod(c) 
     } else 0

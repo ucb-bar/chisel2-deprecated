@@ -41,16 +41,18 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   var testOut: Option[OutputStream] = None
   lazy val reader: BufferedReader = new BufferedReader(new InputStreamReader(testIn.get))
   lazy val writer: BufferedWriter = new BufferedWriter(new OutputStreamWriter(testOut.get))
+  lazy val errReader: BufferedReader = new BufferedReader(new InputStreamReader(testErr.get))
   var t = 0 // simulation time
   var delta = 0
   var testOutputString = "" // output available to test code.
   val sb = new StringBuilder()
   val pokeMap = HashMap[Bits, BigInt]()
   val peekMap = HashMap[Bits, BigInt]()
+  lazy val signalMap = Driver.signalMap
   val (inputs: ListSet[Bits], outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   var isStale = false
 
-  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, FIN = Value }
+  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
    * to the way Process works. TODO: FIXME.
@@ -65,68 +67,42 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  /**
-   * Sends a command to the emulator and returns the reply.
-   * The standard protocol treats a single line as a command, which always
-   * returns a single line of reply.
-   */
-  // TODO: deprecated
-  def emulatorCmd(str: String): String = {
-    // validate cmd
-    if (str contains "\n") {
-      System.err.print(s"emulatorCmd($str): command should not contain newline")
-      return "error"
+  private def writeln(str: String) {
+    writer write str
+    writer.newLine
+    writer.flush
+  }
+
+  private def dumpErrors = {
+    var err: Option[String] = None
+    do {
+      err = Option(errReader.readLine)
+      println(err getOrElse "")
+    } while (err != None)
+    throw new Exception("Errors occurred in simulation")
+  }
+
+  private def readln: String = {
+    Option(reader.readLine) match {
+      case None => dumpErrors 
+      case Some(ln) => ln
     }
+  }
 
-    waitForStreams()
+  private def sendCmd(cmd: SIM_CMD.Value) {
+    writeln(cmd.id.toString)
+  }
 
-    // send command to emulator
-    for (e <- str) testOut.get.write(e);
-    testOut.get.write('\n');
-    testOut.get.flush()
-
-    // read output from emulator
-    var c = testIn.get.read
-    sb.clear()
-    while (c != '\n' && c != -1) {
-      if (c == 0) Thread.sleep(100)
-      sb += c.toChar
-      // Look for a "PRINT" command.
-      if (sb.length == 6 && sb.startsWith("PRINT ")) {
-        do {
-          c = testIn.get.read
-          sb += c.toChar
-        } while (c != ' ')
-        // Get the PRINT character count.
-        val printCommand = """^PRINT (\d+) """.r
-        val printCommand(nChars) = sb.toString
-        sb.clear()
-        for (i <- 0 until nChars.toInt) {
-          c = testIn.get.read
-          sb += c.toChar
-        }
-        // Put any generated output somewhere we can access it.
-        testOutputString = sb.toString()
-        sb.clear()
-        System.out.print(testOutputString)
-      }
-      c = testIn.get.read
+  private val writeMask = int(-1L) 
+  private def writeValue(x: Node, v: BigInt) {
+    for (i <- ((x.needWidth - 1) >> 6) to 0 by -1) {
+      writeln(((v >> (64 * i)) & writeMask).toString(16))
     }
+  }
 
-    // drain errors
-    try {
-      while(testErr.get.available() > 0) {
-        System.err.print(Character.toChars(testErr.get.read()))
-      }
-    } catch {
-      case e : IOException => testErr = None; println("ERR EXCEPTION")
-    }
-
-    if (sb == "error") {
-      System.err.print(s"FAILED: emulatorCmd($str): returned error")
-      ok = false
-    }
-    return sb.toString
+  def dumpName(data: Node): String = Driver.backend match {
+    case _: FloBackend | _: CppBackend => data.getNode.name
+    case _ => data.getNode.chiselName
   }
 
   def setClocks(clocks: HashMap[Clock, Int]) {
@@ -136,31 +112,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         val s = BigInt(clocks(clock)).toString(16)
         cmd = cmd + " " + s
       }
-    }
-    emulatorCmd(cmd)
-    // TODO: check for errors in return
-  }
-
-  def dumpName(data: Node): String = Driver.backend match {
-    case _: FloBackend => data.name
-    case _ => data.chiselName
-  }
-
-  def peekBits(data: Node, off: Int = -1): BigInt = {
-    if (dumpName(data) == "") {
-      println("Unable to peek data " + data)
-      -1
-    } else {
-      var cmd = ""
-      if (off != -1) {
-        cmd = "mem_peek " + dumpName(data) + " " + off;
-      } else {
-        cmd = "wire_peek " + dumpName(data);
-      }
-      val s = emulatorCmd(cmd)
-      val rv = Literal.toLitVal(s)
-      if (isTrace) println("  PEEK " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "-> " + s)
-      rv
     }
   }
 
@@ -174,53 +125,41 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
-    // signed_fix(data(1), peekBits(data, off))
-    peekBits(data, off)
-  }
-
-  def peek(data: Bits): BigInt = {
-    if (isStale) update
-    val x = signed_fix(data, peekMap getOrElse (data, peekBits(data.getNode)))
-    if (isTrace) println("  PEEK " + dumpName(data) + " -> " + x.toString(16))
-    x 
-  }
-
-  def peek(data: Aggregate /*, off: Int = -1 */): Array[BigInt] = {
-    data.flatten.map(x => x._2).map(peek(_))
-  }
-
-  def doPokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
-    if (dumpName(data) == "") {
-      println("Unable to poke data " + data)
+  def peekBits(data: Node, off: Option[Int] = None) = {
+    if (signalMap contains data) {
+      val id = signalMap(data) + (off getOrElse 0)
+      sendCmd(SIM_CMD.PEEK)
+      writeln(id.toString)
+      BigInt(readln, 16)
     } else {
-      var cmd = ""
-      if (off != -1) {
-        cmd = "mem_poke " + dumpName(data) + " " + off;
-      } else {
-        cmd = "wire_poke " + dumpName(data);
-      }
-      // Don't prefix negative numbers with "0x"
-      val radixPrefix = if (x < 0) " -0x" else " 0x"
-      val xval = radixPrefix + x.abs.toString(16)
-      cmd = cmd + xval
-      if (isTrace) {
-        println("  POKE " + dumpName(data) + " " + (if (off >= 0) (off + " ") else "") + "<- " + xval)
-      }
-      val rtn = emulatorCmd(cmd)
-      if (rtn != "ok") {
-        System.err.print(s"FAILED: poke(${dumpName(data)}) returned false")
-        ok = false
-      }
+      BigInt(0)
     }
   }
 
-  def pokeBits(data: Node, x: BigInt, off: Int = -1): Unit = {
-    doPokeBits(data, x, off)
+  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
+    val value = peekBits(data, Some(off))
+    if (isTrace) println("  PEEK %s[%d] -> %s".format(data.chiselName, off, value.toString(16)))
+    value
+  }
+  def peek(data: Bits): BigInt = {
+    if (isStale) update
+    val value = signed_fix(data, peekMap getOrElse (data, peekBits(data.getNode)))
+    if (isTrace) println("  PEEK " + data.getNode.chiselName + " -> " + value.toString(16))
+    value
+  }
+  def peek(data: Aggregate): Array[BigInt] = {
+    data.flatten.map(x => x._2) map (peek(_))
   }
 
-  def pokeAt[T <: Bits](data: Mem[T], x: BigInt, off: Int): Unit = {
-    pokeBits(data, x, off)
+  private def pokeBits(data: Node, v: BigInt, off: Option[Int] = None): Unit = {
+    val id = signalMap(data) + (off getOrElse 0)
+    sendCmd(SIM_CMD.POKE)
+    writeln(id.toString)
+    writeValue(data, v)
+  }
+  def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
+    if (isTrace) println("  POKE %s[%d] <- %s".format(data.chiselName, off, value.toString(16)))
+    pokeBits(data, value, Some(off))
   }
   def poke(data: Bits, x: Boolean) { this.poke(data, int(x)) }
   def poke(data: Bits, x: Int)     { this.poke(data, int(x)) }
@@ -230,11 +169,13 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       val cnt = (data.needWidth() - 1) >> 6
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
-    if (isTrace) println("  POKE " + dumpName(data) + " -> " + value.toString(16))
+    if (isTrace) println("  POKE " + data.getNode.chiselName + " <- " + value.toString(16))
     if (inputs contains data) 
       pokeMap(data) = value
-    else 
+    else if (signalMap contains data.getNode)
       pokeBits(data.getNode, value)
+    else 
+      println("  POKE is not suppoted for " + data.getNode.chiselName)
     isStale = true
   }
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -242,33 +183,13 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     for ((x, y) <- kv) poke(x, y)
   }
 
-  private def writeln(str: String) {
-    writer write str
-    writer.newLine
-    writer.flush
-  }
-
-  private def readln: String = {
-    reader.readLine
-  }
-
-  private def sendCmd(cmd: SIM_CMD.Value) {
-    writeln(cmd.id.toString)
-  }
-
   private def readOutputs {
     peekMap.clear
     outputs foreach (x => peekMap(x) = BigInt(readln, 16))
   }
 
-  private val writeMask = int(-1L) 
   private def writeInputs {
-    inputs foreach { x =>
-      val value = pokeMap getOrElse (x, BigInt(0))
-      for (i <- ((x.needWidth - 1) >> 6) to 0 by -1) {
-        writeln(((value >> (64 * i)) & writeMask).toString(16))
-      }
-    }
+    inputs foreach (x => writeValue(x, pokeMap getOrElse (x, BigInt(0))))
   }
 
   def reset(n: Int = 1) {
@@ -279,7 +200,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  def update {
+  private def update {
     sendCmd(SIM_CMD.UPDATE)
     writeInputs
     readOutputs
@@ -287,10 +208,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   def step(n: Int) {
-    val target = t + n
-    // val s = emulatorCmd("step " + n)
-    // delta += s.toInt
-    if (isTrace) println("STEP " + n + " -> " + target)
+    if (isTrace) println("STEP " + n + " -> " + (t + n))
     for (i <- 0 until n) {
       sendCmd(SIM_CMD.STEP)
       writeInputs
@@ -319,7 +237,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
     val exp = expected & mask
-    expect(got == exp, "EXPECT " + dumpName(data) + " <- " + got.toString(16) + " == " + exp.toString(16))
+    expect(got == exp, "EXPECT " + data.getNode.chiselName + " <- " + got.toString(16) + " == " + exp.toString(16))
   }
 
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
@@ -355,7 +273,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       }
     }
     expect(gotFLoat == expectedFloat,
-       "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
+       "EXPECT " + data.getNode.chiselName + " <- " + gotFLoat + " == " + expectedFloat)
   }
 
   val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()

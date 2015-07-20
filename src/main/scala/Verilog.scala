@@ -382,7 +382,7 @@ class VerilogBackend extends Backend {
     val resets = c.resets.values.toList
 
     harness write "module test;\n"
-    harness write "parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;"
+    harness write "parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;\n"
     ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
     if (clocks.isEmpty) harness write "  reg %s = 0;\n".format(mainClk.name)
@@ -400,25 +400,21 @@ class VerilogBackend extends Backend {
     harness write ");\n\n"
 
     harness write "  initial begin\n"
-    if (Driver.isCompiling) {
-      if (!resets.isEmpty)
-        harness write "    $init_rsts(" + (resets map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
-      if (!ins.isEmpty)
-        harness write "    $init_ins(" + (ins map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
-      if (!outs.isEmpty)
-        harness write "    $init_outs(" + (outs map (emitRef(_)) reduceLeft (_ + ", " + _)) + ");\n"
-    }
+    harness write "    $init_rsts(" + (resets map (emitRef(_)) mkString ", ") + ");\n"
+    harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
+    harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
+    harness write "    $init_sigs(\"%s.sigs\");\n".format(Driver.targetDir+c.name)
 
     if (Driver.isVCD) {
       harness write "    /*** VPD dump ***/\n"
       harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
       harness write "    $vcdpluson(0, %s);\n".format(c.name)
-      if (Driver.isVCDMem) harness.write("  $vcdplusmemon;\n")
+      if (Driver.isVCDMem) harness.write("    $vcdplusmemon;\n")
     }
     harness write "  end\n\n"
 
     harness write "  always @(negedge %s) begin\n".format(mainClk.name)
-    if (Driver.isCompiling) harness write "    #CLOCK_DELAY $tick();\n"
+    harness write "    #CLOCK_DELAY $tick();\n"
     harness write "  end\n\n"
 
     harness write "endmodule\n"

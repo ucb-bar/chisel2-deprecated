@@ -826,6 +826,27 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
+  def genSignalMap(name: String) {
+    val file = createOutputFile(name + ".sigs")
+    var id = 0
+    def dump(node: Node, off: Int) {
+      file write "%s %d %d\n".format(node.chiselName, node.needWidth, off)
+      Driver.signalMap(node) = id
+      id += off
+    }
+    Driver.bfs { 
+      case m: Mem[_] => 
+        dump(m, m.n)
+      case node if node.named && node.isInObject && !node.isTopLevelIO =>
+        dump(node, 1)
+      case node if node.isTopLevelIO => 
+        val temp = node.chiselName // a hack to get its original name
+      case _ =>
+    }
+    file.close
+  }
+
+
   def elaborate(c: Module): Unit = {
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
@@ -919,6 +940,10 @@ abstract class Backend extends FileSystemUtilities{
 
     if (Driver.saveComponentTrace) {
       printStack
+    }
+
+    if (Driver.isGenHarness) {
+      genSignalMap(c.name)
     }
 
     execute(c, analyses)

@@ -30,7 +30,7 @@
 
 package Chisel
 
-import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, Queue => ScalaQueue}
+import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import sys.process.stringSeqToProcess
 
 object Driver extends FileSystemUtilities{
@@ -318,7 +318,7 @@ object Driver extends FileSystemUtilities{
     chiselConfigMode = None
     chiselConfigDump = false
     startTime = System.currentTimeMillis
-
+    signalMap.clear
     readArgs(args)
   }
 
@@ -487,6 +487,8 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  /* For tester */
+  val signalMap = LinkedHashMap[Node, Int]()
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
     if(s1.isEmpty && s2.isEmpty) "" else {

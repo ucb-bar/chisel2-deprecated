@@ -21,7 +21,17 @@ PLI_INT32 init_outs_calltf(PLI_BYTE8 *user_data) {
   return 0;
 }
 
+PLI_INT32 init_sigs_calltf(PLI_BYTE8 *user_data) {
+  vpi_api.init_sigs();
+  return 0;
+}
+
 PLI_INT32 tick_calltf(PLI_BYTE8 *user_data) {
+  vpi_api.tick();
+  return 0;
+}
+
+PLI_INT32 update_cb(p_cb_data cb_data) {
   vpi_api.tick();
   return 0;
 }
@@ -65,6 +75,18 @@ void init_outs_registration() {
   return;
 }
 
+void init_sigs_registration() {
+  s_vpi_systf_data tf_data;
+  tf_data.type      = vpiSysTask;
+  tf_data.tfname    = (PLI_BYTE8*) "$init_sigs";
+  tf_data.sizetf    = NULL;
+  tf_data.calltf    = init_sigs_calltf;
+  tf_data.compiletf = NULL;
+  tf_data.user_data = NULL;
+  vpi_register_systf(&tf_data);
+  return;
+}
+
 void tick_registration() {
   s_vpi_systf_data tf_data;
   tf_data.type      = vpiSysTask;
@@ -84,6 +106,7 @@ void (*vlog_startup_routines[]) () = {
   init_rsts_registration,
   init_ins_registration,
   init_outs_registration,
+  init_sigs_registration,
   tick_registration,
   0
 };
