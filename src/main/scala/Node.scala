@@ -520,4 +520,9 @@ abstract class Node extends nameable {
       gNode.isTypeOnly
     }
   }
+
+  // Is this a zero-width node?
+  def isZeroWidth: Boolean = {
+    isKnownWidth && getWidth == 0
+  }
 }
