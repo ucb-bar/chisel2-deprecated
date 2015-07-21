@@ -2032,17 +2032,18 @@ val reg = Reg(UInt(), explClock = clock2)
 \end{frame}
  
 \begin{frame}[fragile]{Crossing Clock Domains}
-The most general technique to send data between domains is using an asynchronous queue:
+The most general technique to send data between domains is using an
+asynchronous queue or fifo:
 
 \begin{scala} 
-class AsyncQueue[T <: Data]
-    (dataType: T, depth: Int, enq_clk: Clock, deq_clock: Clock) extends Module
+class AsyncFifo[T <: Data]
+    (dataType: T, entries: Int, enq_clk: Clock, deq_clock: Clock) extends Module
 \end{scala}
  
-Using these queues, we can then move a signalA from clock domains clockA to signalB in clockB:
+Using these fifos, we can then move a signalA from clock domains clockA to signalB in clockB:
 
 \begin{scala} 
-val queue = new AsyncQueue(Uint(width = 32), 2, clockA, clockB) 
+val queue = new AsyncFifo(Uint(width = 32), 2, clockA, clockB) 
 fifo.enq.bits := signalA 
 signalB       := fifo.deq.bits 
 fifo.valid    := condA 

@@ -68,9 +68,7 @@ class BitPat(val value: String) extends UInt {
   override def fromNode(n: Node): BitPat.this.type = {
     n match {
       case m: BitPat => BitPat.this
-      case l: Literal if n.name.contains('?') => {
-        BitPat.this.asTypeFor(n).asInstanceOf[BitPat.this.type]
-      }
+      case l: Literal => BitPat.this.asTypeFor(n).asInstanceOf[BitPat.this.type]
       case _ => {
         ChiselError.error("Only literals (and other BitPats), may be converted into BitPats")
         (BitPat("b0")).asInstanceOf[BitPat.this.type]

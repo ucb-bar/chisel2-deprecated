@@ -50,6 +50,8 @@ object Mem {
     Driver.hasSRAM = Driver.hasSRAM | seqRead
     if (seqRead) {
       Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
+      if (Driver.minimumCompatibility > "2")
+        ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     }
     res
   }
@@ -60,18 +62,9 @@ abstract class AccessTracker extends Delay {
   def readAccesses: ArrayBuffer[_ <: MemAccess]
 }
 
-class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean, deprecateSeqRead: Option[Boolean] = None) extends AccessTracker with VecLike[T] {
+class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val orderedWrites: Boolean) extends AccessTracker with VecLike[T] {
   if (seqRead) {
     require(!orderedWrites) // sad reality of realizable SRAMs
-    // Should we issue a "deprecated" message?
-    //  If we aren't explicitly instructed either way, it must be an "old" call,
-    //  in which case, only issue the message if we're compatibility checking.
-    if (deprecateSeqRead match {
-      case Some(b: Boolean) => b
-      case None => Driver.minimumCompatibility > "2"
-      }) {
-      ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
-    }
   }
   def writeAccesses: ArrayBuffer[MemWrite] = writes ++ readwrites.map(_.write)
   def readAccesses: ArrayBuffer[_ <: MemAccess] = reads ++ seqreads ++ readwrites.map(_.read)
@@ -281,21 +274,23 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 
 // Chisel3
 object SeqMem {
-  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
-    val gen = out.cloneType
-    Reg.validateGen(gen)
-    val res = new SeqMem(() => gen, n)
-    Driver.hasMem = true
-    Driver.hasSRAM = Driver.hasSRAM
-    Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
-    res
-  }
+  def apply[T <: Data](out: T, n: Int): SeqMem[T] =
+    new SeqMem(out, n)
 }
 
-class SeqMem[T <: Data](gen: () => T, n: Int) extends Mem(gen, n, true, false, Some(false)) {
-
-  def apply(addr: UInt, enable: Bool): T = {
-    super.apply(Reg(next = addr))
+class SeqMem[T <: Data](out: T, n: Int) {
+  private val mem = {
+    // construct a Mem while pretending we aren't in compatibility mode
+    val compat = Driver.minimumCompatibility
+    Driver.minimumCompatibility = "0"
+    val mem = Mem(out, n, true)
+    Driver.minimumCompatibility = compat
+    mem
   }
-  override def apply(addr: UInt):T = apply(addr, Bool(true))
+
+  def read(addr: UInt): T = mem.read(Reg(next = addr))
+  def read(addr: UInt, enable: Bool): T = mem.read(RegEnable(addr, enable))
+
+  def write(addr: UInt, data: T): Unit = mem.write(addr, data)
+  def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
 }

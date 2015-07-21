@@ -35,6 +35,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
 import scala.util.Random
 import java.io.{File, IOException, InputStream, OutputStream, PrintStream}
+import java.lang.Double.{longBitsToDouble, doubleToLongBits}
+import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process._
 import scala.io.Source._
 import Literal._
@@ -207,6 +209,14 @@ class ManualTester[+T <: Module]
     signed_fix(data, peekBits(data.getNode))
   }
 
+  def peek(data: Flo): Float = {
+    intBitsToFloat(peekBits(data).toInt)
+  }
+
+  def peek(data: Dbl): Double = {
+    longBitsToDouble(peekBits(data).toLong)
+  }
+
   def peek(data: Aggregate /*, off: Int = -1 */): Array[BigInt] = {
     data.flatten.map(x => x._2).map(peek(_))
   }
@@ -253,6 +263,14 @@ class ManualTester[+T <: Module]
 
   def poke(data: Bits, x: BigInt): Unit = {
     pokeBits(data.getNode, x)
+  }
+
+  def poke(data: Flo, x: Float): Unit = {
+    pokeBits(data, BigInt(floatToIntBits(x)))
+  }
+
+  def poke(data: Dbl, x: Double): Unit = {
+    pokeBits(data, BigInt(doubleToLongBits(x)))
   }
 
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -306,6 +324,14 @@ class ManualTester[+T <: Module]
   }
   def expect (data: Bits, expected: Long): Boolean = {
     expect(data, BigInt(expected))
+  }
+  def expect (data: Flo, expected: Float): Boolean = {
+    val got = peek(data)
+    expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
+  }
+  def expect (data: Dbl, expected: Double): Boolean = {
+    val got = peek(data)
+    expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
   /* Compare the floating point value of a node with an expected floating point value.
