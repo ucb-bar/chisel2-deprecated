@@ -718,10 +718,6 @@ class CppBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val parallelMakeJobs = Driver.parallelMakeJobs
 
-    /* Copy the emulator headers into the targetDirectory. */
-    copyToTarget("sim_api.h")
-    copyToTarget("emul_api.h")
-
     def make(args: String) {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
@@ -1582,6 +1578,9 @@ class CppBackend extends Backend {
 
     if (Driver.isGenHarness) {
       genHarness(c, c.name)
+      /* Copy the emulator headers into the targetDirectory. */
+      copyToTarget("sim_api.h")
+      copyToTarget("emul_api.h")
     }
     if (!Params.space.isEmpty) {
       val out_p = createOutputFile(c.name + ".p")
