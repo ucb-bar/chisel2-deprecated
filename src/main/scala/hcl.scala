@@ -191,6 +191,10 @@ abstract class BlackBox extends Module {
     clockMapping.put(clkName, outName)
   }
 
+  def renameClock(clk: Clock, outName: String) {
+    clockMapping.put(clk.name, outName)
+  }
+
   def mapClock(clkName: String) : String = {
     clockMapping.getOrElse(clkName, clkName)
   }
