@@ -120,9 +120,9 @@ class VerilogBackend extends Backend {
     node match {
       case x: Literal => emitLit(x.value, x.needWidth())
       case _: Reg =>
-        if (node.name != "") node.name else "R" + node.emitIndex
+        if (node.name != "") asValidName(node.name) else "R" + node.emitIndex
       case _ =>
-        if (node.name != "") node.name else "T" + node.emitIndex
+        if (node.name != "") asValidName(node.name) else "T" + node.emitIndex
     }
   }
 
@@ -184,7 +184,7 @@ class VerilogBackend extends Backend {
     val portDecs = new ArrayBuffer[StringBuilder]
     for ((n, w) <- c.wires) {
       if(n != "reset" && n != Driver.implicitReset.name) {
-        var portDec = "." + n + "( ";
+        var portDec = "." + asValidName(n) + "( ";
         w match {
           case io: Bits  =>
             if (io.dir == INPUT) { // if reached, then input has consumers

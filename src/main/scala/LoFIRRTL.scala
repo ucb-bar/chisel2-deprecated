@@ -46,7 +46,23 @@ import scala.collection.immutable.ListSet
 object LoFIRRTLBackend {
 
   val keywords = Set[String](
-    "circuit", "module", "extmodule", "input", "output", "UInt", "SInt", "Clock", "default", "reverse", "wire", "reg", "smem", "cmem", "inst", "node", "accessor", "onreset", "through", "when", "else", "assert", "skip", "infer", "read", "write", "rdwr", "add", "sub", "addw", "subw", "mul", "div", "mod", "quo", "rem", "lt", "Leq", "gt", "geq", "eq", "neq", "mux", "pad", "asUInt", "asSInt", "shl", "shr", "dshl", "dshr", "cvt", "neg", "not", "and", "or", "xor", "andr", "orr", "xorr", "cat", "bit", "bits")
+    "circuit", "module", "extmodule", "input", "output", "UInt", "SInt", "Clock", "default", "reverse", "wire", "reg", "smem", "cmem", "inst", "node", "accessor", "onreset", "through", "when", "else", "assert", "skip", "infer", "read", "write", "rdwr", "add", "sub", "addw", "subw", "mul", "div", "mod", "quo", "rem", "lt", "Leq", "gt", "geq", "eq", "neq", "mux", "pad", "asUInt", "asSInt", "shl", "shr", "dshl", "dshr", "cvt", "neg", "not", "and", "or", "xor", "andr", "orr", "xorr", "cat", "bit", "bits",
+    "always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1",
+    "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
+    "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",
+    "endmodule", "endprimitive", "endspecify", "endtable", "endtask", "event",
+    "for", "force", "forever", "fork", "function", "highz0", "highz1", "if",
+    "ifnone", "initial", "inout", "input", "integer", "initvar", "join",
+    "medium", "module", "large", "macromodule", "nand", "negedge", "nmos",
+    "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
+    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos",
+    "real", "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran",
+    "rtranif0", "rtranif1", "scalared", "signed", "small", "specify",
+    "specparam", "strength", "strong0", "strong1", "supply0", "supply1",
+    "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
+    "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
+    "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
+    "SYNTHESIS", "PRINTF_COND", "VCS")
 
   var traversalIndex = 0
 }
@@ -61,11 +77,19 @@ class LoFIRRTLBackend extends Backend {
 
   val memConfs = HashMap[String, String]()
   val compIndices = HashMap[String, Int]()
+  val memDec = new StringBuilder()
 
   private def getMemConfString: String =
     memConfs.map { case (conf, name) => "name " + name + " " + conf } reduceLeft(_ + _)
 
-  private def getMemName(mem: Mem[_], configStr: String): String = {
+          //val name = getMemName( m, m.n,       m.needWidth(),m.ports,                        mask_gran)
+  private def getMemName(mem: Mem[_], depth:Int, width:Int, ports:ArrayBuffer[_ <: MemAccess], mask_gran:Int): String = {
+    val configStr =
+    (" depth " + depth +
+      " width " + width +
+      " ports " + ports.map(_.getPortType).reduceLeft(_ + "," + _) +
+      (if (mask_gran != 1) " mask_gran " + mask_gran else "") +
+      "\n")
     if (!memConfs.contains(configStr)) {
       /* Generates memory that are different in (depth, width, ports).
        All others, we return the previously generated name. */
@@ -83,14 +107,58 @@ class LoFIRRTLBackend extends Backend {
       val memModuleName = if( compIndices contains candidateName ) {
         val count = (compIndices(candidateName) + 1)
         compIndices += (candidateName -> count)
-        candidateName + "_" + count
+        candidateName + "__" + count
       } else {
         compIndices += (candidateName -> 0)
         candidateName
       }
       memConfs += (configStr -> memModuleName)
+      memDec.append(emitMem(memModuleName,ports))
     }
     memConfs(configStr)
+  }
+
+  def emitMem(name:String,ports:ArrayBuffer[_ <: MemAccess]): String = {
+    val res = new StringBuilder()
+    res.append("  extmodule " + name + " :\n")
+    res.append("    input CLK : Clock\n")
+    for (i <- 0 until ports.size)
+      res.append(emitMemPort(ports(i), i))
+    res.result()
+  }
+
+  def emitMemPort(port:MemAccess,idx:Int) : String = {
+    def str(prefix: String, ports: (String, String)*): String =
+      ports.toList.filter(_._2 != null)
+        .map(p => "    " + p._1 + " " + prefix + idx + p._2 + " : UInt" + "\n")
+        .reduce(_ + _)
+
+    val in = "input"
+    val ou = "output"
+    port match {
+      case r: MemSeqRead =>
+        val addr = (in, "A")
+        val en = (in,"E")
+        val out = (ou,"O")
+        str("R", addr, en, out)
+
+      case w: MemWrite =>
+        val addr = (in,"A")
+        val en = (in,"E")
+        val data = (in,"I")
+        val mask = (in, if (w.isMasked) "M" else null)
+        str("W", addr, en, data, mask)
+
+      case rw: MemReadWrite =>
+        val (r, w) = (rw.read, rw.write)
+        val addr = (in,"A")
+        val en = (in,"E")
+        val write = (in,"W")
+        val data = (in,"I")
+        val mask = (in, if (w.isMasked) "M" else null)
+        val out = (ou,"O")
+        str("RW", addr, en, write, data, mask, out)
+    }
   }
 
   def emitWidth(node: Node): String = {
@@ -124,36 +192,65 @@ class LoFIRRTLBackend extends Backend {
     "UInt<1>(0)"
     //"{" + ((node.needWidth()+31)/32) + "{$random}}"
 
-  def emitPortDef(m: MemAccess, idx: Int): String = {
-    def str(prefix: String, ports: (String, String)*): String =
+  def emitPortDef(m: MemAccess, name:String, idx: Int): String = {
+    def str(prefix: String, ports: (String, String, Boolean)*): String =
       ports.toList.filter(_._2 != null)
-        .map(p => "    ." + prefix + idx + p._1 + "(" + p._2 + ")")
-        .reduceLeft(_ + ",\n" + _)
+        .map(p => 
+          if (p._3) {
+            "    " + name + "." + prefix + idx + p._1 + " := " + p._2 + "\n"
+          } else {
+            "    " + p._2 + " := " + name + "." + prefix + idx + p._1 + "\n"
+          }).reduce(_ + _)
 
     m match {
       case r: MemSeqRead =>
-        val addr = ("A", emitRef(r.addr))
-        val en = ("E", emitRef(r.cond))
-        val out = ("O", emitTmp(r))
+        val addr = ("A", emitRef(r.addr),true)
+        val en = ("E", emitRef(r.cond),true)
+        val out = ("O",emitTmp(r),false)
         str("R", addr, en, out)
 
       case w: MemWrite =>
-        val addr = ("A", emitRef(w.addr))
-        val en = ("E", emitRef(w.cond))
-        val data = ("I", emitRef(w.data))
-        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+        val addr = ("A", emitRef(w.addr),true)
+        val en = ("E", emitRef(w.cond),true)
+        val data = ("I", emitRef(w.data),true)
+        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null,true)
         str("W", addr, en, data, mask)
 
       case rw: MemReadWrite =>
         val (r, w) = (rw.read, rw.write)
-        val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr))
-        val en = ("E", emitRef(r.cond) + " || " + emitRef(w.cond))
-        val write = ("W", emitRef(w.cond))
-        val data = ("I", emitRef(w.data))
-        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
-        val out = ("O", emitTmp(r))
+        val addr = ("A", "mux(" + emitRef(w.cond) + "," + emitRef(w.addr) + ", " + emitRef(r.addr) + ")",true)
+        val en = ("E", "or(" + emitRef(r.cond) + ", " + emitRef(w.cond) + ")",true)
+        val write = ("W", emitRef(w.cond),true)
+        val data = ("I", emitRef(w.data),true)
+        val mask = ("M", if (w.isMasked) emitRef(w.mask) else null,true)
+        val out = ("O",emitTmp(r),false)
         str("RW", addr, en, write, data, mask, out)
     }
+
+    //m match {
+    //  case r: MemSeqRead =>
+    //    val addr = ("A", emitRef(r.addr))
+    //    val en = ("E", emitRef(r.cond))
+    //    val out = ("O", emitTmp(r))
+    //    str("R", addr, en, out)
+
+    //  case w: MemWrite =>
+    //    val addr = ("A", emitRef(w.addr))
+    //    val en = ("E", emitRef(w.cond))
+    //    val data = ("I", emitRef(w.data))
+    //    val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+    //    str("W", addr, en, data, mask)
+
+    //  case rw: MemReadWrite =>
+    //    val (r, w) = (rw.read, rw.write)
+    //    val addr = ("A", emitRef(w.cond) + " ? " + emitRef(w.addr) + " : " + emitRef(r.addr))
+    //    val en = ("E", emitRef(r.cond) + " || " + emitRef(w.cond))
+    //    val write = ("W", emitRef(w.cond))
+    //    val data = ("I", emitRef(w.data))
+    //    val mask = ("M", if (w.isMasked) emitRef(w.mask) else null)
+    //    val out = ("O", emitTmp(r))
+    //    str("RW", addr, en, write, data, mask, out)
+    //}
   }
 
   def emitDef(c: Module): String = {
@@ -175,6 +272,7 @@ class LoFIRRTLBackend extends Backend {
             if (io.dir == INPUT) { // if reached, then input has consumers
               if (io.inputs.length == 0) {
                 //portDec = ";" + portDec
+                portDec = portDec + c.name + "." + asValidName(n) + " := " + emitRand(io)
               } else if (io.inputs.length > 1) {
                   if (Driver.saveConnectionWarnings) {
                     ChiselError.warning("" + io + " CONNECTED TOO MUCH " + io.inputs.length);
@@ -255,12 +353,12 @@ class LoFIRRTLBackend extends Backend {
         val value = 
           if (o.op == "~") { "not(" + emitRef(node.inputs(0)) + ")" }
           else if (o.op == "##") { "cat(" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + ")" }
-          else if (o.op == "s*s") { "mul(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + "))" }
-          else if (o.op == "s*u") { "mul(asSInt(" + emitRef(node.inputs(0)) + "), " + emitRef(node.inputs(1)) + ")" }
-          else if (o.op == "s%s") { "mod(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + "))" }
-          else if (o.op == "s/s") { "div(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + "))" }
-          else if (o.op == "s<") { "lt(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + "))" }
-          else if (o.op == "s<=") {"leq(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + "))" }
+          else if (o.op == "s*s") { "asUInt(mul(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + ")))" }
+          else if (o.op == "s*u") { "asUInt(mul(asSInt(" + emitRef(node.inputs(0)) + "), " + emitRef(node.inputs(1)) + "))" }
+          else if (o.op == "s%s") { "asUInt(mod(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + ")))" }
+          else if (o.op == "s/s") { "asUInt(div(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + ")))" }
+          else if (o.op == "s<") { "asUInt(lt(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + ")))" }
+          else if (o.op == "s<=") {"asUInt(leq(asSInt(" + emitRef(node.inputs(0)) + "), asSInt(" + emitRef(node.inputs(1)) + ")))" }
           else if (o.op == "s>>") { "asUInt(dshr(asSInt(" + emitRef(node.inputs(0)) + "), " + emitRef(node.inputs(1)) + "))" }
           else if (o.op == "<<") { "dshl(" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + ")" }
           else if (o.op == ">>") { "dshr(" + emitRef(node.inputs(0)) + ", " + emitRef(node.inputs(1)) + ")" }
@@ -314,21 +412,19 @@ class LoFIRRTLBackend extends Backend {
           val mask_writers = m.writeAccesses.filter(_.isMasked)
           val mask_grans = mask_writers.map(x => find_gran(x.mask))
           val mask_gran = if (!mask_grans.isEmpty && mask_grans.forall(_ == mask_grans(0))) mask_grans(0) else 1
-          val configStr =
-          (" depth " + m.n +
-            " width " + m.needWidth() +
-            " ports " + m.ports.map(_.getPortType).reduceLeft(_ + "," + _) +
-            (if (mask_gran != 1) " mask_gran " + mask_gran else "") +
-            "\n")
-          val name = getMemName(m, configStr)
+          val name = getMemName(m, m.n,m.needWidth(),m.ports,mask_gran)
           ChiselError.info("MEM " + name)
 
-          val clk = "    .CLK(" + emitRef(m.clock) + ")"
+          val dec = "    inst " + emitRef(m) + " of " + name + "\n"
+          val clk = "    " + emitRef(m) + ".CLK := " + emitRef(m.clock) + "\n"
           val portdefs = for (i <- 0 until m.ports.size)
-            yield emitPortDef(m.ports(i), i)
-          "  " + name + " " + emitRef(m) + " (\n" +
-            (clk +: portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
-          "  );\n"
+            yield emitPortDef(m.ports(i),emitRef(m), i)
+
+          val res = new StringBuilder()
+          res.append(dec)
+          res.append(clk)
+          res.append(portdefs.reduceLeft((x:String, y:String) => x + y))
+          res.result()
         } else {
           ""
         }
@@ -360,7 +456,7 @@ class LoFIRRTLBackend extends Backend {
       case _ =>
         ""
     }
-    (if (node.prune && res != "") "//" else "") + res
+    (if (node.prune && res != "") "" else "") + res
   }
 
   def emitDecBase(node: Node, wire: String = "wire"): String =
@@ -385,7 +481,8 @@ class LoFIRRTLBackend extends Backend {
         }
 
       case _: Assert =>
-        "    reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n"
+        ""
+        //"    reg" + "[" + (gotWidth-1) + ":0] " + emitRef(node) + ";\n"
 
       case _: Reg =>
         emitDecReg(node)
@@ -405,8 +502,12 @@ class LoFIRRTLBackend extends Backend {
         }
 
       case x: MemAccess =>
-        x.referenced = true
-        emitDecAccessor(x)
+        if (x.mem.isInline) {
+          x.referenced = true
+          emitDecAccessor(x)
+        } else { 
+          emitDecBase(node)
+        }
 
       case _: ROMData => ""
 
@@ -449,11 +550,11 @@ class LoFIRRTLBackend extends Backend {
       resNode.append(emitDef(m))
     }
     // Did we generate any non-synthesizable definitions?
-    //if (resSimulate.length > 0) {
-    //  res.append(if_not_synthesis)
-    //  res ++= resSimulate
-    //  res.append(endif_not_synthesis)
-    //}
+    if (resSimulate.length > 0) {
+      //res.append(if_not_synthesis)
+      res ++= resSimulate
+      //res.append(endif_not_synthesis)
+    }
     res ++= resSynthesis
     for (c <- c.children) {
       res.append(emitDef(c))
@@ -495,23 +596,23 @@ class LoFIRRTLBackend extends Backend {
     res
   }
 
-  def emitPrintf(p: Printf): String = {
-    if_not_synthesis +
-    "`ifdef PRINTF_COND\n" +
-    "    if (`PRINTF_COND)\n" +
-    "`endif\n" +
-    "      if (" + emitRef(p.cond) + ")\n" +
-    "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
-    endif_not_synthesis
+  def emitPrintf(p: Printf): String = { ""
+    //if_not_synthesis +
+    //"`ifdef PRINTF_COND\n" +
+    //"    if (`PRINTF_COND)\n" +
+    //"`endif\n" +
+    //"      if (" + emitRef(p.cond) + ")\n" +
+    //"        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    //endif_not_synthesis
   }
-  def emitAssert(a: Assert): String = {
-    if_not_synthesis +
-    "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
-    "  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
-    "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
-    "    $finish;\n" +
-    "  end\n" +
-    endif_not_synthesis
+  def emitAssert(a: Assert): String = { ""
+    //if_not_synthesis +
+    //"  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
+    //"  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
+    //"    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+    //"    $finish;\n" +
+    //"  end\n" +
+    //endif_not_synthesis
   }
 
   def emitReg(node: Node): String = {
@@ -541,15 +642,15 @@ class LoFIRRTLBackend extends Backend {
 
   def emitDecs(c: Module): StringBuilder = {
     //c.nodes.map(emitDec(_)).addString(new StringBuilder)
-    val nonMemDecs = new StringBuilder()
-    val memDecs = new StringBuilder()
+    val first = new StringBuilder()
+    val second = new StringBuilder()
     for ( x <- c.nodes) {
       x match {
-        case m:Mem[_] => memDecs.append(emitDec(m))
-        case other => nonMemDecs.append(emitDec(other))
+        case m:MemAccess => second.append(emitDec(m))
+        case other => first.append(emitDec(other))
       }
     }
-    nonMemDecs.addString(memDecs)
+    second.addString(first)
   }
       
 
@@ -609,11 +710,17 @@ class LoFIRRTLBackend extends Backend {
     res.append("\n");
     res.append(pruned.map(_.result + "\n").reduceLeftOption(_ + _).getOrElse(""));
     res.append("\n");
+    res.append(";DECLARATIONS\n");
+    res.append("\n");
     res.append(emitDecs(c));
+    res.append("\n");
+    res.append(";DEFINITIONS\n");
     res.append("\n");
     //res.append(emitInits(c));
     //res.append("\n");
     res.append(emitDefs(c));
+    res.append("\n");
+    res.append(";REG UPDATES\n");
     res.append("\n");
     res.append(emitRegs(c))
     res.append("\n");
@@ -628,7 +735,7 @@ class LoFIRRTLBackend extends Backend {
       var index = 0
       for ( (text, comps) <- modules) {
         val moduleName = if( modules.size > 1 ) {
-          className + "_" + index.toString;
+          className + "___" + index.toString;
         } else {
           className;
         }
@@ -727,6 +834,10 @@ class LoFIRRTLBackend extends Backend {
     if (!Driver.onlyRunTester) {
       val out = createOutputFile(n + ".fir")
       doCompile(c, out, 0)
+
+      // add external memories to output file
+      out.write(memDec.result())
+
       ChiselError.checkpoint()
       out.close()
     }

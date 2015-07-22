@@ -857,11 +857,15 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("inferring widths")
     inferAll(c)
     if (Driver.isSupportW0W) {
-      ChiselError.info("eliminating W0W")
+      ChiselError.info("eliminating W0W before width inference")
       W0Wtransform
     }
     ChiselError.info("checking widths")
     forceMatchingWidths
+    if (Driver.isSupportW0W) {
+      ChiselError.info("eliminating W0W after width inference")
+      W0Wtransform
+    }
     ChiselError.info("lowering complex nodes to primitives")
     lowerNodes(c)
     ChiselError.info("removing type nodes")
