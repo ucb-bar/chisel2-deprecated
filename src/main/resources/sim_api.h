@@ -7,13 +7,14 @@
 #include <vector>
 #include <map>
 
-enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FIN };
+enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, GETID, FIN };
 
 template<class T> struct sim_data_t {
   std::vector<T> resets;
   std::vector<T> inputs;
   std::vector<T> outputs;
   std::vector<T> signals;
+  std::map<std::string, size_t> signal_map;
 };
 
 template <class T> class sim_api_t {
@@ -43,6 +44,7 @@ public:
           update(); exit = true; break;
         case POKE: poke(); break; 
         case PEEK: peek(); break;
+        case GETID: getid(); break;
         case FIN:  finish(); exit = true; break;
         default: break;
       }
@@ -58,17 +60,50 @@ private:
   virtual void put_value(T& sig) = 0;
   // Generate output tokens (in hex)
   virtual void get_value(T& sig) = 0;
+  // Find a signal of path 
+  virtual int search(std::string& path) { return -1; }
 
   void poke() {
     size_t id;
     std::cin >> std::dec >> id;
-    put_value(sim_data.signals[id]);
+    T obj = sim_data.signals[id];
+    if (obj) {
+      put_value(obj);
+    } else {
+      std::cout << "Cannot find the object of id = " << id << std::endl;
+      finish();
+      exit(0);
+    }
   }
 
   void peek() {
     size_t id;
     std::cin >> std::dec >> id;
-    get_value(sim_data.signals[id]);
+    T obj = sim_data.signals[id];
+    if (obj) {
+      get_value(obj);
+    } else {
+      std::cout << "Cannot find the object of id = " << id << std::endl;
+      finish();
+      exit(0);
+    }
+  }
+
+  void getid() {
+    std::string wire;
+    std::cin >> wire;
+    std::map<std::string, size_t>::iterator it = sim_data.signal_map.find(wire);
+    if (it != sim_data.signal_map.end()) {
+      std::cerr << it->second << std::endl;
+    } else {
+      int id = search(wire);
+      if (id < 0) {
+        std::cout << "Cannot find the object, " << wire<< std::endl;
+        finish();
+        exit(0);
+      }
+      std::cerr << id << std::endl;
+    }
   }
 
   void consume_tokens() {
@@ -85,11 +120,10 @@ private:
 protected:
   sim_data_t<T> sim_data;
 
-  std::map<std::string, int> signals;
   void read_signal_map(std::string filename) {
     std::ifstream file(filename.c_str());
     if (!file) {
-      std::cerr << "Cannot open " << filename << std::endl;
+      std::cout << "Cannot open " << filename << std::endl;
       finish();
       exit(0);
     } 
@@ -100,7 +134,7 @@ protected:
       std::string path;
       size_t width, n;
       iss >> path >> width >> n;
-      signals[path] = id;
+      sim_data.signal_map[path] = id;
       id += n;
     }
   }

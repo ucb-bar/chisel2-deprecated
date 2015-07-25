@@ -921,7 +921,7 @@ abstract class Backend extends FileSystemUtilities{
       printStack
     }
 
-    if (Driver.isGenHarness) {
+    if ((Driver.isGenHarness || Driver.isTesting) && !Driver.isGateLevel) {
       genSignalMap(c.name)
     }
 

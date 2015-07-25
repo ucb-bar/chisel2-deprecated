@@ -1321,12 +1321,14 @@ class CppBackend extends Backend {
         "  sim_data.inputs.push_back(new dat_api<%d>(&mod->%s));\n".format(in.needWidth, emitRef(in))) mkString "")
       llm addString (outputs map (out =>
         "  sim_data.outputs.push_back(new dat_api<%d>(&mod->%s));\n".format(out.needWidth, emitRef(out))) mkString "")
-      llm addString (Driver.signalMap.unzip._1 map {
-        case mem: Mem[_] => (0 until mem.n) map (
-          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[%d]));\n".format(mem.needWidth, emitRef(mem), _)) mkString ""
-        
-        case node =>
-          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node))
+      llm addString (Driver.signalMap map {
+        case (mem: Mem[_], id) => 
+          (0 until mem.n) map (off => List(
+            "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[%d]));\n".format(mem.needWidth, emitRef(mem), off),
+            "  sim_data.signal_map[\"%s[%d]\"] = %d;\n".format(emitRef(mem), off, id + off)) mkString "") mkString ""
+        case (node, id) => List(
+          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(emitRef(node), Driver.signalMap(node))) mkString ""
       } mkString "")
 
       llm.done()

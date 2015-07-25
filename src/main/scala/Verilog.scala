@@ -382,7 +382,7 @@ class VerilogBackend extends Backend {
     val resets = c.resets.values.toList
 
     harness write "module test;\n"
-    harness write "parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;\n"
+    harness write "  parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;\n"
     ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
     if (clocks.isEmpty) harness write "  reg %s = 0;\n".format(mainClk.name)
@@ -400,10 +400,12 @@ class VerilogBackend extends Backend {
     harness write ");\n\n"
 
     harness write "  initial begin\n"
+    harness write "    $init_top(%s);\n".format(c.name)
     harness write "    $init_rsts(" + (resets map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
-    harness write "    $init_sigs(\"%s.sigs\");\n".format(Driver.targetDir+c.name)
+    if (!Driver.isGateLevel) 
+      harness write "    $init_sigs(\"%s.sigs\");\n".format(Driver.targetDir+c.name)
 
     if (Driver.isVCD) {
       harness write "    /*** VPD dump ***/\n"
@@ -414,7 +416,7 @@ class VerilogBackend extends Backend {
     harness write "  end\n\n"
 
     harness write "  always @(negedge %s) begin\n".format(mainClk.name)
-    harness write "    #CLOCK_DELAY $tick();\n"
+    harness write "    $init_tick(CLOCK_DELAY);\n"
     harness write "  end\n\n"
 
     harness write "endmodule\n"
@@ -708,13 +710,13 @@ class VerilogBackend extends Backend {
     }
     if (Driver.isGenHarness) {
       genHarness(c, n)
+      copyToTarget("sim_api.h")
+      copyToTarget("vpi.h")
+      copyToTarget("vpi.cpp")
     }
   }
 
   override def compile(c: Module, flags: Option[String]) {
-    copyToTarget("sim_api.h")
-    copyToTarget("vpi.h")
-    copyToTarget("vpi.cpp")
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "

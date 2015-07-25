@@ -61,7 +61,7 @@ private:
   }
 
   virtual void get_value(dat_api_base* &sig) {
-    std::cout << sig->get_value() << std::endl;
+    std::cerr << sig->get_value() << std::endl;
   }
 
   bool is_exit;
@@ -80,7 +80,7 @@ private:
 
   virtual void step() {
     module->dump();
-    module->print(std::cerr);
+    module->print(std::cout);
     module->clock_lo(LIT<1>(0));
     module->clock_hi(LIT<1>(0));
     // TODO: should call twice to get the output for now
