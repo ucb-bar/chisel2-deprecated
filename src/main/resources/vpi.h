@@ -63,74 +63,7 @@ public:
   }
 
   void init_sigs() {
-    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-    vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
-
-    // Argument: filename
-    s_vpi_value file_s;
-    file_s.format = vpiStringVal;
-    vpi_get_value(vpi_scan(arg_iter), &file_s);
-
-    // First read signal map
-    read_signal_map(file_s.value.str);
-
-    // Now, serach signals
-    std::queue<vpiHandle> modules;
-    std::map<int, vpiHandle> handles;
-    size_t offset = std::string(vpi_get_str(vpiFullName, top_handle)).find(".") + 1;
-    modules.push(top_handle);
-    while (!modules.empty()) {
-      vpiHandle mod_handle = modules.front();
-      modules.pop();
-      // Iterate its net
-      vpiHandle net_iter = vpi_iterate(vpiNet, mod_handle);
-      while (vpiHandle net_handle = vpi_scan(net_iter)) {
-        std::string nodepath = std::string(vpi_get_str(vpiFullName, net_handle)).substr(offset);
-        std::map<std::string, size_t>::iterator s = sim_data.signal_map.find(nodepath);
-        if (s != sim_data.signal_map.end()) handles[s->second] = net_handle;
-      }
-      
-      // Iterate its reg
-      vpiHandle reg_iter = vpi_iterate(vpiReg, mod_handle);
-      while (vpiHandle reg_handle = vpi_scan(reg_iter)) {
-        std::string nodepath = std::string(vpi_get_str(vpiFullName, reg_handle)).substr(offset);
-        std::map<std::string, size_t>::iterator s = sim_data.signal_map.find(nodepath);
-        if (s != sim_data.signal_map.end()) handles[s->second] = reg_handle;
-      }
-
-      // Iterate its mem
-      vpiHandle mem_iter = vpi_iterate(vpiRegArray, mod_handle);
-      while (vpiHandle mem_handle = vpi_scan(mem_iter)) {
-        std::string nodepath = std::string(vpi_get_str(vpiFullName, mem_handle)).substr(offset);
-        std::map<std::string, size_t>::iterator s = sim_data.signal_map.find(nodepath);
-        if (s != sim_data.signal_map.end()) {
-          size_t id = s->second + vpi_get(vpiSize, mem_handle);
-          vpiHandle elm_iter = vpi_iterate(vpiReg, mem_handle);
-          while (vpiHandle elm_handle = vpi_scan(elm_iter)) handles[--id] = elm_handle;
-        }
-      }
-
-      // Iterate vec(?)
-      vpiHandle vec_iter = vpi_iterate(vpiNetArray, mod_handle);
-      while (vpiHandle vec_handle = vpi_scan(vec_iter)) {
-        std::string nodepath = std::string(vpi_get_str(vpiFullName, vec_handle)).substr(offset);
-        std::map<std::string, size_t>::iterator s = sim_data.signal_map.find(nodepath);
-        if (s != sim_data.signal_map.end()) {
-          size_t id = s->second + vpi_get(vpiSize, vec_handle);
-          vpiHandle elm_iter = vpi_iterate(vpiNet, vec_handle);
-          while (vpiHandle elm_handle = vpi_scan(elm_iter)) handles[--id] = elm_handle;
-        }
-      }
-
-      vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
-      while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
-        modules.push(sub_handle);
-      }
-    }
-
-    for (size_t i = 0 ; i < handles.size() ; i++) {
-      sim_data.signals.push_back(handles[i]);
-    }
+    search_signals();
   }
 
 private:
@@ -201,14 +134,14 @@ private:
     return id;
   }
 
-  virtual int search(std::string& wire) {
+  int search_signals(const char *wire = NULL) {
     int id = -1;
-    // otherwise, search it
-    int dotpos = wire.rfind(".");
-    int sbrpos = wire.rfind("[");
-    std::string modpath = wire.substr(0, dotpos);
-    std::string wirename = wire.substr(dotpos+1);
-    std::string memname = sbrpos > 0 ? wire.substr(sbrpos) : "";
+    std::string wirepath = wire ? wire : "";
+    int dotpos = wirepath.rfind(".");
+    std::string modpath = dotpos > 0 ? wirepath.substr(0, dotpos) : "";
+    std::string wirename = dotpos > 0 ? wirepath.substr(dotpos+1) : "";
+    int sbrpos = wirename.rfind("[");
+    std::string arrname = sbrpos > 0 ? wirename.substr(0, sbrpos) : "";
     std::queue<vpiHandle> modules;
     size_t offset = std::string(vpi_get_str(vpiFullName, top_handle)).find(".") + 1;
 
@@ -219,60 +152,62 @@ private:
       vpiHandle mod_handle = modules.front();
       modules.pop();
 
+      std::string modname = std::string(vpi_get_str(vpiFullName, mod_handle)).substr(offset);
       // If the module is found
-      if (modpath == std::string(vpi_get_str(vpiFullName, mod_handle)).substr(offset)) {
+      if (!wire || modpath == modname) {
         // Iterate its nets
         vpiHandle net_iter = vpi_iterate(vpiNet, mod_handle);
         while (vpiHandle net_handle = vpi_scan(net_iter)) {
-          if (wirename == vpi_get_str(vpiName, net_handle)) {
-            id = add_signal(net_handle, wire); break;
-          }
+          std::string netname = vpi_get_str(vpiName, net_handle);
+          std::string netpath = modname + "." + netname;
+          size_t netid = (!wire && netname[0] != 'T') || wirename == netname ? 
+            add_signal(net_handle, netpath) : 0;
+          id = netid ? netid : id;
+          if (id > 0) break;
         }
         if (id > 0) break;
 
         // Iterate its regs
         vpiHandle reg_iter = vpi_iterate(vpiReg, mod_handle);
         while (vpiHandle reg_handle = vpi_scan(reg_iter)) {
-          if (wirename == vpi_get_str(vpiName, reg_handle)) {
-            id = add_signal(reg_handle, wire); break;
-          }
+          std::string regname = vpi_get_str(vpiName, reg_handle);
+          std::string regpath = modname + "." + regname;
+          size_t regid = !wire || wirename == regname ? 
+            add_signal(reg_handle, regpath) : 0;
+          id = regid ? regid : id;
+          if (id > 0) break;
         }
         if (id > 0) break;
 
         // Iterate its mems
         vpiHandle mem_iter = vpi_iterate(vpiRegArray, mod_handle);
         while (vpiHandle mem_handle = vpi_scan(mem_iter)) {
-          if (memname == vpi_get_str(vpiName, mem_handle)) {
+          std::string memname = vpi_get_str(vpiName, mem_handle);
+          if (!wire || arrname == memname) {
             vpiHandle elm_iter = vpi_iterate(vpiReg, mem_handle);
-            while (vpiHandle elm_handle = vpi_iterate(vpiReg, mem_handle)) {
+            size_t idx = vpi_get(vpiSize, mem_handle);
+            while (vpiHandle elm_handle = vpi_scan(elm_iter)) {
               std::string elmname = vpi_get_str(vpiName, elm_handle);
-              size_t i = add_signal(elm_handle, elmname);
-              if (wirename == elmname) id = i;
+              std::string elmpath = modname + "." + elmname;
+              size_t elmid = add_signal(elm_handle, elmpath);
+              id = wirename == elmname ? elmid : id;
             }
-            break;
           }
-        }
-
-        // Iterate its vec(?)
-        vpiHandle vec_iter = vpi_iterate(vpiNetArray, mod_handle);
-        while (vpiHandle vec_handle = vpi_scan(vec_iter)) {
-          if (memname == vpi_get_str(vpiName, vec_handle)) {
-            vpiHandle elm_iter = vpi_iterate(vpiNet, vec_handle);
-            while (vpiHandle elm_handle = vpi_iterate(vpiNet, vec_handle)) {
-              std::string elmname = vpi_get_str(vpiName, elm_handle);
-              size_t i = add_signal(elm_handle, elmname);
-              if (wirename == elmname) id = i;
-            }
-            break;
-          }
+          if (id > 0) break;
         }
       }
+
       vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
       while (vpiHandle sub_handle = vpi_scan(sub_iter)) {
         modules.push(sub_handle);
       }
     }
+
     return id;
+  }
+
+  virtual int search(std::string& wire) {
+    return search_signals(wire.c_str());
   }
 };
 

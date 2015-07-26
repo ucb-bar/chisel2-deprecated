@@ -404,8 +404,7 @@ class VerilogBackend extends Backend {
     harness write "    $init_rsts(" + (resets map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
-    if (!Driver.isGateLevel) 
-      harness write "    $init_sigs(\"%s.sigs\");\n".format(Driver.targetDir+c.name)
+    harness write "    $init_sigs();\n"
 
     if (Driver.isVCD) {
       harness write "    /*** VPD dump ***/\n"

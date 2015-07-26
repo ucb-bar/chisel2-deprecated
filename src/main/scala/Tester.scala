@@ -46,8 +46,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   var delta = 0
   private val _pokeMap = HashMap[Bits, BigInt]()
   private val _peekMap = HashMap[Bits, BigInt]()
-  private val _pathMap = HashMap[String, Int]()
-  lazy val _signalMap = Driver.signalMap
+  private val _signalMap = HashMap[String, Int]()
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
   val _logs = ScalaQueue[String]()
@@ -135,10 +134,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
   }
   def peekPath(path: String) = { 
-    peek(_pathMap getOrElseUpdate (path, getId(path)))
+    peek(_signalMap getOrElseUpdate (path, getId(path)))
   }
   def peekNode(node: Node, off: Option[Int] = None) = {
-    peek((_signalMap getOrElseUpdate (node, getId(dumpName(node)))) + (off getOrElse 0))
+    peekPath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""))
   }
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
     val value = peekNode(data, Some(off))
@@ -161,10 +160,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     writeValue(v, w)
   }
   def pokePath(path: String, v: BigInt, w: Int = 1) {
-    poke(_pathMap getOrElseUpdate (path, getId(path)), v, w)
+    poke(_signalMap getOrElseUpdate (path, getId(path)), v, w)
   }
   def pokeNode(node: Node, v: BigInt, off: Option[Int] = None) {
-    poke((_signalMap getOrElseUpdate (node, getId(dumpName(node)))) + (off getOrElse 0), v, node.needWidth)
+    pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v, node.needWidth)
   }
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
     if (isTrace) println("  POKE %s[%d] <- %s".format(dumpName(data), off, value.toString(16)))
@@ -181,10 +180,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     if (isTrace) println("  POKE " + dumpName(data) + " <- " + value.toString(16))
     if (_inputs contains data) 
       _pokeMap(data) = value
-    else if (_signalMap contains data.getNode)
-      pokeNode(data.getNode, value)
     else 
-      println("  POKE is not suppoted for " + dumpName(data))
+      pokeNode(data.getNode, value)
     isStale = true
   }
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -334,5 +331,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     process.destroy()
     println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else "FAILED FIRST AT CYCLE " + failureTime))
     if(!ok) throwException("Module under test FAILED at least one test vector.")
+  }
+
+  _signalMap ++= Driver.signalMap flatMap {
+    case (m: Mem[_], id) => 
+      (0 until m.n) map (idx => "%s[%d]".format(dumpName(m), idx) -> (id + idx))
+    case (node, id) => Seq(dumpName(node) -> id)
   }
 }

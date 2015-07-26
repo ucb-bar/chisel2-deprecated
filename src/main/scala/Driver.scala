@@ -275,7 +275,6 @@ object Driver extends FileSystemUtilities{
     isCompiling = false
     isCheckingPorts = false
     isTesting = false
-    isGateLevel = false
     testCommand = None
     isAssert = true
     isAssertWarn = false
@@ -370,7 +369,6 @@ object Driver extends FileSystemUtilities{
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
-        case "--gateLevel" => isGateLevel = true
         case "--testCommand" => 
           var cmd = ""
           while(i + 1 < args.size && args(i + 1).substring(0,2) != "--") {
@@ -450,7 +448,6 @@ object Driver extends FileSystemUtilities{
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
-  var isGateLevel = false
   var testCommand: Option[String] = None
   var isAssert = true
   var isAssertWarn = false

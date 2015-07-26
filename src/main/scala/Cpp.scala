@@ -1313,6 +1313,17 @@ class CppBackend extends Backend {
                  s"  assert(mod);\n"
       val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
+      var id = 0
+      Driver.bfs {
+        case m: Mem[_] => 
+          Driver.signalMap(m) = id
+          id += m.n
+        case node if node.prune || node.driveRand =>
+        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => 
+          Driver.signalMap(node) = id
+          id += 1
+        case _ =>
+      }
       llm addString (inputs map (in =>
         "  sim_data.inputs.push_back(new dat_api<%d>(&mod->%s));\n".format(in.needWidth, emitRef(in))) mkString "")
       llm addString (outputs map (out =>
@@ -1321,10 +1332,10 @@ class CppBackend extends Backend {
         case (mem: Mem[_], id) => 
           (0 until mem.n) map (off => List(
             "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[%d]));\n".format(mem.needWidth, emitRef(mem), off),
-            "  sim_data.signal_map[\"%s[%d]\"] = %d;\n".format(emitRef(mem), off, id + off)) mkString "") mkString ""
+            "  sim_data.signal_map[\"%s[%d]\"] = %d;\n".format(mem.chiselName, off, id + off)) mkString "") mkString ""
         case (node, id) => List(
           "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
-          "  sim_data.signal_map[\"%s\"] = %d;\n".format(emitRef(node), Driver.signalMap(node))) mkString ""
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) mkString ""
       } mkString "")
 
       llm.done()

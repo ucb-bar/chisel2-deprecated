@@ -812,23 +812,6 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def genSignalMap(name: String) {
-    val file = createOutputFile(name + ".sigs")
-    var id = 0
-    def dump(node: Node, off: Int) {
-      file write "%s %d %d\n".format(node.chiselName, node.needWidth, off)
-      Driver.signalMap(node) = id
-      id += off
-    }
-    Driver.bfs { 
-      case m: Mem[_] => dump(m, m.n)
-      case node if node.prune || node.driveRand =>
-      case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => dump(node, 1)
-      case _ =>
-    }
-    file.close
-  }
-
   def elaborate(c: Module): Unit = {
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
@@ -921,10 +904,8 @@ abstract class Backend extends FileSystemUtilities{
       printStack
     }
 
-    if ((Driver.isGenHarness || Driver.isTesting) && !Driver.isGateLevel) {
-      genSignalMap(c.name)
-    }
-
+    // generate chisel names
+    Driver.dfs { _.chiselName }
     execute(c, analyses)
   }
 
