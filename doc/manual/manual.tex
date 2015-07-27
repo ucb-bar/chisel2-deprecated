@@ -864,6 +864,7 @@ outside of Chisel.  The user defines:
 \begin{itemize}
 \item a module as a subclass of \code{BlackBox} and
 \item an \code{io} field with the interface.
+\item optionally a subclass of \code{VerilogParameters}
 \end{itemize}
 
 \noindent
@@ -874,12 +875,36 @@ class RomIo extends Bundle {
   val isVal = Bool(INPUT)
   val raddr = UInt(INPUT,  32)
   val rdata = UInt(OUTPUT, 32)
+  raddr.nameIt("RADDR")
+}
+
+class RomParams extends VerilogParameters {
+  val MY_STR = "Test"
+  val MY_INT = 5
 }
 
 class Rom extends BlackBox {
   val io = new RomIo()
+  val romParams = new RomParams()
+  setVerilogParameters(romParams)
+  renameClock(Driver.implicitClock, "clock_A")
+  renameClock("my_other_clock", "test_clock")
+  renameReset("rst")
+
+  // Define how to use in simulation here
+
 }
 \end{scala}
+
+The parameters are transformed to the verilog parameters with names and values used in the class definition.
+\code{setVerilogParameters} can also take a string directly.
+The function \code{renameClock} can take a \code{Clock} object or a string name of the clock to rename the BlackBox output clock.
+The function \code{renameReset} will rename the implicit reset.
+If other resets need to be named, call \code{nameIt()}.
+An example of the use of \code{nameIt()} is shown in the io class.
+Rather than being called \code{io\textunderscore raddr} for the io of the BlackBox, it will be \code{RADDR}.
+The blackbox behaves as a module in c simulation.
+This means you can implement the functionality of the BlackBox using the io so that you can verify your design.
 
 \section{Printf and Sprintf}
 
