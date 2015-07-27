@@ -47,8 +47,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _pokeMap = HashMap[Bits, BigInt]()
   private val _peekMap = HashMap[Bits, BigInt]()
   private val _signalMap = HashMap[String, Int]()
-  private val _clockLens = HashMap(Driver.implicitClock -> 0)
-  private val _clockCnts = HashMap(Driver.implicitClock -> 0)
+  private val _clocks = Driver.clocks map (clk => clk -> clk.period.round.toInt)
+  private val _clockLens = HashMap(_clocks:_*)
+  private val _clockCnts = HashMap(_clocks:_*)
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
   val _logs = ScalaQueue[String]()

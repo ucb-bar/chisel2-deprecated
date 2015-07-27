@@ -288,8 +288,7 @@ class VerilogBackend extends Backend {
         ChiselError.info("MEM " + name)
 
         val clk = "    .CLK(" + emitRef(m.clock.get) + ")"
-        val portdefs = for (i <- 0 until m.ports.size)
-          yield emitPortDef(m.ports(i), i)
+        val portdefs = m.ports.zipWithIndex map (x => emitPortDef(x._1, x._2))
         "  " + name + " " + emitRef(m) + " (\n" +
           (clk +: portdefs).reduceLeft(_ + ",\n" + _) + "\n" +
         "  );\n"
@@ -386,12 +385,12 @@ class VerilogBackend extends Backend {
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
     clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name)) 
     resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name))
-    if (clocks.size > 1) { 
-      harness write "\n  integer min = 1 << 31 - 1;\n"
-      clocks foreach (clk => harness write "  integer %s_cnt = `CLOCK_PERIOD;\n".format(clk.name)) 
-    } 
-    clocks foreach (clk => harness write "  integer %s_len = `CLOCK_PERIOD;\n".format(clk.name)) 
+    clocks foreach (clk => harness write "  integer %s_len;\n".format(clk.name)) 
     clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name)) 
+    if (clocks.size > 1) {
+      harness write "  integer min = 1 << 31 - 1;\n\n"
+      clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
+    }
 
     harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
@@ -402,6 +401,15 @@ class VerilogBackend extends Backend {
     harness write ");\n\n"
 
     harness write "  initial begin\n"
+    clocks foreach (clk => clk.srcClock match {
+      case None => harness write "    %s_len = `CLOCK_PERIOD;\n".format(clk.name)
+      case Some(src) =>
+        val initStr = "%s_len".format(src.name) + (if (src.period > clk.period)
+          " / " + (src.period / clk.period).round else
+          " * " + (clk.period / src.period).round)
+        harness write "    %s_len = %s;\n".format(clk.name, initStr)
+    })
+    if (clocks.size > 1) clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name)) 
     harness write "    $init_top(%s);\n".format(c.name)
     harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
     harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"

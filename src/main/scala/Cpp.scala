@@ -592,17 +592,16 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock => (x.srcClock match {
+      case x: Clock => List(x.srcClock match {
         case None => 
-          "  " + emitRef(node) + ".len = 0;\n" +
-          "  " + emitRef(node) + ".cnt = 0;\n" 
+          "  " + emitRef(node) + ".len = %d;\n".format(x.period.round)
         case Some(src) => 
-          val initStr = emitRef(src) + (if (src.period > x.period) 
+          val initStr = emitRef(src) + ".len" + (if (src.period > x.period) 
             " / " + (src.period / x.period).round else 
             " * " + (x.period / src.period).round)
-          "  " + emitRef(node) + ".len = " + initStr + ";\n" +
-          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ";\n"
-      }) + "  " + emitRef(node) + ".values[0] = 0;\n"
+          "  " + emitRef(node) + ".len = " + initStr + ";\n"}, 
+          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ".len;\n",
+          "  " + emitRef(node) + ".values[0] = 0;\n") mkString ""
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
