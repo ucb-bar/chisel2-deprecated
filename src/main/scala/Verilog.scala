@@ -121,6 +121,8 @@ class VerilogBackend extends Backend {
       case x: Literal => emitLit(x.value, x.needWidth())
       case _: Reg =>
         if (node.name != "") node.name else "R" + node.emitIndex
+      case _: Clock =>
+        if (node.name != "") node.name else "C" + node.emitIndex
       case _ =>
         if (node.name != "") node.name else "T" + node.emitIndex
     }
@@ -458,7 +460,7 @@ class VerilogBackend extends Backend {
     for (rst <- resets)
       harness.write("  reg %s;\n".format(rst.name))
 
-    // Diffent code generation for clocks
+    // Different code generation for clocks
     if (Driver.isCompiling) {
       harness.write("  reg %s = 0;\n".format(mainClk.name))
       if (clocks.size > 1) {

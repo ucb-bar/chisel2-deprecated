@@ -61,7 +61,7 @@ class MultiClockSuite extends TestSuite {
       }
       val sub = Module(new ClockedSubComp())
       sub.io.ready := io.data0 & io.data1
-      io.result := sub.io.valid
+      io.result := RegNext(sub.io.valid)
     }
 
     chiselMain(Array[String]("--v",

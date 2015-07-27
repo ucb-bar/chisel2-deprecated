@@ -1,4 +1,4 @@
-module MultiClockSuite_ClockedSubComp_1(input T0,
+module MultiClockSuite_ClockedSubComp_1(input C0,
     input  io_ready,
     output io_valid
 );
@@ -17,26 +17,40 @@ module MultiClockSuite_ClockedSubComp_1(input T0,
 
   assign io_valid = stored;
 
-  always @(posedge T0) begin
+  always @(posedge C0) begin
     stored <= io_ready;
   end
 endmodule
 
-module MultiClockSuite_Comp_1(input T0,
+module MultiClockSuite_Comp_1(input clk, input C0,
     input  io_data0,
     input  io_data1,
     output io_result
 );
 
   wire T0;
+  reg  R1;
   wire sub_io_valid;
 
+`ifndef SYNTHESIS
+// synthesis translate_off
+  integer initvar;
+  initial begin
+    #0.002;
+    R1 = {1{$random}};
+  end
+// synthesis translate_on
+`endif
 
   assign T0 = io_data0 & io_data1;
-  assign io_result = sub_io_valid;
-  MultiClockSuite_ClockedSubComp_1 sub(.T0(T0),
+  assign io_result = R1;
+  MultiClockSuite_ClockedSubComp_1 sub(.C0(C0),
        .io_ready( T0 ),
        .io_valid( sub_io_valid )
   );
+
+  always @(posedge clk) begin
+    R1 <= sub_io_valid;
+  end
 endmodule
 
