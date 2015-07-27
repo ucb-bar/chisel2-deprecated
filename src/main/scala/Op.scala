@@ -444,7 +444,7 @@ abstract class Op extends Node {
     case "d/"  => 1
     case "d%"  => 1
     case "dpow"  => 1
-    case "==" | "!=" | "<" | ">" | "<=" | ">=" => 0
+    case "==" | "!=" | "<" | ">" | "<=" | ">=" | "s<" | "s<=" => 0
   }
 
   // Transform an operator with one or more zero-width children into an operator without.
@@ -468,7 +468,10 @@ abstract class Op extends Node {
              *  We need to create it with a non-zero-width (to avoid complaints from the constructor),
              *  the force its width to zero.
              */
-            val identity = UInt(identityFromNode, 1)
+            val identity = c match {
+              case s: SInt => SInt(identityFromNode, 2) // '2' is the smallest allowed width for a signed integer. We'll fix it up below.
+              case _ => UInt(identityFromNode, 1)
+            }
             identity.setWidth(0)
             inputs(i) = identity
             modified = true
@@ -559,7 +562,7 @@ abstract class Op extends Node {
               }
             }
             /* A zero-width node is always less than a non-zero width node. */
-            case "<" | "<=" => {
+            case "<" | "<=" | "s<" | "s<=" => {
               /* True if the zero-width child is the first operand. */
               replaceTree(if (zeroChildId < nonzeroChildId) trueNode else falseNode)
             }

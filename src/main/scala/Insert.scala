@@ -43,4 +43,7 @@ class Insert(tgt: Bits, bit: UInt, length: Int) extends proc {
         tgt := UInt(next) & ~shiftedMask | fill
     }
   }
+
+  // Chisel3 - this node contains data - used for verifying Wire() wrapping
+  override def isTypeOnly = false
 }

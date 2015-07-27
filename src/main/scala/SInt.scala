@@ -134,7 +134,15 @@ class SInt extends Bits with Num[SInt] {
   def -&  (b: SInt): SInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
 
   //SInt to UInt arithmetic
-  def * (b: UInt): SInt = newBinaryOp(b.zext, "s*u")
+  def * (b: UInt): SInt = {
+    // We need to detect a zero-width operand early, due to the assumptions about "s*u" width manipulation in Op.c (see mulSUWidth())
+    val opType = if (b.isZeroWidth) {
+      "s*s"
+    } else {
+      "s*u"
+    }
+    newBinaryOp(b.zext, opType)
+  }
   def + (b: UInt): SInt = this + b.zext
   def - (b: UInt): SInt = this - b.zext
   def / (b: UInt): SInt = this / b.zext

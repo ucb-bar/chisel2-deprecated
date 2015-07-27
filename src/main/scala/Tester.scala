@@ -33,6 +33,8 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import scala.util.Random
 import java.io._
+import java.lang.Double.{longBitsToDouble, doubleToLongBits}
+import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessIO}
 
 class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
@@ -158,6 +160,13 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def peek(data: Aggregate): Array[BigInt] = {
     data.flatten.map(x => x._2) map (peek(_))
   }
+  def peek(data: Flo): Float = {
+    intBitsToFloat(peekNode(data).toInt)
+  }
+  def peek(data: Dbl): Double = {
+    longBitsToDouble(peekNode(data).toLong)
+  }
+
 
   def poke(id: Int, v: BigInt, w: Int = 1) {
     sendCmd(SIM_CMD.POKE)
@@ -192,6 +201,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
     val kv = (data.flatten.map(x => x._2), x.reverse).zipped
     for ((x, y) <- kv) poke(x, y)
+  }
+  def poke(data: Flo, x: Float): Unit = {
+    pokeNode(data, BigInt(floatToIntBits(x)))
+  }
+  def poke(data: Dbl, x: Double): Unit = {
+    pokeNode(data, BigInt(doubleToLongBits(x)))
   }
 
   private def readOutputs {
@@ -283,6 +298,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   def expect (data: Bits, expected: Long): Boolean = {
     expect(data, int(expected))
+  }
+  def expect (data: Flo, expected: Float): Boolean = {
+    val got = peek(data)
+    expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
+  }
+  def expect (data: Dbl, expected: Double): Boolean = {
+    val got = peek(data)
+    expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
 
   /* Compare the floating point value of a node with an expected floating point value.

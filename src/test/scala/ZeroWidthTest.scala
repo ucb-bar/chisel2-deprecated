@@ -34,6 +34,8 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.Ignore
+import scala.collection.immutable.HashMap
+import scala.collection.mutable.ArrayBuffer
 
 import Chisel._
 
@@ -59,6 +61,18 @@ class ZeroWidthTest extends TestSuite {
       "--backend", backend,
       "--targetDir", dir.getPath.toString()
       )
+
+  def filterArgs(args: Array[String], amap: HashMap[String, String]): Array[String] = {
+    val newArgs = ArrayBuffer[String]()
+    for (arg <- args) {
+      if (amap.contains(arg)) {
+        newArgs += amap(arg)
+      } else {
+        newArgs += arg
+      }
+    }
+    newArgs.toArray
+  }
 
   @Before override def initialize() {
     super.initialize()
@@ -271,7 +285,7 @@ class ZeroWidthTest extends TestSuite {
     assertFile("ZeroWidthTest_RemUZ_1." + backend)
   }
 
-  /** Multiply an signed zero-width number by an unsigned number */
+  /** Multiply a signed zero-width number by an unsigned number */
   @Test def testMulZU() {
     println("\ntestMulZU ...")
     class MulZU extends Module {
@@ -284,6 +298,33 @@ class ZeroWidthTest extends TestSuite {
     }
     chiselMain(testArgs, () => Module(new MulZU()))
     assertFile("ZeroWidthTest_MulZU_1." + backend)
+  }
+
+  /** Multiply an unsigned zero-width number by a signed number. */
+  @Test def testMulZS() {
+    println("\ntestMulZS ...")
+    class MulZS extends Module {
+      val io = new Bundle {
+        val x = UInt(INPUT, 0)
+        val y = SInt(INPUT, 32)
+        val z = SInt(OUTPUT)
+      }
+      io.z := io.x * io.y
+    }
+    class MulZSTester(m: MulZS) extends Tester(m) {
+      poke(m.io.y, 42)
+      step(1)
+      expect(m.io.z, 42)
+    }
+    // Replace whatever backend we're using with verilog.
+    if (true) {
+      chiselMain(testArgs, () => Module(new MulZS()))
+      assertFile("ZeroWidthTest_MulZS_1." + backend)
+    } else {
+      val replaceArgs = HashMap[String, String]((backend, "c"))
+      val testerArgs = Array("--genHarness", "--compile", "--test")
+      chiselMainTest(filterArgs(testArgs, replaceArgs) ++ testerArgs, () => Module(new MulZS())) {m => new MulZSTester(m)}
+    }
   }
 
   /** Divide a signed zero-width number by an unsigned number */
@@ -472,6 +513,33 @@ class ZeroWidthTest extends TestSuite {
       when ( io.i_valid ) {
         io.o_value := io.i_value
       }
+    }
+  }
+  
+  /** Issue 439
+    *  Chisel somehow finds a way to build negative (actually zero) width wires.
+    */
+  @Test def testZeroWidthForceMatching {
+    println("\ntestZeroWidthForceMatching ...")
+    class ZeroWidthForceMatching extends Module {
+      val io = UInt(OUTPUT, 1)
+      io := UInt(1, 1)
+      io := UInt(width = 0)
+    }
+    
+    class ZeroWidthForceMatchingTester(c: ZeroWidthForceMatching) extends Tester(c) {
+      assertTrue(c.io.getWidth == 1)
+      expect(c.io, 0)
+    }
+    if (true) {
+      // Replace whatever backend we're using with verilog.
+      val replaceArgs = HashMap[String, String]((backend, "v"))
+      chiselMain(filterArgs(testArgs, replaceArgs) , () => Module(new ZeroWidthForceMatching()))
+      assertFile("ZeroWidthTest_ZeroWidthForceMatching_1." + "v")
+    } else {
+      val replaceArgs = HashMap[String, String]((backend, "c"))
+      val testerArgs = Array("--genHarness", "--compile", "--test")
+      chiselMainTest(filterArgs(testArgs, replaceArgs) ++ testerArgs, () => Module(new ZeroWidthForceMatching())) {m => new ZeroWidthForceMatchingTester(m)}
     }
   }
 }

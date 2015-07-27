@@ -95,7 +95,16 @@ class UInt extends Bits with Num[UInt] {
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
   // arithmetic operators
-  def zext(): SInt = Cat(UInt(0,1), this).toSInt
+  def zext(): SInt = {
+    // Don't sign-extend a zero-width node.
+    val result = if (isZeroWidth) {
+      this
+    } else {
+      Cat(UInt(0,1), this)
+    }
+    result.toSInt
+  }
+
   def unary_-(): UInt = UInt(0) - this
   def unary_!(): Bool = this === UInt(0)
   def >> (b: UInt): UInt = newBinaryOp(b, ">>")

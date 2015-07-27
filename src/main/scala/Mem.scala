@@ -268,7 +268,7 @@ class SeqMem[T <: Data](out: T, n: Int) {
   private val mem = {
     // construct a Mem while pretending we aren't in compatibility mode
     val compat = Driver.minimumCompatibility
-    Driver.minimumCompatibility = ""
+    Driver.minimumCompatibility = "0"
     val mem = Mem(out, n, true)
     Driver.minimumCompatibility = compat
     mem

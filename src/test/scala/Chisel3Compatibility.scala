@@ -154,4 +154,31 @@ class Chisel3CompatibilitySuite extends TestSuite {
     }
     assertTrue(ChiselError.hasErrors)
   }
+
+  @Test def testSubwordNoWireWrap() {
+    println("\ntestSubwordNoWireWrap ...")
+
+    class SubwordNoWire() extends Module {
+    
+      val io = new Bundle {
+        val out = UInt(OUTPUT, 16)
+      }
+
+      // The following should pass without a Wire wrapper.
+      val foo = Reg(Bits(width = 16))
+      foo(0) := UInt(1)
+      io.out := foo
+    }
+
+    class WireTester(c: SubwordNoWire) extends Tester(c) {
+      expect(c.io.out, 1)
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
+    
+    // This should pass (no Wire() wrapper)
+    chiselMainTest(testArgs, () => Module(new SubwordNoWire())){ c => new WireTester(c) }
+    assertFalse(ChiselError.hasErrors)
+  }
 }
