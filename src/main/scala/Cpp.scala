@@ -182,7 +182,7 @@ class CppBackend extends Backend {
       case r: ROMData =>
         List((s"mem_t<${r.needWidth()},${r.n}>", emitRef(r)))
       case c: Clock =>
-        List(("int", emitRef(node)), ("int", emitRef(node) + "_cnt"))
+        List(("clk_t", emitRef(c)))
       case _ =>
         List((s"dat_t<${node.needWidth()}>", emitRef(node)))
     }
@@ -515,8 +515,7 @@ class CppBackend extends Backend {
           }
         })
 
-      case x: Clock =>
-        ""
+      case x: Clock => ""
 
       case x: Bits if x.isInObject && x.inputs.length == 1 => 
         emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
@@ -593,12 +592,17 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock => x.srcClock match {
-        case None => ""
+      case x: Clock => (x.srcClock match {
+        case None => 
+          "  " + emitRef(node) + ".len = 0;\n" +
+          "  " + emitRef(node) + ".cnt = 0;\n" 
         case Some(src) => 
-          "  " + emitRef(node) + " = " + emitRef(src) + x.initStr +
-          "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
-      }
+          val initStr = emitRef(src) + (if (src.period > x.period) 
+            " / " + (src.period / x.period).round else 
+            " * " + (x.period / src.period).round)
+          "  " + emitRef(node) + ".len = " + initStr + ";\n" +
+          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ";\n"
+      }) + "  " + emitRef(node) + ".values[0] = 0;\n"
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -685,8 +689,8 @@ class CppBackend extends Backend {
       var i = 0;
       for (clock <- Driver.clocks) {
         if (clock.srcClock == None) {
-          harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
-          harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
+          harness.write("  " + emitRef(clock) + ".len = periods[" + i + "];\n")
+          harness.write("  " + emitRef(clock) + ".cnt = periods[" + i + "];\n")
           i += 1;
         }
       }
@@ -1103,7 +1107,7 @@ class CppBackend extends Backend {
         out_h.write(" public:\n")
       }
 
-      for ( clock <- Driver.clocks) {
+      for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
         out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
         out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
@@ -1214,20 +1218,20 @@ class CppBackend extends Backend {
       }
 
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) +".cnt;\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
+        writeCppFile("  " + emitRef(clock) + ".cnt-=min;\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
-                    emitRef(clock) + ";\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) " + emitRef(clock) + ".cnt = " +
+                    emitRef(clock) + ".len;\n")
       }
       writeCppFile("  return min;\n")
       writeCppFile("}\n")
@@ -1280,8 +1284,9 @@ class CppBackend extends Backend {
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
-        val codePrefix = "  if (t == 0) return dump_init(f);\n" +
-                "  fprintf(f, \"#%d\\n\", t);\n"
+        val codePrefix = List(
+          "  if (t == 0) return dump_init(f);\n",
+          "  fprintf(f, \"#%d\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
@@ -1336,6 +1341,9 @@ class CppBackend extends Backend {
         case (node, id) => List(
           "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
           "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) mkString ""
+      } mkString "")
+      llm addString (Driver.clocks map { clk =>
+        "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
       } mkString "")
 
       llm.done()

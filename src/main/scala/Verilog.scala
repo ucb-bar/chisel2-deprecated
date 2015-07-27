@@ -155,12 +155,12 @@ class VerilogBackend extends Backend {
   def emitDef(c: Module): String = {
     val spacing = (if(c.verilog_parameters != "") " " else "")
     var res = "  " + c.moduleName + " " + c.verilog_parameters + spacing + c.name + "("
-    if (c.clocks.length > 0) {
-      res = res + (c.clocks).map(x => "." + emitRef(x) + "(" + emitRef(x) + ")").reduceLeft(_ + ", " + _)
+    if (!c.clocks.isEmpty) {
+      res += c.clocks map (x => "." + emitRef(x) + "(" + emitRef(x) + ")") mkString ", "
     }
-    if (c.resets.size > 0 ) {
-      if (c.clocks.length > 0) res = res + ", "
-      res = res + (c.resets.values.toList).map(x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")").reduceLeft(_ + ", " + _)
+    if (!c.resets.isEmpty) {
+      if (!c.clocks.isEmpty) res = res + ", "
+      res += c.resets.values map (x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")") mkString ", "
     }
     var isFirst = true
     val portDecs = new ArrayBuffer[StringBuilder]
@@ -206,7 +206,7 @@ class VerilogBackend extends Backend {
     val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
     portDecs.map(_.insert(0, "       "))
-    if (c.clocks.length > 0 || c.resets.size > 0) res += ",\n" else res += "\n"
+    if (!c.clocks.isEmpty || !c.resets.isEmpty) res += ",\n" else res += "\n"
     res += portDecs.map(_.result).reduceLeft(_ + "\n" + _)
     res += "\n  );\n"
     if (c.wires.map(_._2.driveRand).reduceLeft(_ || _)) {
@@ -378,30 +378,33 @@ class VerilogBackend extends Backend {
     val ins = for ((n, io) <- c.wires if io.dir == INPUT) yield io
     val outs = for ((n, io) <- c.wires if io.dir == OUTPUT) yield io
     val mainClk = Driver.implicitClock
-    val clocks = c.clocks
+    val clocks = Driver.clocks
     val resets = c.resets.values.toList
 
     harness write "module test;\n"
-    harness write "  parameter CLOCK_DELAY = `CLOCK_PERIOD - 0.1;\n"
     ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
-    if (clocks.isEmpty) harness write "  reg %s = 0;\n".format(mainClk.name)
     clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name)) 
-    resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name)) 
+    resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name))
+    if (clocks.size > 1) { 
+      harness write "\n  integer min = 1 << 31 - 1;\n"
+      clocks foreach (clk => harness write "  integer %s_cnt = `CLOCK_PERIOD;\n".format(clk.name)) 
+    } 
+    clocks foreach (clk => harness write "  integer %s_len = `CLOCK_PERIOD;\n".format(clk.name)) 
+    clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name)) 
 
-    harness write "  always #`CLOCK_PERIOD %s = ~%s;\n\n".format(mainClk.name, mainClk.name)
-
-    harness write "  /*** DUT instantiation ***/\n"
+    harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
-    clocks foreach (clk => harness write "    .%s(%s),\n".format(clk.name, clk.name)) 
-    resets foreach (rst => harness write "    .%s(%s),\n".format(rst.name, rst.name)) 
+    c.clocks foreach (clk => harness write "    .%s(%s),\n".format(clk.name, clk.name)) 
+    resets   foreach (rst => harness write "    .%s(%s),\n".format(rst.name, rst.name)) 
     
     harness write ((ins ++ outs) map (node => "    .%s(%s)".format(emitRef(node), emitRef(node))) reduceLeft (_ + ",\n" + _))
     harness write ");\n\n"
 
     harness write "  initial begin\n"
     harness write "    $init_top(%s);\n".format(c.name)
-    harness write "    $init_rsts(" + (resets map (emitRef(_)) mkString ", ") + ");\n"
+    harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
+    harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_sigs();\n"
@@ -414,10 +417,19 @@ class VerilogBackend extends Backend {
     }
     harness write "  end\n\n"
 
-    harness write "  always @(negedge %s) begin\n".format(mainClk.name)
-    harness write "    $init_tick(CLOCK_DELAY);\n"
-    harness write "  end\n\n"
-
+    if (clocks.size > 1) {
+      harness write "  initial forever begin\n"
+      clocks foreach (clk => harness write "    if (%s_cnt < min) min = %s_cnt;\n".format(clk.name, clk.name))   
+      clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
+      harness write "    #min $init_tick(min - 0.1);\n"
+      harness write "    #min\n"    
+      clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
+      harness write "  end\n"
+    } else {
+      harness write "  always @(negedge %s) begin\n".format(mainClk.name)
+      harness write "    $init_tick(%s_len - 0.1);\n".format(mainClk.name)
+      harness write "  end\n\n"
+    } 
     harness write "endmodule\n"
 
     harness.close
@@ -495,19 +507,21 @@ class VerilogBackend extends Backend {
   }
 
   def emitPrintf(p: Printf): String = {
+    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
     if_not_synthesis +
     "`ifdef PRINTF_COND\n" +
     "    if (`PRINTF_COND)\n" +
     "`endif\n" +
     "      if (" + emitRef(p.cond) + ")\n" +
-    "        $fwrite(32'h80000002, " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
+    "        $fwrite(" + file + ", " + p.args.map(emitRef _).foldLeft(CString(p.format))(_ + ", " + _) + ");\n" +
     endif_not_synthesis
   }
   def emitAssert(a: Assert): String = {
+    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
     if_not_synthesis +
     "  if(" + emitRef(a.reset) + ") " + emitRef(a) + " <= 1'b1;\n" +
     "  if(!" + emitRef(a.cond) + " && " + emitRef(a) + " && !" + emitRef(a.reset) + ") begin\n" +
-    "    $fwrite(32'h80000002, " + CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
+    "    $fwrite(" + file + ", "+ CString("ASSERTION FAILED: %s\n") + ", " + CString(a.message) + ");\n" +
     "    $finish;\n" +
     "  end\n" +
     endif_not_synthesis
@@ -567,7 +581,7 @@ class VerilogBackend extends Backend {
     val res = new StringBuilder()
     var first = true
     var nl = ""
-    if (c.clocks.length > 0 || c.resets.size > 0)
+    if (!c.clocks.isEmpty || !c.resets.isEmpty)
       res.append((c.clocks ++ c.resets.values.toList).map(x => "input " + emitRef(x)).reduceLeft(_ + ", " + _))
     val ports = new ArrayBuffer[StringBuilder]
     for ((n, io) <- c.wires) {
@@ -582,7 +596,7 @@ class VerilogBackend extends Backend {
     }
     val uncommentedPorts = ports.filter(!_.result.contains("//"))
     uncommentedPorts.slice(0, uncommentedPorts.length-1).map(_.append(","))
-    if (c.clocks.length > 0 || c.resets.size > 0) res.append(",\n") else res.append("\n")
+    if (!c.clocks.isEmpty || !c.resets.isEmpty) res.append(",\n") else res.append("\n")
     res.append(ports.map(_.result).reduceLeft(_ + "\n" + _))
     res.append("\n);\n\n")
     res.append(emitDecs(c))
@@ -720,7 +734,7 @@ class VerilogBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
     val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc", 
-     "+v2k", "+vpi", "+define+CLOCK_PERIOD=10", "+vcs+initreg+random") mkString " "
+     "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
     val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)

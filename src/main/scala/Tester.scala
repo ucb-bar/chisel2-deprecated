@@ -47,6 +47,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _pokeMap = HashMap[Bits, BigInt]()
   private val _peekMap = HashMap[Bits, BigInt]()
   private val _signalMap = HashMap[String, Int]()
+  private val _clockLens = HashMap(Driver.implicitClock -> 0)
+  private val _clockCnts = HashMap(Driver.implicitClock -> 0)
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
   val _logs = ScalaQueue[String]()
@@ -54,7 +56,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     if(_logs.isEmpty) "" else _logs.dequeue
   }
 
-  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, GETID, FIN = Value }
+  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, GETID, SETCLK, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
    * to the way Process works. TODO: FIXME.
@@ -104,18 +106,20 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   def dumpName(data: Node): String = Driver.backend match {
-    case _: FloBackend | _: CppBackend => data.getNode.name
+    case _: FloBackend => data.getNode.name
     case _ => data.getNode.chiselName
   }
 
-  def setClocks(clocks: HashMap[Clock, Int]) {
-    var cmd = "set_clocks"
-    for (clock <- Driver.clocks) {
-      if (clock.srcClock == null) {
-        val s = BigInt(clocks(clock)).toString(16)
-        cmd = cmd + " " + s
-      }
-    }
+  def setClock(clk: Clock, len: Int) {
+    _clockLens(clk) = len
+    _clockCnts(clk) = len
+    sendCmd(SIM_CMD.SETCLK)
+    writeln(clk.name)
+    writeValue(len)
+  }
+
+  def setClocks(clocks: Iterable[(Clock, Int)]) {
+    clocks foreach { case (clk, len) => setClock(clk, len) }
   }
 
   def signed_fix(dtype: Bits, rv: BigInt): BigInt = {
@@ -213,9 +217,17 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     isStale = false
   }
 
+  private def calcDelta = {
+    val min = (_clockCnts.values foldLeft Int.MaxValue)(math.min(_, _))
+    _clockCnts.keys foreach (_clockCnts(_) -= min)
+    (_clockCnts filter (_._2 == 0)).keys foreach (k => _clockCnts(k) = _clockLens(k)) 
+    min
+  }
+
   protected def takeStep {
     sendCmd(SIM_CMD.STEP)
     writeInputs
+    delta += calcDelta
     readOutputs
     dumpLogs
     isStale = false

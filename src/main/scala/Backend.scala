@@ -406,8 +406,8 @@ abstract class Backend extends FileSystemUtilities{
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == None) 
-        module.clock = module.parent.clock
+      if (module._clock == None) 
+        module._clock = module.parent._clock
       if (!module.hasExplicitReset)
         module._reset = module.parent._reset
     }
@@ -423,17 +423,17 @@ abstract class Backend extends FileSystemUtilities{
   def addClocksAndResets {
     Driver.bfs {
       case x: Delay =>
-        val clock = x.clock getOrElse x.component.clock.get
+        val clock = x.clock getOrElse x.component._clock.get
         val reset =
           if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.clock != None) x.clock.get.getReset
-          else if (x.component.hasExplicitClock) x.component.clock.get.getReset
+          else if (x.component.hasExplicitClock) x.component._clock.get.getReset
           else x.component._reset.get
         x.assignReset(x.component addResetPin reset)
         x.assignClock(clock)
         x.component.addClock(clock)
       case x: Printf =>
-        val clock = x.clock getOrElse x.component.clock.get
+        val clock = x.clock getOrElse x.component._clock.get
         x.assignClock(clock)
         x.component.addClock(clock)
       case _ =>
@@ -479,14 +479,15 @@ abstract class Backend extends FileSystemUtilities{
 
   // walk forward from root register assigning consumer clk = root.clock
   private def createClkDomain(root: Reg, walked: HashSet[Node]) = {
-    val dfsStack = new Stack[Node]
+    val dfsStack = Stack[Node]()
     walked += root
     dfsStack.push(root)
     val clock = root.clock getOrElse (throw new RuntimeException("Reg should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-      for (consumer <- node.consumers ; if !(walked contains consumer)) {
-        consumer.clock match {
+      node.consumers filterNot (walked contains _) foreach {
+        case _: Delay =>
+        case consumer => consumer.clock match {
           case Some(clk) if clk != clock =>
             ChiselError.warning(consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + 
                                 "in module" + consumer.component + " resolves to clock domain " + 

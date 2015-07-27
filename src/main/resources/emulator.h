@@ -1270,6 +1270,12 @@ class dat_t {
   }
 };
 
+class clk_t: public dat_t<1> {
+public:
+  size_t len;
+  size_t cnt;
+};
+
 template <int w>
 std::string dat_to_str(const dat_t<w>& x) {
   char s[w];
@@ -1694,7 +1700,7 @@ template <int w, int d> mem_t<w,d> MEM( void );
 
 class mod_t {
  public:
-  mod_t(): dumpfile(NULL) { }
+  mod_t(): dumpfile(NULL), timestep(0) { }
   virtual ~mod_t() {}
   virtual void init ( val_t rand_init=false ) = 0;
   virtual void clock_lo ( dat_t<1> reset ) = 0;
@@ -1708,7 +1714,7 @@ class mod_t {
 
   void set_dumpfile(FILE* f) { dumpfile = f; }
 
-  int timestep;
+  size_t timestep;
 
   void dump () {
     if (dumpfile != NULL) dump(dumpfile, timestep);

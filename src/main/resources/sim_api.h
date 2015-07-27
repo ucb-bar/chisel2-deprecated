@@ -7,7 +7,7 @@
 #include <vector>
 #include <map>
 
-enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, GETID, FIN };
+enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, GETID, SETCLK, FIN };
 
 template<class T> struct sim_data_t {
   std::vector<T> resets;
@@ -15,6 +15,7 @@ template<class T> struct sim_data_t {
   std::vector<T> outputs;
   std::vector<T> signals;
   std::map<std::string, size_t> signal_map;
+  std::map<std::string, T> clk_map;
 };
 
 template <class T> class sim_api_t {
@@ -45,6 +46,7 @@ public:
         case POKE: poke(); break; 
         case PEEK: peek(); break;
         case GETID: getid(); break;
+        case SETCLK: setclk(); break;
         case FIN:  finish(); exit = true; break;
         default: break;
       }
@@ -103,6 +105,17 @@ private:
         exit(0);
       }
       std::cerr << id << std::endl;
+    }
+  }
+
+  void setclk() {
+    std::string clkname;
+    std::cin >> clkname;
+    typename std::map<std::string, T>::iterator it = sim_data.clk_map.find(clkname);
+    if (it != sim_data.clk_map.end()) {
+      put_value(it->second);
+    } else {
+      std::cout << "Cannot find " << clkname << std::endl;
     }
   }
 

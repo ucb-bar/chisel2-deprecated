@@ -31,8 +31,8 @@
 package Chisel
 
 object Clock {
-  def apply(reset: Bool = Driver.implicitReset, src: Option[Clock] = None, str: String = "") = {
-    new Clock(reset, src, str)
+  def apply(reset: Bool = Driver.implicitReset, src: Option[Clock] = None, period: Double = 1.0) = {
+    new Clock(reset, src, period)
   }
 
   implicit def toOption(c: Clock) = Option(c)
@@ -40,12 +40,10 @@ object Clock {
 
 class Clock(reset: Bool = Driver.implicitReset, 
   private[Chisel] val srcClock: Option[Clock] = None, 
-  private[Chisel] val initStr: String = "") extends Node {
+  private[Chisel] val period: Double = 1.0 /* in ps */) extends Node {
 
   init("", 1)
   Driver.clocks += this
-
-  var period = "1ps"
 
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
@@ -56,6 +54,9 @@ class Clock(reset: Bool = Driver.implicitReset,
     }
   }
 
-  def * (x: Int) = Clock(reset, Some(this), " * " + x + ";\n")
-  def / (x: Int) = Clock(reset, Some(this), " / " + x + ";\n")
+  override lazy val isInObject: Boolean = true
+  override lazy val isInVCD: Boolean = Driver.isVCD
+
+  def * (x: Int) = Clock(reset, Some(this), period * x.toDouble)
+  def / (x: Int) = Clock(reset, Some(this), period / x.toDouble)
 }

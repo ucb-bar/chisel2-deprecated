@@ -40,6 +40,28 @@ private:
   dat_t<w>* dat_ptr;
 };
 
+inline std::string itos(int in) {
+  std::stringstream out;
+  out << std::hex << in;
+  return out.str();
+}
+
+class clk_api: public dat_api_base {
+public:
+  clk_api(clk_t* new_clk): dat_api_base(1), clk_ptr(new_clk) { }
+  std::string get_value() { return itos(clk_ptr->len); }
+  bool put_value(std::string value) { return false; }
+  void put_value(val_t value, size_t idx /* not used */) {
+    clk_ptr->len = (size_t) value;
+    clk_ptr->cnt = (size_t) value;
+  }
+  size_t get_width() { return 8*sizeof(size_t); }
+  size_t get_num_words() { return 1; }
+
+private:
+  clk_t* clk_ptr;
+};
+
 class emul_api_t: public sim_api_t<dat_api_base*> {
 public:
   emul_api_t(mod_t* m) {
@@ -66,8 +88,7 @@ private:
 
   bool is_exit;
   virtual void reset() {
-    module->clock_lo(LIT<1>(1));
-    module->clock_hi(LIT<1>(1));
+    module->clock(LIT<1>(1));
     // TODO: should call twice to get the output for now
     module->clock_lo(LIT<1>(0));
   }
@@ -75,14 +96,14 @@ private:
   virtual void start() { }
 
   virtual void finish() { 
+    module->dump();
     is_exit = true; 
   }
 
   virtual void step() {
     module->dump();
     module->print(std::cout);
-    module->clock_lo(LIT<1>(0));
-    module->clock_hi(LIT<1>(0));
+    module->clock(LIT<1>(0));
     // TODO: should call twice to get the output for now
     module->clock_lo(LIT<1>(0));
   }

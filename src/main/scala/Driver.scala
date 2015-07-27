@@ -106,7 +106,7 @@ object Driver extends FileSystemUtilities{
     implicitReset.compOpt = topComponent
     implicitClock.compOpt = topComponent 
     mod._reset = Some(implicitReset)
-    mod.clock = Some(implicitClock)
+    mod._clock = Some(implicitClock)
     mod.hasExplicitReset = true
     mod.hasExplicitClock = true
   }

@@ -35,6 +35,17 @@ public:
     top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
   }
 
+  
+  void init_clks() {
+    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+    vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
+    // Cache clocks
+    while (vpiHandle arg_handle = vpi_scan(arg_iter)) {
+      std::string name = vpi_get_str(vpiName, arg_handle);
+      sim_data.clk_map[name.substr(0, name.rfind("_len"))] = arg_handle;
+    }
+  }
+
   void init_rsts() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);

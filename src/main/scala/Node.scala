@@ -261,7 +261,7 @@ abstract class Node extends nameable {
     (Module.topMod.debugs contains this) || (Driver.backend isInObject this) ||
     isReg || isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
-  private[Chisel] lazy val isInVCD = name != "reset" && needWidth() > 0 &&
+  private[Chisel] lazy val isInVCD = Driver.isVCD && name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
      ((isIo && isInObject) || isReg || Driver.isDebug)
 

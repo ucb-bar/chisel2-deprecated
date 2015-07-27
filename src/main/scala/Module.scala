@@ -119,7 +119,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) {
+abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -158,13 +158,15 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
   Driver.components += this
   Module.push(this)
 
-  if (clock == null) clock = None
+  if (_clock == null) _clock = None
   if (_reset == null) _reset = None
-  private[Chisel] val clocks = ArrayBuffer[Clock]()
+  private[Chisel] val clocks = LinkedHashSet[Clock]()
   private[Chisel] val resets = HashMap[Bool, Bool]()
   private[Chisel] var resetPin: Option[Bool] = None
-  private[Chisel] var hasExplicitClock = clock != None
+  private[Chisel] var hasExplicitClock = _clock != None
   private[Chisel] var hasExplicitReset = _reset != None
+  def clock: Clock = _clock getOrElse (
+    if (parent == null) Driver.implicitClock else parent.clock)
   def reset = resetPin match {
     case None => {
       val r = Bool(INPUT)
@@ -192,7 +194,7 @@ abstract class Module(var clock: Option[Clock] = None, private[Chisel] var _rese
     }
     resets getOrElseUpdate (r, pin)
   }
-  def addClock(clock: Clock) { if (!(clocks contains clock)) clocks += clock }
+  def addClock(clock: Clock) { clocks += clock }
 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
 
