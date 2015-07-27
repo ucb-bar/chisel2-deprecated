@@ -268,11 +268,11 @@ class VcdBackend(top: Module) extends Backend {
   } sortWith (_.width < _.width)
 
   private lazy val sortedMems: Seq[Mem[_]] = Driver.orderedNodes filter {
-    case _: Mem[_] => true case _ => false 
+    case m: Mem[_] => m.isInVCD case _ => false 
   } map (_.asInstanceOf[Mem[_]]) sortWith (_.widthW < _.widthW)
 
   private lazy val sortedROMs: Seq[ROMData] = Driver.orderedNodes filter {
-    case _: ROMData => true case _ => false
+    case r: ROMData => r.isInVCD case _ => false
   } map (_.asInstanceOf[ROMData]) sortWith (_.width < _.width)
 
   private val (lo, hi) = ('!'.toInt, '~'.toInt)
