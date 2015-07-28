@@ -71,7 +71,7 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
     elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
   val lits = {
-    val dc = BitPat.DC(w).litOf
+    val dc = Bits.DC(w).litOf
     Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
   }
 
