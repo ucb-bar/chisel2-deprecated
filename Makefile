@@ -5,8 +5,8 @@ CLEAN_DIRS	:= doc
 
 SRC_DIR	?= .
 SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
+SYSCTESTS ?= $(addsuffix .sysctest,$(notdir $(basename $(wildcard $(SRC_DIR)/src/test/scala/SysCTest/*.scala))))
 CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
-DRIVER	   ?= $(SRC_DIR)/src/test/resources/AddFilterSysCdriver.cpp
 TEST_OUTPUT_DIR ?= ./test-outputs
 
 .PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test
@@ -45,20 +45,22 @@ jenkins-build: clean
 	$(SBT) $(SBT_FLAGS) scalastyle coverage test
 	$(SBT) $(SBT_FLAGS) coverageReport
 
-sysctest:
+sysctests: $(SYSCTESTS)
+
+sysctest:  $(firstword $(SYSCTESTS))
+
+%.sysctest:
 	mkdir -p $(TEST_OUTPUT_DIR)
-	$(MAKE) -C $(TEST_OUTPUT_DIR) -f ../Makefile SRC_DIR=.. syscbuildandruntest
+	$(MAKE) -C $(TEST_OUTPUT_DIR) -f ../Makefile SRC_DIR=.. $(basename $@).sysc
+	cd $(TEST_OUTPUT_DIR) && ./$(basename $@).sysc
 
-syscbuildandruntest:	AddFilter
-	./AddFilter
-
-AddFilter:	AddFilter.h AddFilter.cpp $(SYSC_DRIVER)
-	$(CXX)  AddFilter.cpp $(DRIVER) \
+%.sysc:	%.h %.cpp $(SRC_DIR)/src/test/resources/%SysCdriver.cpp
+	$(CXX) -g $(filter-out %.h,$^) \
 	   -I. -I$(SYSTEMC)/include -L$(SYSTEMC)/lib-macosx64 -lsystemc -o $@
 
-AddFilter.cpp AddFilter.h:	   AddFilter.class
-	scala -cp $(CHISEL_JAR):. AddFilter --targetDir . --genHarness --backend sysc --design AddFilter
+%.h %.cpp:	%.class
+	scala -cp $(CHISEL_JAR):. SysCTest.$(basename $@) --targetDir . --genHarness --backend sysc
 
-AddFilter.class:  $(CHISEL_JAR) ../src/test/scala/AddFilter.scala
-	scalac -cp $(CHISEL_JAR) ../src/test/scala/AddFilter.scala
+%.class:  ../src/test/scala/SysCTest/%.scala $(CHISEL_JAR)
+	scalac -cp $(CHISEL_JAR) $<
 
