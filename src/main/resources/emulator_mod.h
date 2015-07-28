@@ -1722,11 +1722,6 @@ class mod_t {
 
   int timestep;
 
-  void dump () {
-    if (dumpfile != NULL) dump(dumpfile, timestep);
-    timestep += 1;
-  }
-
   int step (bool is_reset, int n) {
     int delta = 0;
     dat_t<1> reset = LIT<1>(is_reset);
@@ -1736,8 +1731,10 @@ class mod_t {
       }
       // Collect any print output.
       print(printStream);
-      dump();
-      delta += clock(reset);
+      if (dumpfile != NULL) dump(dumpfile, timestep);
+      int count = clock(reset);
+      delta += count;
+      timestep += count;
     }
     return delta;
   }
