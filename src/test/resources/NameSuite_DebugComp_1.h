@@ -14,7 +14,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_wen;
   dat_t<1> reset;
   dat_t<1> NameSuite_DebugComp_1_dpath__reset;
-  dat_t<1> T0;
+  dat_t<1> T1;
   dat_t<1> NameSuite_DebugComp_1_dpath__wb_reg_ll_wb;
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_out;
@@ -26,6 +26,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
   int clk;
   int clk_cnt;
+  int last_dump_time;
 
   void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset );

@@ -632,7 +632,7 @@ class CppBackend extends Backend {
           "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr +
           "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
         } else
-          ""
+          "  " + emitRef(node) + " = 1;\n" 
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -1214,7 +1214,8 @@ class CppBackend extends Backend {
         out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
         out_h.write(emitDec(clock))
-
+        
+      out_h.write("  int last_dump_time;\n");
       out_h.write("\n");
 
       // If we're generating multiple init methods, wrap them in private/public.
@@ -1459,8 +1460,41 @@ class CppBackend extends Backend {
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
-        val codePrefix = "  if (t == 0) return dump_init(f);\n" +
-                "  fprintf(f, \"#%d\\n\", t);\n"
+        var codePrefix = "  if (t == 0) { last_dump_time = 0; return dump_init(f); }\n"
+        
+        // Generate clocks
+        for (clock <- Driver.clocks) {
+          val clkname = emitRef(clock)
+          codePrefix += "  int " + clkname + "_offset = "+ clkname + " - (" + 
+            clkname + "_cnt + t) % " + clkname + " * 2;\n"
+          codePrefix += "  int " + clkname + "_phase = " + clkname + "_offset % " + clkname + ";\n";
+          codePrefix += "  int next_" + clkname + " = ((last_dump_time + " + clkname + 
+            "_phase) / " + clkname + " + 1) * " + clkname + " - " + clkname + "_phase;\n"
+          codePrefix += "  int " + clkname + "_state = ((last_dump_time + " + clkname +
+            "_offset) / " + clkname + ") & 1;\n"
+        }
+
+        codePrefix += "  int end_time = t * 2;\n" +
+                      "  int next_event;\n" +
+                      "  do {\n" +
+                      "    next_event = end_time;\n"
+        for (clock <- Driver.clocks) {
+          codePrefix += "    if (next_" + emitRef(clock) + " < next_event) next_event = next_" + 
+            emitRef(clock) + ";\n"
+        }
+
+        codePrefix = codePrefix + "    fprintf(f, \"#%d\\n\", next_event);\n"
+        for (clock <- Driver.clocks) {
+          codePrefix += "    if (next_event == next_" + emitRef(clock) + ") {\n" +
+                        "      " + emitRef(clock) + "_state = !" + emitRef(clock) + "_state;\n" +
+                        "      next_" + emitRef(clock) + " += " + emitRef(clock) + ";\n" +
+                        "      if (" + emitRef(clock) + "_state) fputs(\"1" + vcd.clockName(clock) + "\\n\", f); else fputs(\"0" + vcd.clockName(clock) + "\\n\", f);\n" +
+                        "    }\n"
+        }
+
+        codePrefix += "  } while (next_event != end_time);\n" +
+                      "  last_dump_time = end_time;\n"
+
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,43 +28,46 @@
  MODIFICATIONS.
 */
 
-package Chisel
+import Chisel._
+import collection.mutable.HashMap
+import org.junit.Assert._
+import org.junit.Test
+import org.junit.Ignore
 
-import scala.collection.mutable.ArrayBuffer
+class VCDFile extends Module {
+  val io = new Bundle {
+    val out0 = Bool(OUTPUT)
+    val out1 = Bool(OUTPUT)
+    val out2 = Bool(OUTPUT)
+  }
 
-class Clock(reset: Bool = Driver.implicitReset) extends Node {
-  val stateElms = new ArrayBuffer[Node]
-  val id = Driver.clocks.length
-  Driver.clocks += this
-  init("", 1)
+  val clk1 = new Clock()
+  val clk2 = new Clock()
+  val reg0 = Reg(outType=Bool(), init=Bool(false))
+  val reg1 = Reg(outType=Bool(), init=Bool(false), clock = clk1)
+  val reg2 = Reg(outType=Bool(), init=Bool(false), clock = clk2)
 
-  var srcClock: Clock = null
-  var initStr = ""
+  reg0 := !reg0
+  reg1 := !reg1
+  reg2 := !reg2
 
-  var period = "1ps"
+  io.out0 := reg0
+  io.out1 := reg1
+  io.out2 := reg2
+}
 
-  // returns a reset pin connected to reset for the component in scope
-  def getReset: Bool = {
-    if (Driver.compStack.length != 0) {
-      Driver.compStack.top.addResetPin(reset)
-    } else {
-      reset
+class VCDFileTester(c : VCDFile) extends Tester(c) {
+  setClocks(HashMap(Driver.implicitClock -> 5, c.clk1 -> 6, c.clk2 -> 7))
+  step(25)
+}
+
+class VCDSuite extends TestSuite {
+	@Test def testVCDFile() {
+    chiselMainTest(Array[String]("--backend", "c", "--targetDir", dir.getPath.toString(), "--genHarness", 
+      "--compile", "--test", "--vcd"), () => Module(new VCDFile())) {
+      c => new VCDFileTester(c)
     }
-  }
-
-  def * (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " * " + x + ";\n"
-    clock
-  }
-
-  def / (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " / " + x + ";\n"
-    clock
+    assertFile("VCDFile.vcd")
   }
 }
+
