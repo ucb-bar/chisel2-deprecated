@@ -408,7 +408,7 @@ object PartitionIslands {
     } else if (! islands.exists(_.nodes.size > 0)) {
       // No islands with nodes.
       // Construct an array with a single entry containing an empty set.
-      return Array[NodeIdIslands](scala.collection.immutable.HashSet.empty)
+      return Array[NodeIdIslands](new NodeIdIslands())
     }
     // Find the maximum node _id
     val maxIslandId = islands.map(_.nodes.map(_._id).max).max
