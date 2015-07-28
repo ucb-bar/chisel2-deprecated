@@ -1,3 +1,6 @@
+# Retain all intermediate files.
+.SECONDARY:
+
 SBT		?= sbt
 SBT_FLAGS	?= -Dsbt.log.noformat=true
 RM_DIRS 	:= test-outputs test-reports
