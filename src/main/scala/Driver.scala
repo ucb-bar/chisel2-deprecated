@@ -295,7 +295,6 @@ object Driver extends FileSystemUtilities{
     moduleNamePrefix = ""
     components.clear()
     sortedComps.clear()
-    nodes.clear()
     orderedNodes.clear()
     blackboxes.clear()
     chiselOneHotMap.clear()
@@ -468,7 +467,6 @@ object Driver extends FileSystemUtilities{
   var moduleNamePrefix = ""
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
-  val nodes = ArrayBuffer[Node]()
   val orderedNodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
@@ -493,6 +491,12 @@ object Driver extends FileSystemUtilities{
   var startTime = 0L
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
+  var nodeId = 0
+  def getNodeId = {
+    val id = nodeId
+    nodeId +=1
+    id
+  }
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
     if(s1.isEmpty && s2.isEmpty) "" else {

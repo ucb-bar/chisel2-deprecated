@@ -140,8 +140,7 @@ abstract class Node extends nameable {
       ChiselError.findFirstUserLine(trace) getOrElse trace(0)
     } else null
 
-  val _id = Driver.nodes.length
-  Driver.nodes += this
+  val _id = Driver.getNodeId 
 
   private[Chisel] def width: Int = {
     val w = widthW
