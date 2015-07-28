@@ -35,105 +35,27 @@ import ChiselError._
 
 /* Chisel3 compatibility */
 object BitPat {
-  def bitPatLit(n: String, width: Int) = {
-    assert(n(0) == 'b', "BINARY BitPats ONLY")
-    val w = if (width == -1) {
-      n.length - 1
-    } else {
-      width
-    }
-    val res = new BitPat(n.substring(1, n.length))
-    res.create(null, w)
-    res
+  def apply(n: String): BitPat = {
+    require(n(0) == 'b', "BINARY BitPats ONLY")
+    val (bits, mask, swidth) = parseLit(n.substring(1))
+    new BitPat(toLitVal(bits, 2), toLitVal(mask, 2), swidth)
   }
-  def apply(x: String, width: Int): BitPat = Lit(x, width){bitPatLit(x, width)}
-  def apply(x: String): BitPat = apply(x, -1)
-//  def apply(value: String, width: Int): BitPat = bitPatLit(value, width)
-//  def apply(value: String): BitPat = apply(value, -1)
 
-  def DC(width: Int): BitPat = BitPat("b" + "?"*width, width)
+  def DC(width: Int): BitPat = BitPat("b" + ("?" * width))
+
+  // BitPat <-> UInt
+  implicit def BitPatToUInt(x: BitPat): UInt = {
+    require(x.mask == (BigInt(1) << x.getWidth)-1)
+    UInt(x.value, x.getWidth)
+  }
+  implicit def apply(x: UInt): BitPat = {
+    require(x.isLit)
+    BitPat("b" + x.litValue().toString(2))
+  }
 }
 
-class BitPat(val value: String) extends UInt {
-  // Since we have a constructor parameter, we need a clone method.
-  override def cloneType: BitPat.this.type = (new BitPat(value)).asInstanceOf[BitPat.this.type]
-  def fromInt(x: BigInt): BitPat = (BitPat(x.toString(2))).asInstanceOf[BitPat.this.type]
-  val (bits, mask, swidth) = parseLit(value)
-  def zEquals(other: Bits): Bool = 
-    (Bits(toLitVal(mask, 2)) & other) === Bits(toLitVal(bits, 2))
-  def === (other: Bits): Bool = zEquals(other)
-  override def != (other: Bits): Bool  = !zEquals(other)
-
-  // Far too much magic happens here.
-  override def fromNode(n: Node): BitPat.this.type = {
-    n match {
-      case m: BitPat => BitPat.this
-      case l: Literal => BitPat.this.asTypeFor(n).asInstanceOf[BitPat.this.type]
-      case _ => {
-        ChiselError.error("Only literals (and other BitPats), may be converted into BitPats")
-        (BitPat("b0")).asInstanceOf[BitPat.this.type]
-      }
-    }
-  }
-
-  def badOp(op: String) {
-    ChiselError.error("Operator %s is illegal for BitPats".format(op))
-  }
-
-  def badOpUInt(op: String): UInt = {
-    badOp(op)
-    UInt(0)
-  }
-
-  def badOpSInt(op: String): SInt = {
-    badOp(op)
-    SInt(0)
-  }
-
-  def badOpBool(op: String): Bool = {
-    badOp(op)
-    Bool(false)
-  }
-
-  def badOpThis(op: String): BitPat.this.type = {
-    badOp(op)
-    BitPat.this
-  }
-
-  // arithmetic operators
-  override def zext(): SInt = badOpSInt("zext")
-  override def unary_-(): UInt = badOpUInt("-")
-  override def unary_!(): Bool = badOpBool("!")
-  override def >> (b: UInt): UInt = badOpUInt(">>")
-  override def +  (b: UInt): UInt = badOpUInt("+")
-  override def *  (b: UInt): UInt = badOpUInt("*")
-  override def /  (b: UInt): UInt = badOpUInt("/")
-  override def %  (b: UInt): UInt = badOpUInt("%")
-  override def ?  (b: UInt): UInt = badOpUInt("?")
-  override def -  (b: UInt): UInt = badOpUInt("-")
-  override def >> (i: Int): UInt = badOpUInt(">>") // chisel3
-  override def << (i: Int): UInt = badOpUInt("<<") // chisel3
-  override def +%  (b: UInt): UInt = badOpUInt("+") // chisel3 add-wrap
-  override def +&  (b: UInt): UInt = badOpUInt("+&") // chisel3 add (width +1)
-  override def -%  (b: UInt): UInt = badOpUInt("-") // chisel3 sub-wrap
-  override def -&  (b: UInt): UInt = badOpUInt("-&") // chisel3 sub (width +1)
-
-  // logical operators
-  override def & (b: Bits): BitPat.this.type = badOpThis("&")
-  override def | (b: Bits): BitPat.this.type = badOpThis("|")
-  override def ^ (b: Bits): BitPat.this.type = badOpThis("^")
-  override def <<(b: UInt): BitPat.this.type = badOpThis("<<")
- 
-  // order operators
-  override def <  (b: UInt): Bool = badOpBool("<")
-  override def <= (b: UInt): Bool = badOpBool("<=")
-  override def >  (b: UInt): Bool = badOpBool(">")
-  override def >= (b: UInt): Bool = badOpBool(">=")
-
-  //UInt op SInt arithmetic
-  override def +   (b: SInt): SInt = badOpSInt("+")
-  override def *   (b: SInt): SInt = badOpSInt("*")
-  override def -   (b: SInt): SInt = badOpSInt("-")
-  override def /   (b: SInt): SInt = badOpSInt("/")
-  override def %   (b: SInt): SInt = badOpSInt("%")
+class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
+  def getWidth: Int = width
+  def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))
+  def != (other: Bits): Bool = !(this === other)
 }

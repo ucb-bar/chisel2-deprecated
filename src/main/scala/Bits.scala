@@ -43,7 +43,7 @@ object Bits {
 
   def apply(dir: IODirection = null, width: Int = -1): UInt = UInt(dir, width);
 
-  def DC(width: Int): BitPat = BitPat.DC(width)
+  def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
@@ -477,6 +477,9 @@ abstract class Bits extends Data with proc {
         this.asInstanceOf[Data] === right
     }
   }
+
+  def === (that: BitPat): Bool = that === this
+  def != (that: BitPat): Bool = that != this
 
   override def ##[T <: Data](right: T): this.type = {
     right match {
