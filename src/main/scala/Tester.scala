@@ -162,10 +162,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     data.flatten.map(x => x._2) map (peek(_))
   }
   def peek(data: Flo): Float = {
-    intBitsToFloat(peekNode(data).toInt)
+    intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
   }
   def peek(data: Dbl): Double = {
-    longBitsToDouble(peekNode(data).toLong)
+    longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
   }
 
 
@@ -206,10 +206,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     for ((x, y) <- kv) poke(x, y)
   }
   def poke(data: Flo, x: Float): Unit = {
-    pokeNode(data, BigInt(floatToIntBits(x)))
+    poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
   }
   def poke(data: Dbl, x: Double): Unit = {
-    pokeNode(data, BigInt(doubleToLongBits(x)))
+    poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
   }
 
   private def readOutputs {
@@ -377,4 +377,42 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       (0 until m.n) map (idx => "%s[%d]".format(dumpName(m), idx) -> (id + idx))
     case (node, id) => Seq(dumpName(node) -> id)
   }
+}
+
+class MapTester[+T <: Module](c: T, val testNodes: Seq[Node]) extends Tester(c, false) {
+  val (ins, outs) = testNodes partition { case b: Bits => b.dir == INPUT case _ => false }
+  def step(svars: HashMap[Node, Node],
+           ovars: HashMap[Node, Node] = HashMap.empty,
+           isTrace: Boolean = true): Boolean = {
+    if (isTrace) println("---\nINPUTS")
+    ins foreach { in =>
+      val value = (svars get in) match { case None => BigInt(0) case Some(v) => v.litValue() }
+      in match {
+        case io: Bits if io.isTopLevelIO => poke(io, value)
+        case _ => pokeNode(in, value)
+      }
+      if (isTrace) println("  WRITE " + dumpName(in) + " = " + value)
+    }
+    step(1)
+    if (isTrace) println("OUTPUTS")
+    outs forall { out =>
+      val value = out match { 
+        case io: Bits if io.isTopLevelIO => peek(io)
+        case _ => peekNode(out)
+      }
+      (ovars get out) match {
+        case None => 
+          ovars(out) = Literal(value)
+          if (isTrace) println("  READ " + dumpName(out) + " = " + value)
+          true
+        case Some(e) =>
+          val expected = e.litValue()
+          val pass = expected == value
+          if (isTrace) println("  EXPECTED %s: %x == %x -> %s".format(value, expected, if (pass) "PASS" else "FAIL"))
+          pass
+      }
+    }
+  }
+  var tests: () => Boolean = () => { println("DEFAULT TESTS"); true }
+  def defTests(body: => Boolean) = body
 }
