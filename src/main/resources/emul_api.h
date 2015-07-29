@@ -40,9 +40,10 @@ private:
   dat_t<w>* dat_ptr;
 };
 
-inline std::string itos(int in) {
+inline std::string itos(int in, bool is_hex = true) {
   std::stringstream out;
-  out << std::hex << in;
+  if (is_hex) out << std::hex;
+  out << in;
   return out.str();
 }
 

@@ -1332,14 +1332,15 @@ class CppBackend extends Backend {
         "  sim_data.inputs.push_back(new dat_api<%d>(&mod->%s));\n".format(in.needWidth, emitRef(in))) mkString "")
       llm addString (outputs map (out =>
         "  sim_data.outputs.push_back(new dat_api<%d>(&mod->%s));\n".format(out.needWidth, emitRef(out))) mkString "")
-      llm addString (Driver.signalMap map {
-        case (mem: Mem[_], id) => 
-          (0 until mem.n) map (off => List(
-            "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[%d]));\n".format(mem.needWidth, emitRef(mem), off),
-            "  sim_data.signal_map[\"%s[%d]\"] = %d;\n".format(mem.chiselName, off, id + off)) mkString "") mkString ""
+      llm addString (Driver.signalMap flatMap {
+        case (mem: Mem[_], id) => List(
+            "  std::string %s_path = \"%s\";\n".format(emitRef(mem), mem.chiselName),
+            "  for (size_t i = 0 ; i < %d ; i++) {\n".format(mem.n),
+            "    sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[i]));\n".format(mem.needWidth, emitRef(mem)),
+            "    sim_data.signal_map[%s_path+\"[\"+itos(i,false)+\"]\"] = %d+i;\n".format(emitRef(mem), id), "  }\n")
         case (node, id) => List(
           "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
-          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) mkString ""
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) 
       } mkString "")
       llm addString (Driver.clocks map { clk =>
         "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
