@@ -32,14 +32,14 @@ package Chisel
 
 /* backward compatibility */
 object Bits {
-  def apply(x: Int): UInt = UInt(x)
-  def apply(x: Int, width: Int): UInt = UInt(x, width)
-  def apply(x: BigInt): UInt = UInt(x)
-  def apply(x: BigInt, width: Int): UInt = UInt(x, width)
-  def apply(x: String): UInt = UInt(x)
-  def apply(x: String, width: Int): UInt = UInt(x, width)
-  def apply(dir: IODirection = NODIR, width: Int = -1): UInt = UInt(dir, width)
-  def DC(width: Int): BitPat = BitPat.DC(width)
+  def apply(x: Int): UInt = UInt(x);
+  def apply(x: Int, width: Int): UInt = UInt(x, width);
+  def apply(x: BigInt): UInt = UInt(x);
+  def apply(x: BigInt, width: Int): UInt = UInt(x, width);
+  def apply(x: String): UInt = UInt(x);
+  def apply(x: String, width: Int): UInt = UInt(x, width);
+  def apply(dir: IODirection = NODIR, width: Int = -1): UInt = UInt(dir, width);
+  def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
@@ -442,6 +442,9 @@ abstract class Bits extends Data with proc {
         this.asInstanceOf[Data] === right
     }
   }
+
+  def === (that: BitPat): Bool = that === this
+  def != (that: BitPat): Bool = that != this
 
   override def ##[T <: Data](right: T): this.type = {
     right match {

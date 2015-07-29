@@ -69,13 +69,19 @@ object switch {
 }
 
 object is {
+  def apply(v: BitPat)(block: => Unit): Unit =
+    when (v === switchCond) { block }
   def apply(v: Bits)(block: => Unit): Unit =
     apply(Seq(v))(block)
   def apply(v: Bits, vr: Bits*)(block: => Unit): Unit =
     apply(v :: vr.toList)(block)
-  def apply(v: Iterable[Bits])(block: => Unit): Unit = {
-    val keys = Module.current.switchKeys
-    if (keys.isEmpty) ChiselError.error("The 'is' keyword may not be used outside of a switch.")
-    else if (!v.isEmpty) when (v.map(_ === keys.top).reduce(_||_)) { block }
+  def apply(v: Iterable[Bits])(block: => Unit): Unit =
+    when (v.map(_ === switchCond).fold(Bool(false))(_||_)) { block }
+
+  private def switchCond = {
+    if (Module.current.switchKeys.isEmpty) {
+      ChiselError.error("The 'is' keyword may not be used outside of a switch.")
+      Bits(0)
+    } else Module.current.switchKeys.top
   }
 }

@@ -43,7 +43,7 @@ object Bool {
     *  FIXME: This should remain a BitPat(), not a Bool().
     *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
     */
-  def DC = Bool().fromNode(BitPat.DC(1))
+  def DC = Bool().fromNode(Bits.DC(1))
 }
 
 class Bool extends UInt {
