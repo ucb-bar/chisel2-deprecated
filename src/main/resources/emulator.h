@@ -1507,7 +1507,7 @@ class mem_t {
     return get(idx.lo_word() & (nextpow2_1(d)-1));
   }
   dat_t<w> get (val_t idx) {
-    if (!ispow2(d) && idx >= d) {
+    if (/*!ispow2(d) &&*/ idx >= d) {
       dat_t<w> res;
       res.randomize(seedp);
       return res;
@@ -1515,7 +1515,7 @@ class mem_t {
     return contents[idx];
   }
   val_t get (val_t idx, int word) {
-    if (!ispow2(d) && idx >= d)
+    if (/*!ispow2(d) &&*/ idx >= d)
       return __rand_val(seedp) & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
@@ -1525,11 +1525,11 @@ class mem_t {
     put(idx.lo_word(), val);
   }
   void put (val_t idx, dat_t<w> val) {
-    if (ispow2(d) || idx < d)
+    if (/*ispow2(d) ||*/ idx < d)
       contents[idx] = val;
   }
   void put (val_t idx, int word, val_t val) {
-    if (ispow2(d) || idx < d)
+    if (/*ispow2(d) ||*/ idx < d)
       contents[idx].values[word] = val;
   }
 
