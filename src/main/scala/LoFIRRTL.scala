@@ -184,7 +184,7 @@ class LoFIRRTLBackend extends Backend {
   private def emitLit(x: BigInt, w: Int): String = {
     val unsigned = if (x < 0) (BigInt(1) << w) + x else x
     require(unsigned >= 0)
-    "UInt<" + w + ">(" + unsigned.toString(10) + ")"
+    "UInt<" + w + ">(\"h" + unsigned.toString(16) + "\")"
   }
 
   // $random only emits 32 bits; repeat its result to fill the Node
