@@ -487,11 +487,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
-  def isInput(node: Node): Boolean =
-    node match { case b: Bits => b.dir == INPUT case o => false }
-  def keepInputs(nodes: Seq[Node]): Seq[Node] = nodes.filter(isInput)
-  def removeInputs(nodes: Seq[Node]): Seq[Node] = nodes.filter(n => !isInput(n))
-
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
   // Chisel3
