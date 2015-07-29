@@ -30,9 +30,6 @@
 
 package Chisel
 
-import Node._
-import ChiselError._
-
 abstract class Aggregate extends Data {
   override def getWidth: Int = this.flatten.map(_._2.getWidth).fold(0)(_+_)
     // Aggregate classes do not generally 'live' in the graph so width inference

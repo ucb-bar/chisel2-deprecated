@@ -4,7 +4,7 @@
 
 template <int w> dat_t<w> LITS(const char* str) { 
   dat_t<w> dat;
-  assert(dat_from_str<w>(str, dat));
+  assert(dat_from_hex<w>(str, dat));
   return dat;
 }
 

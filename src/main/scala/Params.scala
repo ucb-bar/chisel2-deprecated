@@ -30,18 +30,7 @@
 
 /* Unfinished. Has 3 basic parameters available */
 package Chisel
-
-import Node._
-import Module._
-import JHFormat._
-
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.ArrayBuffer
-
-import java.lang.reflect.{Type, ParameterizedType}
-
-import scala.io.Source
-import java.io._
 
 //>Params.scala: Implementation of parameter framework. Defines case class
   //containers for parameter types. Params object is what actually stores
@@ -57,9 +46,9 @@ abstract class Param[+T] {
   def pname: String
   var index: Int = -2
   var gID: Int = -1
-  var register = Params.register(getComponent(), pname, this)
+  var register = Params.register(Module.getComponent, pname, this)
   //def register(pName: String) = { pname = pName; Params.register(jack.getComponent(), pname, this)}
-  def getValue: T = Params.getValue(getComponent(),this.pname,this).asInstanceOf[T]
+  def getValue: T = Params.getValue(Module.getComponent, pname, this).asInstanceOf[T]
 }
 
 case class ValueParam(pname:String, init: Any) extends Param[Any] {
@@ -100,13 +89,13 @@ object Params {
   type Space = JHFormat.Space
   var space = new Space
   var design = new Space
-  var modules = new HashMap[String, Module]
+  var modules = new HashMap[String, Option[Module]]
   var gID: Int = 0
 
   var buildingSpace = true
 
-  def getValue(module: Module, pname: String, p: Param[Any]) = {
-    val mname= if(module == null) "TOP" else {module.getClass.getName}
+  def getValue(module: Option[Module], pname: String, p: Param[Any]) = {
+    val mname= module match { case None => "TOP" case Some(p) => p.getClass.getName }
     if(buildingSpace) p.init
     else{
       val x = design.find(t => (t._3) == (p.gID))
@@ -118,8 +107,8 @@ object Params {
     }
   }
 
-  def register(module: Module, pname: String, p: Param[Any]) = {
-    val mname= if(module == null) "TOP" else {module.getClass.getName}
+  def register(module: Option[Module], pname: String, p: Param[Any]) = {
+    val mname= module match { case None => "TOP" case Some(p) => p.getClass.getName }
     modules(mname) = module
     if(buildingSpace) {
       space += ((mname,p,gID))
@@ -131,7 +120,7 @@ object Params {
 
   def dump_file(filename: String, design: Space) = {
     val string = JHFormat.serialize(design)
-    val writer = new PrintWriter(new File(filename))
+    val writer = new java.io.PrintWriter(new java.io.File(filename))
     println("Dumping to " + filename + ":\n" + string)
     writer.write(string)
     writer.close()
@@ -150,7 +139,7 @@ object Params {
   def toCxxStringParams : String = {
     var string = new StringBuilder("")
     for ((mname, p, gID) <- space) {
-      val rmname = if (mname == "TOP") "" else modules(mname).name + "__";
+      val rmname = (modules(mname) map (_.name + "__")) getOrElse ""
       string ++= "const int " + rmname + p.pname + " = " + toCxxStringParam(p) + ";\n"
     }
     string.toString
@@ -159,7 +148,7 @@ object Params {
   def toDotpStringParams : String = {
     var string = new StringBuilder("")
     for ((mname, p, gID) <- space) {
-      val rmname = if (mname == "TOP") "" else modules(mname).name + ":";
+      val rmname = (modules(mname) map (_.name + ":")) getOrElse ""
       string ++= rmname + p.pname + " = " + toCxxStringParam(p) + "\n"
     }
     string.toString

@@ -29,19 +29,11 @@
 */
 
 package Chisel
-import scala.math._
-import scala.collection.mutable.{ArrayBuffer, Stack, BitSet}
-import scala.collection.mutable.{LinkedHashSet, HashSet, HashMap}
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import java.lang.reflect.Modifier._
-import scala.sys.process._
-import scala.math.max
-import Literal._
-import Bundle._
-import ChiselError._
-import Module._
+import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
 
 object Module {
+  def topMod = Driver.topComponent getOrElse (throwException("no top component"))
+
   def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
     Driver.parStack.push(p.push)
@@ -58,7 +50,7 @@ object Module {
     val res = c
     pop()
     for ((n, io) <- res.wires) {
-      if (io.dir == null) {
+      if (io.dir == NODIR) {
         val io_str = "<" + n + " (" + io.getClass.getName + ")>"
         ChiselError.error(new ChiselError(() => {
            "All IO's must be ports (dir set): " + io_str + " in " + res }, io.line))
@@ -105,15 +97,10 @@ object Module {
   }
 
   // XXX Remove and instead call current()
-  def getComponent(): Module = if(Driver.compStack.length != 0) Driver.compStack.top else null
-  def current: Module = {
-    val comp = getComponent
-    if (comp == null) Driver.topComponent else comp
-  }
+  def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
+  def current = getComponent getOrElse topMod
 
-  // despite being notionally internal, these have leaked into the API
-  def backend: Backend = Driver.backend
-  def components: ArrayBuffer[Module] = Driver.components
+  def backend = Driver.backend
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
     Driver.modStackPushed = true
@@ -132,7 +119,7 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool = null) {
+abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -140,97 +127,93 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     and discard textual duplicates. By walking the nodes from level zero
     (leafs) to level N (root), we are guaranteed to generate all
     Module/modules source text before their first instantiation. */
-  var level = 0;
-  var traversal = 0;
-  var ioVal: Data = null;
+  private[Chisel] var level = 0
+  private[Chisel] var traversal = 0
   /** Name of the instance. */
-  var name: String = "";
+  var name: String = ""
   /** Name of the module this component generates (defaults to class name). */
-  var moduleName: String = "";
-  var named = false;
-  val bindings = new ArrayBuffer[Binding];
-  var parent: Module = null;
+  var moduleName: String = ""
+  var named = false
+  var parent: Module = null
   val children = ArrayBuffer[Module]()
-  val debugs = LinkedHashSet[Node]()
-  val printfs = ArrayBuffer[Printf]()
-  val asserts = ArrayBuffer[Assert]()
 
-  val switchKeys = Stack[Bits]()
-  val whenConds = Stack[Bool]()
+  private[Chisel] val bindings = ArrayBuffer[Binding]()
+  private[Chisel] val printfs = ArrayBuffer[Printf]()
+  private[Chisel] val asserts = ArrayBuffer[Assert]()
+  private[Chisel] val debugs = LinkedHashSet[Node]()
+  private[Chisel] val nodes = LinkedHashSet[Node]()
+  private[Chisel] val names = HashMap[String, Node]()
+
   private lazy val trueCond = Bool(true)
-  def hasWhenCond: Boolean = !whenConds.isEmpty
-  def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
+  private[Chisel] val switchKeys = Stack[Bits]()
+  private[Chisel] val whenConds = Stack[Bool]()
+  private[Chisel] def hasWhenCond: Boolean = !whenConds.isEmpty
+  private[Chisel] def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  val nodes = new LinkedHashSet[Node]
-  val names = new HashMap[String, Node]
-  var nindex = -1;
-  var defaultWidth = 32;
-  var pathParent: Module = null;
   var verilog_parameters = "";
-  val clocks = new ArrayBuffer[Clock]
-  val resets = new HashMap[Bool, Bool]
-
-  def hasReset = !(reset == null)
-  def hasClock = !(clock == null)
-
-  Driver.components += this
-  push(this)
-
   //Parameter Stuff
   lazy val params = Module.params
   params.path = this.getClass :: params.path
 
-  var hasExplicitClock = !(clock == null)
-  var hasExplicitReset = !(_reset == null)
+  Driver.components += this
+  Module.push(this)
 
-  var defaultResetPin: Bool = null
-  def reset = {
-    if (defaultResetPin == null) {
-      defaultResetPin = Bool(INPUT)
-      defaultResetPin.isIo = true
-      defaultResetPin.component = this
-      defaultResetPin.setName("reset")
+  if (_clock == null) _clock = None
+  if (_reset == null) _reset = None
+  private[Chisel] val clocks = LinkedHashSet[Clock]()
+  private[Chisel] val resets = HashMap[Bool, Bool]()
+  private[Chisel] var resetPin: Option[Bool] = None
+  private[Chisel] var hasExplicitClock = _clock != None
+  private[Chisel] var hasExplicitReset = _reset != None
+  def clock: Clock = _clock getOrElse (
+    if (parent == null) Driver.implicitClock else parent.clock)
+  def reset = resetPin match {
+    case None => {
+      val r = Bool(INPUT)
+      r.isIo = true
+      r.compOpt = Some(this)
+      r setName ("reset")
+      resetPin = Some(r)
+      r
     }
-    defaultResetPin
+    case Some(r) => r
   }
   def reset_=(r: Bool) {
-    _reset = r
+    _reset = Some(r)
   }
-  def reset_=() {
-    _reset = parent._reset
+  // returns the pin connected to the reset signal, creates a new one if
+  // no such pin exists
+  def addResetPin(r: Bool): Bool = {
+    val pin = _reset match {
+      case Some(p) if p == r => reset
+      case _ => 
+        val p = Bool(INPUT)
+        p.isIo = true
+        p.compOpt = Some(this)
+        p
+    }
+    resets getOrElseUpdate (r, pin)
   }
+  def addClock(clock: Clock) { clocks += clock }
 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
-
-  // This function sets the IO's component.
-  private def ownIo() {
-    val wires = io.flatten;
-    for ((n, w) <- wires) {
-      // This assert is a sanity check to make sure static resolution
-      // of IOs didn't fail
-      if (this != w.component) {
-        val io_str = "<" + n + " (" + w.getClass.getName + ")>"
-        ChiselError.error("Statically resolved component(" + this + 
-          ") differs from dynamically resolved component(" + w.component + 
-          ") of IO: " + io_str + " crashing compiler")
-      }
-    }
-    // io naming
-    io nameIt ("io", true)
-  }
 
   def findBinding(m: Node) = bindings find (_.inputs(0) == m)
 
   def io: Data
 
-  def nextIndex : Int = { nindex = nindex + 1; nindex }
+  var nindex: Option[Int] = None
+  def nextIndex : Int = {
+    nindex = nindex match { case None => Some(0) case Some(i) => Some(i+1) }
+    nindex.get
+  }
 
   // override def toString: String = name this one isn't really working...
   def wires: Array[(String, Bits)] = io.flatten
 
   /** Add an assertion in the code generated by a backend. */
   def assert(cond: Bool, message: String): Unit = {
-    val a = new Assert(!Module.current.whenCond || cond, this.reset, message)
+    val a = new Assert(!Module.current.whenCond || cond, reset, message)
     debug(a)
     asserts += a
   }
@@ -239,52 +222,32 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     from the outputs. */
   def debug(x: Node): Unit = {
     // XXX Because We cannot guarentee x is flatten later on in collectComp.
-    x.getNode.component = this
+    x.getNode.compOpt = Some(this)
     debugs += x.getNode
   }
 
   def printf(message: String, args: Node*): Unit = {
-    val p = new Printf(Module.current.whenCond && !this.reset, message, args)
+    val p = new Printf(Module.current.whenCond && !reset, message, args)
     printfs += p
     debug(p)
     p.inputs.foreach(debug _)
-    for (arg <- args)
-      if (arg.isInstanceOf[Aggregate])
+    args foreach {
+      case arg: Aggregate =>
         ChiselError.error(new ChiselError(() => { "unable to printf aggregate argument " + arg }, arg.line))
+      case _ =>
+    }
   }
 
-  def <>(src: Module) {
-    io <> src.io
-  }
+  def <>(src: Module) { io <> src.io }
 
-  def apply(name: String): Data = io(name);
+  def apply(name: String): Data = io(name)
   // COMPILATION OF REFERENCE
   def emitDec(b: Backend): String = {
-    var res = "";
+    var res = ""
     // val wires = io.flatten;
     for ((n, w) <- wires)
-      res += b.emitDec(w);
+      res += b.emitDec(w)
     res
-  }
-
-  // returns the pin connected to the reset signal, creates a new one if
-  // no such pin exists
-  def addResetPin(reset: Bool): Bool = {
-    def makeIO = {
-      val res = Bool(INPUT)
-      res.isIo = true
-      res.component = this
-      res
-    }
-    def pin =
-      if (reset == _reset) this.reset
-      else makeIO
-    this.resets.getOrElseUpdate(reset, pin)
-  }
-
-  def addClock(clock: Clock) {
-    if (!this.clocks.contains(clock))
-      this.clocks += clock
   }
 
   def addPin[T <: Data](pin: T, name: String = "") = {
@@ -292,7 +255,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     io match {
       case b: Bundle => {
         for ((n, io) <- gen.flatten) {
-          io.component = this
+          io.compOpt = Some(this)
           io.isIo = true
         }
         if (name != "") gen nameIt (name, true)
@@ -309,7 +272,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     val q = params.alterPartial(f)
     Driver.compStack.push(this)
     Driver.parStack.push(q)
-    val res = init(c)
+    val res = Module.init(c)
     Driver.parStack.pop
     Driver.compStack.pop
     res
@@ -319,7 +282,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
     Driver.modAdded = true
     Driver.compStack.push(this)
     Driver.parStack.push(p.push)
-    val res = init(c)
+    val res = Module.init(c)
     res.markComponent
     Driver.parStack.pop
     Driver.compStack.pop
@@ -336,34 +299,22 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       queue enqueue io
     for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       queue enqueue io
-    if (!(defaultResetPin == null))
-      queue enqueue defaultResetPin
+    for (pin <- resets.values)
+      queue enqueue pin
 
     // Do BFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](queue:_*)
+    def walked(node: Node) = (_walked contains node) || node.isIo
+    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
+    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
-      walked += top
       visit(top)
       top match {
-        case v: Vec[_] =>
-          for ((n, e) <- v.flatten;
-          if !(e == null) && !(walked contains e) && !e.isIo) {
-            queue enqueue e
-            walked += e
-          }
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            queue enqueue i
-            walked += i
-          }
-        case _ => {
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            queue enqueue i
-            walked += i
-          }
-        }
+        case b: Bundle => enqueueElems(b)
+        case v: Vec[_] => enqueueElems(v) ; enqueueInputs(v)
+        case _ => enqueueInputs(top)
       }
     }
   }
@@ -375,50 +326,55 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
       stack push io
     for (child <- children ; (n, io) <- child.wires ; if io.isIo && io.dir == INPUT)
       stack push io
-    if (!(defaultResetPin == null))
-      stack push defaultResetPin
+    for (pin <- resets.values)
+      stack push pin
     for (a <- debugs)
       stack push a
 
     // Do DFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](stack:_*)
+    def walked(node: Node) = (_walked contains node) || node.isIo
+    def pushNode(node: Node) { stack push node ; _walked += node }
+    def pushInputs(top: Node) { top.inputs filterNot walked foreach pushNode }
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
-      walked += top
       visit(top)
       top match {
-        case v: Vec[_] => {
-          for ((n, e) <- v.flatten;
-          if !(e == null) && !(walked contains e) && !e.isIo) {
-            stack push e
-            walked += e
-          }
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
-        case _ => {
-          for (i <- top.inputs;
-          if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
+        case b: Bundle => pushElems(b)
+        case v: Vec[_] => pushElems(v) ; pushInputs(v)
+        case _ => pushInputs(top)
       }
     }
   }
 
   def addDefaultReset {
-    if (!(defaultResetPin == null)) {
-      addResetPin(_reset)
-      if (this != Driver.topComponent && hasExplicitReset)
-        defaultResetPin.inputs += _reset
+    _reset match {
+      case None => throw new RuntimeException
+      case Some(r) => resetPin match {
+        case None => 
+        case Some(p) =>
+          addResetPin(r)
+          if ((this ne Module.topMod) && hasExplicitReset) p := r
+      }
     }
   }
 
-  def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
+  // This function sets the IO's component.
+  private def ownIo() {
+    for ((n, w) <- wires ; if this != w.component) {
+      // This assert is a sanity check to make sure static resolution
+      // of IOs didn't fail
+      val io_str = "<" + n + " (" + w.getClass.getName + ")>"
+      ChiselError.error("Statically resolved component(" + this + 
+        ") differs from dynamically resolved component(" + w.component + 
+        ") of IO: " + io_str + " crashing compiler")
+    }
+    // io naming
+    io nameIt ("io", true)
+  }
+
+  private def getClassValNames(c: Class[_]): ArrayBuffer[String] = {
     val valnames = new ArrayBuffer[String]()
     for (v <- c.getDeclaredFields) {
       v.setAccessible(true)
@@ -430,13 +386,13 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   }
 
   // Allow checking if a method name is also the name of a val -- reveals accessors
-  def getValNames = {
+  private def getValNames = {
     val valnames = new ArrayBuffer[String]()
     valnames ++= getClassValNames(getClass)
     valnames
   }
 
-  object isValName {
+  private object isValName {
     val valnames = Module.this.getValNames
     def apply(name: String) = valnames.contains(name)
   }
@@ -445,7 +401,8 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   // 2) name the IO
   // 3) name and set the component of all statically declared nodes through introspection
   // 4) set variable names
-  def markComponent() {
+  private[Chisel] def markComponent {
+    import Module.backend
     ownIo()
     /* We are going through all declarations, which can return Nodes,
      ArrayBuffer[Node], BlackBox and Modules.
@@ -461,7 +418,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
        val name = m.getName();
        val types = m.getParameterTypes();
        if (types.length == 0 && isValName(name) // patch to avoid defs
-        && isPublic(m.getModifiers())) {
+        && java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
          val o = m.invoke(this);
          o match {
          case node: Node => {
@@ -508,7 +465,6 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
            backend.nameSpace += bb.name
          }
          case comp: Module => {
-           comp.pathParent = this
            if (!comp.named) {
              comp.name = backend.asValidName(name)
              comp.named = true
@@ -525,21 +481,16 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
    They never get overridden yet it is called
    for each component (See Backend implementations). */
   def stripComponent(s: String): String = s.split("__").last
-
-    /** Returns the absolute path to a component instance from toplevel. */
-  def getPathName: String = {
-    getPathName()
-  }
+  /** Returns the absolute path to a component instance from toplevel. */
+  def getPathName: String = getPathName()
   def getPathName(separator: String = "_"): String = {
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
 
   def isInput(node: Node): Boolean =
-    node match { case b:Bits => b.dir == INPUT; case o => false }
-  def keepInputs(nodes: Seq[Node]): Seq[Node] =
-    nodes.filter(isInput)
-  def removeInputs(nodes: Seq[Node]): Seq[Node] =
-    nodes.filter(n => !isInput(n))
+    node match { case b: Bits => b.dir == INPUT case o => false }
+  def keepInputs(nodes: Seq[Node]): Seq[Node] = nodes.filter(isInput)
+  def removeInputs(nodes: Seq[Node]): Seq[Node] = nodes.filter(n => !isInput(n))
 
   override val hashCode: Int = Driver.components.size
   override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
@@ -548,7 +499,7 @@ abstract class Module(var clock: Clock = null, private[Chisel] var _reset: Bool 
   private[Chisel] def addAssignment(assignee: Data) = {
     val stack = Thread.currentThread().getStackTrace
     if (!assignments.contains(assignee)) {
-      assignments += ((assignee, findFirstUserLine(stack) getOrElse stack(0)))
+      assignments += ((assignee, ChiselError.findFirstUserLine(stack) getOrElse stack(0)))
     }
   }
   

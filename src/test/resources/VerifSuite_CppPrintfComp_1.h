@@ -17,24 +17,17 @@ class VerifSuite_CppPrintfComp_1_t : public mod_t {
   dat_t<8> T3;
   dat_t<16> VerifSuite_CppPrintfComp_1__io_z;
   dat_t<104> T4;
-  int clk;
-  int clk_cnt;
+  clk_t clk;
 
   void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset );
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
-  mod_t* clone();
-  bool set_circuit_from(mod_t* src);
   void print ( FILE* f );
   void print ( std::ostream& s );
   void dump ( FILE* f, int t );
   void dump_init ( FILE* f );
 
-};
-
-class VerifSuite_CppPrintfComp_1_api_t : public mod_api_t {
-  void init_mapping_table();
 };
 
 

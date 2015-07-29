@@ -29,34 +29,64 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.{Queue=>ScalaQueue}
-import scala.collection.mutable.Stack
-import scala.collection.mutable.{HashSet, HashMap, LinkedHashMap}
-import java.lang.reflect.Modifier._
-import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-
-object Backend {
-  var moduleNamePrefix = ""
-}
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue=>ScalaQueue}
+import sys.process.stringSeqToProcess
 
 trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
-  def ensureDir(dir: String): String = {
+  def ensureDir(dir: String) = {
     val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    new File(d).mkdirs()
+    val file = new java.io.File(d)
+    if (!file.exists) file.mkdirs
     d
   }
 
-  def createOutputFile(name: String): java.io.FileWriter = {
+  def createOutputFile(name: String) = {
     val baseDir = ensureDir(Driver.targetDir)
     new java.io.FileWriter(baseDir + name)
+  }
+
+  def copyToTarget(filename: String) = {
+    val resourceStream = getClass().getResourceAsStream("/" + filename)
+    if( resourceStream != null ) {
+      val classFile = createOutputFile(filename)
+      while(resourceStream.available > 0) {
+        classFile.write(resourceStream.read())
+      }
+      classFile.close()
+      resourceStream.close()
+    } else {
+      println(s"WARNING: Unable to copy '$filename'" )
+    }
+  }
+
+  import scala.util.Properties.envOrElse
+  protected val CC = envOrElse("CC", "g++" )
+  protected val CXX = envOrElse("CXX", "g++" )
+  protected val CCFLAGS = envOrElse("CCFLAGS", "")
+  protected val CXXFLAGS = envOrElse("CXXFLAGS", "")
+  protected val CPPFLAGS = envOrElse("CPPFLAGS", "")
+  protected val LDFLAGS = envOrElse("LDFLAGS", "")
+  protected val chiselENV = envOrElse("CHISEL", "")
+
+  def run(cmd: String) = {
+    val bashCmd = Seq("bash", "-c", cmd)
+    val c = bashCmd.!
+    ChiselError.info(cmd + " RET " + c)
+    c == 0
+  }
+
+  def cc(dir: String, name: String, flags: String = "", isCC: Boolean = false) {
+    val compiler = if (isCC) CC else CXX
+    val cmd = List(compiler, "-c", "-o", dir + name + ".o", flags, dir + name + ".cpp").mkString(" ")
+    if (!run(cmd)) throw new Exception("failed to compile " + name + ".cpp")
+  }
+
+  def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
+    val compiler = if (isCC) CC else CXX
+    val shared = if (isLib) "-shared" else ""
+    val ac = (List(compiler, LDFLAGS, shared, "-o", dir + target) ++ (objects map (dir + _))).mkString(" ")
+    if (!run(ac)) throw new Exception("failed to link " + objects.mkString(", "))
   }
 }
 
@@ -68,25 +98,16 @@ abstract class Backend extends FileSystemUtilities{
      lowered to simpler Ops. */
   val needsLowering = Set[String]()
 
+  def topMod = Driver.topComponent getOrElse (throwException("no top component"))
+
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
-
-  def depthString(depth: Int): String = {
-    var res = "";
-    for (i <- 0 until depth)
-      res += "  ";
-    res
-  }
 
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');
-    Backend.moduleNamePrefix + (
+    Driver.moduleNamePrefix + (
       if (dotPos >= 0) cname.substring(dotPos + 1) else cname);
-  }
-
-  protected def genIndent(x: Int): String = {
-    if(x == 0) "" else "    " + genIndent(x-1);
   }
 
   def sortComponents {
@@ -107,31 +128,27 @@ abstract class Backend extends FileSystemUtilities{
       result
     }
 
-    levelChildren(Driver.topComponent, 0)
+    levelChildren(topMod, 0)
     Driver.sortedComps.clear
-    Driver.sortedComps ++= gatherChildren(Driver.topComponent).sortWith(
+    Driver.sortedComps ++= gatherChildren(topMod).sortWith(
       (x, y) => (x.level < y.level || (x.level == y.level && x.traversal < y.traversal)))
   }
 
-  def markComponents {
-    Driver.components foreach (_.markComponent)
-  }
+  def markComponents { Driver.sortedComps foreach (_.markComponent) }
  
-  def verifyComponents {
-    Driver.components foreach (_.verify)
-  }
+  def verifyComponents { Driver.sortedComps foreach (_.verify) }
 
   def verifyAllMuxes {
-    Driver.bfs { _ match {
+    Driver.bfs { 
       case p: proc => p.verifyMuxes
       case _ =>
-    } }
+    } 
   }
 
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
   def asValidName( name: String ): String = {
-    if (keywords.contains(name)) name + "_" else name;
+    if (keywords contains name) name + "_" else name;
   }
 
   def nameAll() {
@@ -172,14 +189,13 @@ abstract class Backend extends FileSystemUtilities{
         // since sortedComps, all children should have names due to check above
       
       // ensure all nodes in the design has SOME name
-      comp dfs { _ match {
+      comp dfs { 
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
-
-        case node: Node if !node.isTypeNode && node.name == "" && node.component != null =>
+        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
-      } }
+      }
 
       // Now, ensure everything has a UNIQUE name
       // First, reserve all the IO names
@@ -188,7 +204,7 @@ abstract class Backend extends FileSystemUtilities{
       // Second, give module instances high priority for names
       children.foreach(c => c.name = namespace.getUniqueName(c.name))
       // Then, check all other nodes in the design
-      comp dfs { _ match {
+      comp dfs { 
         case reg: Reg =>
           reg setName namespace.getUniqueName(reg.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
@@ -197,28 +213,32 @@ abstract class Backend extends FileSystemUtilities{
           node.name = namespace.getUniqueName(node.name)
         }
         case _ =>
-      } }
-
+      }
     }
   }
 
-  def fullyQualifiedName( m: Node ): String = {
-    m match {
-      case l: Literal => l.toString;
-      case any       =>
-        if (m.name != ""
-          && m != Driver.topComponent.defaultResetPin && m.component != null) {
-          /* Only modify name if it is not the reset signal
-           or not in top component */
-          if(m.name != "reset" && m.component != Driver.topComponent) {
-            m.component.getPathName + "__" + m.name;
-          } else {
-            m.name
-          }
-        } else {
-          m.name
-        }
+  /** Ensures each node such that it has a unique name across the whole
+    hierarchy by prefixing its name by a component path (except for "reset"
+    and all nodes in *c*). */
+  def renameNodes(nodes: Seq[Node], sep: String = "_") = nodes foreach {
+    case _: Literal =>
+    case m if m.named => m.compOpt match {
+      case Some(p) if (p != topMod || m.name != "reset" || m.name != Driver.implicitReset.name) =>
+        m.name = m.component.getPathName(sep) + sep + sep + m.name
+      case _ =>
     }
+    case _ =>
+  }
+
+  def fullyQualifiedName( m: Node ): String = m match {
+    case l: Literal => l.toString;
+    case _ if m.name != "" && m.name != "reset" => m.compOpt match {
+      case Some(p) if p != topMod => 
+        /* Only modify name if it is not the reset signal or not in top component */
+        m.component.getPathName + "__" + m.name
+      case _ => m.name
+    }
+    case _ => m.name
   }
 
   def emitTmp(node: Node): String =
@@ -270,26 +290,26 @@ abstract class Backend extends FileSystemUtilities{
 
   def collectNodesIntoComp(mod: Module) {
     Driver.sortedComps foreach (_.nodes.clear)
-    Driver.dfs { node =>
-      val curComp = node match {
-        case io: Bits if io.isIo && io.dir == INPUT =>
-          node.component.parent
-        case _ =>
-          node.component
-      }
-      assert(node.component != null, "NULL NODE COMPONENT " + node.name)
-      if (!node.isTypeNode) node.component.nodes += node
-      for (input <- node.inputs ; if !input.isTypeNode) {
-        if (!(input.component == null || input.component == node.component) &&
-            !input.isLit && !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
+    Driver.dfs { node => node.compOpt match {
+      case None => throwException("NULL NODE COMPONENT " + node.name)
+      case Some(p) =>
+        val curComp = node match {
+          case io: Bits if io.isIo && io.dir == INPUT => p.parent
+          case _ => p
+        }
+        if (!node.isTypeNode) p.nodes += node
+        node.inputs filterNot (_.isTypeNode) foreach (input => input.compOpt match {
+          case None => input.compOpt = Some(curComp)
+          case Some(q) => if (p != q && !input.isLit &&
+            !isBitsIo(input, OUTPUT) && !isBitsIo(node, INPUT) &&
             // ok if parent referring to any child nodes
             // not symmetric and only applies to direct children
             // READ BACK INPUT -- TODO: TIGHTEN THIS UP
             !isBitsIo(input, INPUT)) {
-          ChiselError.error(new ChiselError(() => {
-            "Illegal cross module reference between " + node + " and " + input }, node.line))
-        }
-        if (input.component == null) input.component = curComp
+            ChiselError.error(new ChiselError(() => {
+             "Illegal cross module reference between " + node + " and " + input }, node.line))
+          }
+        })
       }
     }
   }
@@ -297,29 +317,28 @@ abstract class Backend extends FileSystemUtilities{
   def checkModuleResolution {
     // check module resolution
     val comps = HashMap[Node, Module]()
+    val compSet = Driver.components.toSet
     Driver.dfs { node =>
       val nextComp = node match {
         case io: Bits if io.isIo && io.dir == OUTPUT => io.component
         case io: Bits if io.isIo && io.dir == INPUT  => io.component.parent
         case _ => comps getOrElse (node, null)
       }
-      for (input <- node.inputs ; if !(input == null)) {
-        input match {
-          case _: Literal => // Skip the below check for Literals, which can safely be static
-          //tmp fix, what happens if multiple componenets reference static nodes?
-          case _ if input.component == null || !(Driver.components contains input.component) =>
+      node.inputs foreach { 
+        case _: Literal => // Skip the below check for Literals, which can safely be static
+        //tmp fix, what happens if multiple componenets reference static nodes?
+        case input: Node => input.compOpt match {
+          case Some(p) if compSet contains p =>
+          case _ => assert(input.component == nextComp, 
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
-            assert(input.component == nextComp,
-              (if (input.name != null && !input.name.isEmpty) input.name else "?") +
-              "[" + input.getClass.getName + "] has no match between component " +
-              (if (input.component == null ) "(null)" else input.component) +
-              " and '" + nextComp + "' input of " +
-              (if (node.name != null && !node.name.isEmpty) node.name else "?"))
-          case _ =>
+            (if (!input.name.isEmpty) input.name else "?") +
+            "[" + input.getClass.getName + "] has no match between component " +
+            ((input.compOpt map (_.toString)) getOrElse "(null)") +
+            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?"))
         }
-        comps(input) = nextComp
       }
+      comps ++= node.inputs map (_ -> nextComp)
     }
   }
 
@@ -334,56 +353,51 @@ abstract class Backend extends FileSystemUtilities{
     }
   }
 
-  def pruneUnconnectedIOs(m: Module) {
-    val inputs = m.wires.filter(_._2.dir == INPUT)
-    val outputs = m.wires.filter(_._2.dir == OUTPUT)
-
-    for ((name, i) <- inputs) {
-      if (i.inputs.length == 0 && m != Driver.topComponent)
-        if (i.consumers.size > 0) {
+  def pruneUnconnectedIOs = for (m <- Driver.sortedComps) {
+    val (inputs, outputs) = m.wires.unzip._2 partition (_.dir == INPUT)
+    if (m != topMod) {
+      for (i <- inputs if i.inputs.isEmpty) {
+        if (i.consumers.isEmpty) {
           if (Driver.warnInputs)
-            ChiselError.warning({"UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + i.component +
-                                 " has consumers"})
-          i.driveRand = true
-        } else {
-          if (Driver.warnInputs)
-            ChiselError.warning({"FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component})
+            ChiselError.warning("FLOATING INPUT " + emitRef(i) + " in COMPONENT " + i.component)
           i.prune = true
-        }
-    }
-
-    for ((name, o) <- outputs) {
-      if (o.inputs.length == 0 && !o.component.isInstanceOf[BlackBox]) {
-        if (o.consumers.size > 0) {
-          if (Driver.warnOutputs)
-            ChiselError.warning({"UNCONNECTED OUTPUT " + emitRef(o) + " in component " + o.component +
-                                 " has consumers on line " + o.consumers.head.line})
-          o.driveRand = true
         } else {
-          if (Driver.warnOutputs)
-            ChiselError.warning({"FLOATING OUTPUT " + emitRef(o) + " in component " + o.component})
-          o.prune = true
+          if (Driver.warnInputs)
+            ChiselError.warning("UNCONNECTED INPUT " + emitRef(i) + " in COMPONENT " + 
+                                i.component + " has consumers")
+          i.driveRand = true
         }
       }
     }
-  }
+    m match {
+      case _: BlackBox =>
+      case _ => for (o <- outputs if o.inputs.isEmpty) {
+        if (o.consumers.isEmpty) {
+          if (Driver.warnOutputs)
+            ChiselError.warning("FLOATING OUTPUT " + emitRef(o) + " in component " + o.component)
+          o.prune = true
+        } else {
+          if (Driver.warnOutputs)
+            ChiselError.warning("UNCONNECTED OUTPUT " + emitRef(o) + " in component " + 
+                                o.component + " has consumers")
+          o.driveRand = true
+        }
+      }
+    }
+  } 
 
   def checkPorts {
-    def prettyPrint(n: Node, c: Module) {
-      val dir = if (n.asInstanceOf[Bits].dir == INPUT) "Input" else "Output"
+    for {
+      c <- Driver.sortedComps
+      if c != topMod 
+      n <- c.wires.unzip._2
+      if n.inputs.isEmpty
+    } {
       val portName = n.name
       val compName = c.name
       val compInstName = c.moduleName
-      ChiselError.warning(dir + " port " + portName
+      ChiselError.warning(n.dir + " port " + portName
         + " is unconnected in module " + compInstName + " " + compName)
-    }
-
-    for (c <- Driver.components ; if c != Driver.topComponent) {
-      for ((n,i) <- c.wires) {
-        if (i.inputs.length == 0) {
-          prettyPrint(i, c)
-        }
-      }
     }
   }
 
@@ -392,10 +406,10 @@ abstract class Backend extends FileSystemUtilities{
   // go through every Module and set its clock and reset field
   def assignClockAndResetToModules {
     for (module <- Driver.sortedComps.reverse) {
-      if (module.clock == null)
-        module.clock = module.parent.clock
+      if (module._clock == None) 
+        module._clock = module.parent._clock
       if (!module.hasExplicitReset)
-        module.reset_=
+        module._reset = module.parent._reset
     }
   }
 
@@ -408,94 +422,80 @@ abstract class Backend extends FileSystemUtilities{
   //          component's clock's reset
   def addClocksAndResets {
     Driver.bfs {
-      _ match {
-        case x: Delay =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
-          val reset =
-            if (x.component.hasExplicitReset) x.component._reset
-            else if (x.clock != null) x.clock.getReset
-            else if (x.component.hasExplicitClock) x.component.clock.getReset
-            else x.component._reset
-          x.assignReset(x.component.addResetPin(reset))
-          x.assignClock(clock)
-          x.component.addClock(clock)
-         case x: Printf =>
-          val clock = if (x.clock == null) x.component.clock else x.clock
-          x.assignClock(clock)
-          x.component.addClock(clock)
-       case _ =>
-      }
+      case x: Delay =>
+        val clock = x.clock getOrElse x.component._clock.get
+        val reset =
+          if (x.component.hasExplicitReset) x.component._reset.get
+          else if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitClock) x.component._clock.get.getReset
+          else x.component._reset.get
+        x.assignReset(x.component addResetPin reset)
+        x.assignClock(clock)
+        x.component.addClock(clock)
+      case x: Printf =>
+        val clock = x.clock getOrElse x.component._clock.get
+        x.assignClock(clock)
+        x.component.addClock(clock)
+      case _ =>
     }
   }
 
   def addDefaultResets {
-    Driver.components foreach (_.addDefaultReset)
+    Driver.sortedComps foreach (_.addDefaultReset)
   }
 
   // go through every Module, add all clocks+resets used in it's tree to it's list of clocks+resets
   def gatherClocksAndResets {
-    for (parent <- Driver.sortedComps) {
-      for (child <- parent.children) {
-        for (clock <- child.clocks) {
-          parent.addClock(clock)
-        }
-        for (reset <- child.resets.keys) {
-          // create a reset pin in parent if reset does not originate in parent and
-          // if reset is not an output from one of parent's children
-          if (reset.component != parent && !parent.children.contains(reset.component))
-            parent.addResetPin(reset)
-
-          // special case for implicit reset
-          if (reset == Driver.implicitReset && parent == Driver.topComponent)
-            if (!parent.resets.contains(reset))
-              parent.resets += (reset -> reset)
-        }
+    for (parent <- Driver.sortedComps ; childSet = parent.children.toSet ; child <- parent.children) {
+      child.clocks foreach (parent addClock _)
+      for (reset <- child.resets.keys) {
+        // create a reset pin in parent if reset does not originate in parent and
+        // if reset is not an output from one of parent's children
+        if (reset.component != parent && !(childSet contains reset.component))
+          parent addResetPin reset
+        // special case for implicit reset
+        if (reset == Driver.implicitReset && parent == topMod) 
+          parent.resets getOrElseUpdate (reset, reset)
       }
     }
   }
 
   def connectResets {
-    for (parent <- Driver.sortedComps) {
-      for (child <- parent.children) {
-        for (reset <- child.resets.keys) {
-          if (child.resets(reset).inputs.length == 0)
-            if (parent.resets.contains(reset))
-              child.resets(reset).inputs += parent.resets(reset)
-            else
-              child.resets(reset).inputs += reset
-        }
-      }
+    for {
+      parent <- Driver.sortedComps
+      child <- parent.children
+      reset <- child.resets.keys
+      pin = child.resets(reset) if pin.inputs.isEmpty
+    } { 
+      pin := (parent.resets getOrElse (reset, reset))
     }
   }
 
   def nameRsts {
-    for (comp <- Driver.sortedComps) {
-      for (rst <- comp.resets.keys) {
-        if (!comp.resets(rst).named)
-            comp.resets(rst).setName(rst.name)
-      }
+    for (comp <- Driver.sortedComps ; rst <- comp.resets.keys ; if !comp.resets(rst).named) {
+      comp.resets(rst) setName rst.name
     }
   }
 
   // walk forward from root register assigning consumer clk = root.clock
-  private def createClkDomain(root: Node, walked: HashSet[Node]) = {
-    val dfsStack = new Stack[Node]
-    walked += root; dfsStack.push(root)
-    val clock = root.clock
+  private def createClkDomain(root: Reg, walked: HashSet[Node]) = {
+    val dfsStack = Stack[Node]()
+    walked += root
+    dfsStack.push(root)
+    val clock = root.clock getOrElse (throw new RuntimeException("Reg should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-      for (consumer <- node.consumers) {
-        if (!consumer.isInstanceOf[Delay] && !walked.contains(consumer)) {
-          val c1 = consumer.clock
-          val c2 = clock
-          if(!(consumer.clock == null || consumer.clock == clock)) {
-            ChiselError.warning({consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + "in module" +
-                                 consumer.component + " resolves to clock domain " +
-                                 emitRef(c1) + " and " + emitRef(c2) + " traced from " + root.name})
-          } else { consumer.clock = clock }
-          walked += consumer
-          dfsStack.push(consumer)
+      node.consumers filterNot (walked contains _) foreach {
+        case _: Delay =>
+        case consumer => consumer.clock match {
+          case Some(clk) if clk != clock =>
+            ChiselError.warning(consumer.getClass + " " + emitRef(consumer) + " " + emitDef(consumer) + 
+                                "in module" + consumer.component + " resolves to clock domain " + 
+                                emitRef(clk) + " and " + emitRef(clock) + " traced from " + root.name)
+          case _ => consumer.clock = Some(clock)
         }
+        walked += consumer
+        dfsStack.push(consumer)
       }
     }
   }
@@ -529,13 +529,8 @@ abstract class Backend extends FileSystemUtilities{
         if( updated ) { nbUpdates = nbUpdates + 1  }
         done = done && !updated
       }
-
       count += 1
-
-      if(done){
-        verify
-        return count;
-      }
+      if(done){ verify ; return count }
     }
     verify
     count
@@ -552,14 +547,14 @@ abstract class Backend extends FileSystemUtilities{
 
   def computeMemPorts(mod: Module) {
     if (Driver.hasMem) {
-      Driver.bfs { _ match {
+      Driver.bfs { 
         case memacc: MemAccess => memacc.referenced = true
         case _ =>
-      } }
-      Driver.bfs { _ match {
+      }
+      Driver.bfs { 
         case mem: Mem[_] => mem.computePorts
         case _ =>
-      } }
+      }
     }
   }
 
@@ -574,10 +569,9 @@ abstract class Backend extends FileSystemUtilities{
         ChiselError.error("Real node required here, but 'type' node found - did you neglect to insert a node with a direction?", x.line)
       }
       count += 1
-      for (i <- 0 until x.inputs.length)
-        if (x.inputs(i) != null && x.inputs(i).isTypeNode) {
-          x.inputs(i) = x.inputs(i).getNode
-        }
+      for ((input, i) <- x.inputs.zipWithIndex if input.isTypeNode) {
+        x.inputs(i) = input.getNode
+      }
     }
     count
   }
@@ -593,8 +587,7 @@ abstract class Backend extends FileSystemUtilities{
           case _ =>
         }
       }
-      if (!lowerTo.isEmpty)
-        inferAll(mod)
+      if (!lowerTo.isEmpty) inferAll(mod)
     }
   }
 
@@ -613,7 +606,7 @@ abstract class Backend extends FileSystemUtilities{
         //   and then having all subsequent logic use that
         if (io.dir == OUTPUT) {
           // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
-          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+          for (node <- io.consumers.toSet; if io.component != node.component.parent) {
             if(node match {
               case _ if io.component != node.component => true
               case b: Bits if (b.dir == INPUT) && io.component == node.component => true
@@ -631,7 +624,7 @@ abstract class Backend extends FileSystemUtilities{
         // INPUT logic is adjusted by having consumers use that input's producer
         else if (io.dir == INPUT && !io.inputs.isEmpty) {
           // IMPORTANT: the toSet call makes an immutable copy, allows for manipulation of io.consumers
-          for (node <- io.consumers.toSet; if !(node == null) && io.component != node.component.parent) {
+          for (node <- io.consumers.toSet; if io.component != node.component.parent) {
             if(node match {
               case _ if io.component != node.component => true
               case b: Bits if (b.dir == INPUT) && io.component == node.component => true
@@ -651,13 +644,11 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def nameBindings {
-    for (comp <- Driver.sortedComps) {
-      for (bind <- comp.bindings) {
-        var genName = bind.targetComponent.name + "_" + bind.targetNode.name
-        if(nameSpace contains genName) genName += ("_" + bind.emitIndex)
-        bind.name = asValidName(genName) // Not using nameIt to avoid override
-        bind.named = true
-      }
+    for (comp <- Driver.sortedComps ; bind <- comp.bindings) {
+      var genName = bind.targetComponent.name + "_" + bind.targetNode.name
+      if (nameSpace contains genName) genName += ("_" + bind.emitIndex)
+      bind.name = asValidName(genName) // Not using nameIt to avoid override
+      bind.named = true
     }
   }
 
@@ -668,49 +659,45 @@ abstract class Backend extends FileSystemUtilities{
     val sccList = new ArrayBuffer[ArrayBuffer[Node]]
 
     def tarjanSCC(n: Node): Unit = {
-      if(n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+      if (n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
 
       n.sccIndex = sccIndex
       n.sccLowlink = sccIndex
       sccIndex += 1
       stack.push(n)
 
-      for(i <- n.inputs) {
-        if(!(i == null) && !i.isInstanceOf[Delay] && !i.isReg) {
-          if(i.sccIndex == -1) {
-            tarjanSCC(i)
-            n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
-          } else if(stack.contains(i)) {
-            n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
-          }
-        }
+      n.inputs foreach {
+        case _: Delay =>
+        case i if i.isReg =>
+        case i if i.sccIndex == -1 =>
+          tarjanSCC(i)
+          n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
+        case i =>
+          n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
       }
 
-      if(n.sccLowlink == n.sccIndex) {
+      if (n.sccLowlink == n.sccIndex) {
         val scc = new ArrayBuffer[Node]
-
-        var top: Node = null
         do {
-          top = stack.pop()
-          scc += top
-        } while (!(n == top))
+          scc += stack.pop
+        } while (!(n == scc.last))
         sccList += scc
       }
     }
 
-    Driver.bfs { node =>
-      if(node.sccIndex == -1 && !node.isInstanceOf[Delay] && !(node.isReg)) {
-        tarjanSCC(node)
-      }
+    Driver.bfs { 
+      case _: Delay =>
+      case node if node.isReg || node.sccIndex == -1 =>
+      case node => tarjanSCC(node)
     }
 
     // check for combinational loops
     var containsCombPath = false
     for (nodelist <- sccList) {
-      if(nodelist.length > 1) {
+      if (nodelist.length > 1) {
         containsCombPath = true
         ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for((node, ind) <- nodelist zip nodelist.indices) {
+        for ((node, ind) <- nodelist zip nodelist.indices) {
           ChiselError.error("  (" + ind +  ")", node.line)
         }
       }
@@ -718,58 +705,51 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
+  protected def genIndent(x: Int): String = (0 until x) map ("    ") mkString ""
   protected def printStack {
-    var res = ""
-    for((i, c) <- Driver.printStackStruct){
-      res += (genIndent(i) + c.moduleName + " " + c.name + "\n")
-    }
-    ChiselError.info(res)
+    ChiselError.info(Driver.printStackStruct map {
+      case (i, c) => "%s%s %s\n".format(genIndent(i), c.moduleName, c.name)
+    } mkString "") 
   }
 
   def flattenAll {
     // Reset indices for temporary nodes
-    Driver.components foreach (_.nindex = -1)
+    Driver.sortedComps foreach (_.nindex = None)
 
     // Flatten all signals
-    val comp = Driver.topComponent
-    for (c <- Driver.components ; if c != comp) {
-      comp.debugs ++= c.debugs
-      comp.nodes ++= c.nodes
+    for (c <- Driver.components ; if c != topMod) {
+      topMod.debugs ++= c.debugs
+      topMod.nodes ++= c.nodes
     }
 
     // Find roots
     val roots = ArrayBuffer[Node]()
     for (c <- Driver.components)
       roots ++= c.debugs
-    for ((n, io) <- comp.wires)
+    for ((n, io) <- topMod.wires)
       roots += io
     for (b <- Driver.blackboxes)
       roots += b.io
-    for (node <- comp.nodes) {
-      node match {
-        case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty =>
-          roots += node
-        case _: Delay =>
-          roots += node
-        case _ =>
-    } }
+    topMod.nodes foreach {
+      case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty => roots += io
+      case d: Delay => roots += d
+      case _ =>
+    }
 
     // visit nodes and find ordering
-    val stack = Stack[(Int, Node)]()
+    val stack = Stack[(Node, Option[Int])]((roots.reverse map ((_, Some(0)))):_*)
     val walked = HashSet[Node]()
-    for (root <- roots) stack push ((0, root))
     while (!stack.isEmpty) {
-      val (depth, node) = stack.pop
-      if (depth == -1) Driver.orderedNodes += node
-      else {
-        node.depth = math.max(node.depth, depth)
-        if (!(walked contains node)) {
-          walked += node
-          stack push ((-1, node))
-          for (i <- node.inputs; if !(i == null)) {
-            i match {
+      stack.pop match {
+        case (node, None) => Driver.orderedNodes += node
+        case (node, Some(depth)) => { 
+          node.depth = math.max(node.depth, depth)
+          if (!(walked contains node)) {
+            walked += node
+            stack push ((node, None))
+            node.inputs foreach {
               case _: Delay =>
-              case _ => stack push ((depth + 1, i))
+              case i => stack push ((i, Some(depth+1)))
             }
           }
         }
@@ -834,9 +814,10 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
-    ChiselError.info("// COMPILING " + c + "(" + c.children.length + ")");
-    markComponents
+    ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
+    markComponents
+
     verifyComponents
 
     ChiselError.info("giving names")
@@ -899,17 +880,16 @@ abstract class Backend extends FileSystemUtilities{
     nameRsts
 
     ChiselError.info("creating clock domains")
-    val clkDomainWalkedNodes = new HashSet[Node]
-    for (comp <- Driver.sortedComps)
-      for (node <- comp.nodes)
-        if (node.isInstanceOf[Reg])
-          createClkDomain(node, clkDomainWalkedNodes)
+    val clkDomainWalkedNodes = HashSet[Node]()
+    for (comp <- Driver.sortedComps ; node <- comp.nodes) {
+      node match {
+        case r: Reg => createClkDomain(r, clkDomainWalkedNodes)
+        case _ =>
+      }
+    } 
 
     ChiselError.info("pruning unconnected IOs")
-    for (comp <- Driver.sortedComps) {
-      // remove unconnected outputs
-      pruneUnconnectedIOs(comp)
-    }
+    pruneUnconnectedIOs
 
     if (Driver.isCheckingPorts) {
       ChiselError.info("checking for unconnected ports")
@@ -929,10 +909,12 @@ abstract class Backend extends FileSystemUtilities{
       printStack
     }
 
+    // generate chisel names
+    Driver.dfs { _.chiselName }
     execute(c, analyses)
   }
 
-  def compile(c: Module, flags: String = null): Unit = { }
+  def compile(c: Module, flags: Option[String] = None): Unit = { }
 
   // Allow the backend to decide if this node should be recorded in the "object".
   def isInObject(n: Node): Boolean = false

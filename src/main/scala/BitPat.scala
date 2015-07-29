@@ -29,9 +29,7 @@
 */
 
 package Chisel
-import Node._
 import Literal._
-import ChiselError._
 
 /* Chisel3 compatibility */
 object BitPat {

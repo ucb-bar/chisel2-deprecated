@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Lit._
 
 object NodeExtract {
   // extract one bit
@@ -42,43 +40,36 @@ object NodeExtract {
   def apply(mod: Node, hi: Int, lo: Int, width: Int): Node = {
     if (hi < lo) {
       if (!((hi == lo - 1) && Driver.isSupportW0W)) {
-        ChiselError.error("Extract(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
+        ChiselError.error("Extract " + mod.getNode.name + "(hi = " + hi + ", lo = " + lo + ") requires hi >= lo")
       }
     }
     val w = if (width == -1) hi - lo + 1 else width
-    val bits_lit = mod.litOf
     // Currently, we don't restrict literals to their width,
     // so we can't use the literal directly if it overflows its width.
     val wmod = mod.widthW
-    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) {
-      mod
-    } else if (bits_lit != null) {
-      Literal((bits_lit.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
-    } else {
-      makeExtract(mod, Literal(hi), Literal(lo), fixWidth(w))
+    if (lo == 0 && wmod.isKnown && w == wmod.needWidth()) mod
+    else mod.litOpt match {
+      case Some(l) => Literal((l.value >> lo) & ((BigInt(1) << w) - BigInt(1)), w)
+      case None => makeExtract(mod, Literal(hi), Literal(lo), Node.fixWidth(w))
     }
   }
 
   // extract bit range
   def apply(mod: Node, hi: Node, lo: Node, width: Int = -1): Node = {
-    val hiLit = hi.litOf
-    val loLit = lo.litOf
-    val widthInfer = if (width == -1) widthOf(0) else fixWidth(width)
-    if (hiLit != null && loLit != null) {
-      apply(mod, hiLit.value.toInt, loLit.value.toInt, width)
-    } else { // avoid extracting from constants and avoid variable part selects
-      val rsh = Op(">>", widthInfer, mod, lo)
-      val hiMinusLoPlus1 = Op("+", maxWidth _, Op("-", maxWidth _, hi, lo), UInt(1))
-      val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
-      Op("&", widthInfer, rsh, mask)
+    val widthInfer = if (width == -1) Node.widthOf(0) else Node.fixWidth(width)
+    (hi.litOpt, lo.litOpt) match {
+      case (Some(hl), Some(ll)) => apply(mod, hl.value.toInt, ll.value.toInt, width)
+      case _ =>
+        val rsh = Op(">>", widthInfer, mod, lo)
+        val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
+        val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
+        Op("&", widthInfer, rsh, mask)
     }
   }
 
   private def makeExtract(mod: Node, hi: Node, lo: Node, widthFunc: (=> Node) => Width) = {
-    val res = new Extract
+    val res = new Extract(hi, lo)
     res.init("", widthFunc, mod, hi, lo)
-    res.hi = hi
-    res.lo = lo
     res
   }
 }
@@ -107,21 +98,20 @@ object Extract {
   }
 }
 
-class Extract extends Node {
-  var lo: Node = null;
-  var hi: Node = null;
-
+class Extract(hi: Node, lo: Node) extends Node {
   override def toString: String =
-    ("/*" + (if (name != null && !name.isEmpty) name else "?") + "*/ Extract("
+    ("/*" + (if (!name.isEmpty) name else "?") + "*/ Extract("
       + inputs(0) + (if (hi == lo) "" else (", " + hi)) + ", " + lo + ")")
 
   def validateIndex(x: Node) {
-    val lit = x.litOf
     val w0 = inputs(0).widthW
-    assert(lit == null || lit.value >= 0 && lit.value < w0.needWidth(),
-           ChiselError.error("Extract(" + lit.value + ")" +
-                    " out of range [0," + (w0.needWidth()-1) + "]" +
-                    " of " + inputs(0), line))
+    x.litOpt match {
+      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(), 
+        ChiselError.error("Extract(" + l.value + ")" +
+          " out of range [0," + (w0.needWidth()-1) + "]" +
+          " of " + inputs(0), line))
+      case _ => 
+    }
   }
 
   override def canCSE: Boolean = true
@@ -136,14 +126,12 @@ class Extract extends Node {
      *  the high and lo must be n-1 and n respectively.
      *  If this is true, we ensure our width is zero.
      */
-    val hi_lit = inputs(1).litOf
-    val lo_lit = inputs(2).litOf
-    if (inputs(0).getWidth == 0 && hi_lit != null && lo_lit != null &&
-        hi_lit.value == (lo_lit.value - 1)) {
-      setWidth(0)
-      modified = true
-    } else {
-      ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
+    (inputs(1).litOpt, inputs(2).litOpt) match {
+      case (Some(hl), Some(ll)) if inputs(0).getWidth == 0 && hl.value == (ll.value-1) =>
+        setWidth(0)
+        modified = true
+      case _ =>
+        ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
             " W0Wtransform", line)
     }
   }

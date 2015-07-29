@@ -30,12 +30,8 @@
 
 package Chisel
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
-import scala.io.Source._
-//import java.util._
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import java.io._
-import java.lang.String.format
 
 object SCWrapper {
   type ReplacementMap = HashMap[String, String]

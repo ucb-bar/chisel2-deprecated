@@ -29,9 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Literal._
-import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
   def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
