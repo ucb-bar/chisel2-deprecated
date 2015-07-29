@@ -153,7 +153,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
+    val value = if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
+                else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
     if (isTrace) println("  PEEK " + dumpName(data) + " -> " + value.toString(16))
     value
   }
@@ -192,8 +193,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
     if (isTrace) println("  POKE " + dumpName(data) + " <- " + value.toString(16))
-    if (_inputs contains data) 
+    if (data.isTopLevelIO && data.dir == INPUT)
       _pokeMap(data) = value
+    else if (data.isTopLevelIO && data.dir == OUTPUT)
+      println("  NOT ALLOWED TO POKE OUTPUT " + dumpName(data))
     else 
       pokeNode(data.getNode, value)
     isStale = true
