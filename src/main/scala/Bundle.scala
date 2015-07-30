@@ -29,13 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.LinkedHashMap
-import scala.collection.mutable.Stack
-import java.lang.reflect.Modifier._
-import Node._;
-import ChiselError._
+import scala.collection.mutable.{HashSet, LinkedHashMap}
 
 object Bundle {
   val keywords = Set("elements", "flip", "toString",
@@ -59,7 +53,7 @@ object Bundle {
 /** Defines a collection of datum of different types into a single coherent
   whole.
   */
-class Bundle(val view: Seq[String] = null) extends Aggregate {
+class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
@@ -76,11 +70,9 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
       val isInterface = classOf[Data].isAssignableFrom(rtype)
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
-      if( types.length == 0 && !isStatic(modifiers) && isInterface
-        && !(name contains '$')
-        && !(Bundle.keywords contains name)
-        && (view == null || (view contains name))
-        && checkPort(m, name)) {
+      if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers) 
+        && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
+        && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
         // Fetch the actual object
         val obj = m invoke this
         if(!(seen contains obj)) {
@@ -101,7 +93,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
           line
         } else {
           val stack = Thread.currentThread().getStackTrace
-          findFirstUserLine(stack) getOrElse stack(0)
+          ChiselError.findFirstUserLine(stack) getOrElse stack(0)
         }
         ChiselError.warning("method \"clone\" is deprecated. Please use \"cloneType\"", errorLine)
       }
@@ -137,9 +129,7 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   }
 
   override def nameIt (path: String, isNamingIo: Boolean) {
-    if( !named
-      && (name.isEmpty
-        || (!path.isEmpty && name != path)) ) {
+    if( !named && (name.isEmpty || (!path.isEmpty && name != path)) ) {
       name = path
       val prefix = if (name.length > 0) name + "_" else ""
       for ((n, i) <- elements) {
@@ -171,36 +161,21 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   override def apply(name: String): Data = elements(name)
 
   override def <>(src: Node): Unit = {
-    if (comp == null) {
-      src match {
-        case other: Bundle => {
-          for ((n, i) <- elements) {
-            if (other contains n){
-              i <> other(n)
-            } else {
-              ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component)
-            }
-          }
-        }
-        case default =>
-          ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + default)
+    (comp, src) match {
+      case (None, other: Bundle) => for ((n, i) <- elements) {
+        if (other contains n) i <> other(n)
+        else ChiselError.warning("UNABLE TO FIND " + n + " IN " + other.component)
       }
-    } else {
-      src match {
-        case other: Bundle => {
-          comp assign other
-        }
-        case default =>
-          ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
-      }
+      case (None, _) => ChiselError.warning("TRYING TO CONNECT BUNDLE TO NON BUNDLE " + src)
+      case (Some(p), other: Bundle) => p assign other
+      case (Some(p), _) => ChiselError.warning("CONNECTING INCORRECT TYPES INTO WIRE OR REG")
     }
   }
 
   override protected def colonEquals(src: Bundle): Unit = {
-    if (isTypeNode && comp != null) {
-      comp procAssign src.toNode
-    } else {
-      for ((n, i) <- elements ; if src contains n) i := src(n)
+    comp match {
+      case Some(p) if isTypeNode => p procAssign src.toNode
+      case _ => for ((n, i) <- elements if src contains n) i := src(n)
     }
   }
 
@@ -216,31 +191,11 @@ class Bundle(val view: Seq[String] = null) extends Aggregate {
   }
 
   override def getWidth: Int = (elements foldLeft 0)(_ + _._2.getWidth)
-
-  override def asDirectionless(): this.type = {
-    elements.foreach(_._2.asDirectionless)
-    this
-  }
-
-  override def asInput(): this.type = {
-    elements.foreach(_._2.asInput)
-    this
-  }
-
-  override def asOutput(): this.type = {
-    elements.foreach(_._2.asOutput)
-    this
-  }
-
+  override def asDirectionless: this.type = { elements.foreach(_._2.asDirectionless) ; this }
+  override def asInput: this.type = { elements.foreach(_._2.asInput) ; this }
+  override def asOutput: this.type = { elements.foreach(_._2.asOutput) ;this }
   override def isDirectionless: Boolean = elements.forall(_._2.isDirectionless)
-
-  override def setIsTypeNode {
-    isTypeNode = true
-    elements foreach (_._2.setIsTypeNode)
-  }
-
+  override def setIsTypeNode { isTypeNode = true ; elements foreach (_._2.setIsTypeNode) }
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
-  override def isTypeOnly: Boolean = {
-    elements.forall(_._2.isTypeOnly)
-  }
+  override def isTypeOnly: Boolean = { elements.forall(_._2.isTypeOnly) }
 }

@@ -68,7 +68,7 @@ class DataSuite extends TestSuite {
 
   @Test def testBoolFromDefault() {
     val tested = Bool();
-    assertTrue( tested.dir == null )
+    assertTrue( tested.dir == NODIR );
     assertFalse( tested.named );
   }
 
@@ -169,7 +169,7 @@ class DataSuite extends TestSuite {
   }
 
   @Test def testUIntDirWidth() {
-    // def apply(dir: IODirection = null, width: Int = -1): UInt
+    // def apply(dir: IODirection = None, width: Int = -1): UInt
     val dat = UInt(INPUT, 4)
     assertTrue( dat.getWidth() == 4 );
     assertTrue( dat.dir == INPUT );

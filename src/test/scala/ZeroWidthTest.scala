@@ -82,23 +82,32 @@ class ZeroWidthTest extends TestSuite {
 
   /** Generate a zero-width wire (explicitly) */
   @Test def testImplicitZeroWidth() {
-    val res = UInt(0,0)
-    assertTrue( res.getWidth == 0 )
-    assertTrue( res.litOf.value == 0 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(0,0)
+      assertTrue( res.getWidth == 0 )
+      assertTrue( res.litValue() == 0 )
+      }
   }
 
   /** Generate a zero-width wire from a '>>' */
   @Test def testRSHZeroWidth() {
-    val res = UInt(3,2) >> UInt(2)
-    assertTrue( res.getWidth == 0 )
-    assertTrue( res.litOf.value == 0 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(3,2) >> UInt(2)
+      assertTrue( res.getWidth == 0 )
+      assertTrue( res.litValue() == 0 )
+    }
   }
 
   /** Generate a zero-width wire from an extraction. */
   @Test def testExtractZeroWidth() {
-    val res = UInt(3)((0, 1))
-    assertTrue( res.getWidth == 0 )
-    assertTrue( res.litOf.value == 0 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(3)((0, 1))
+      assertTrue( res.getWidth == 0 )
+      assertTrue( res.litValue() == 0 )
+    }
   }
 
   @Test def testOperators() {

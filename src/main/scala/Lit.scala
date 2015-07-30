@@ -29,13 +29,7 @@
 */
 
 package Chisel
-import scala.math.log
-import scala.math.abs
-import scala.math.ceil
-import scala.math.max
-import scala.math.min
-import Literal._
-import ChiselError._
+import scala.math.{log, abs, ceil, max, min}
 
 /* Factory for literal values to be used by Bits and SInt factories. */
 object Lit {
@@ -70,46 +64,32 @@ object Lit {
 
 object Literal {
 
-  private def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y;
+  private def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y
   def sizeof(x: BigInt): Int = {
-    val y = bigMax(BigInt(1), x.abs).toDouble;
-    val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt);
+    val y = bigMax(BigInt(1), x.abs).toDouble
+    val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt)
     res
    }
 
   @deprecated("This part of the implementation is not used anymore?", "2.0")
   def signedsizeof(x: BigInt, width: Int = -1, signed: Boolean = false): (Int, String) = {
-    var count = 0;
-    var n = x;
-    var resNum = BigInt(0);
+    var count = 0
+    var n = x
+    var resNum = BigInt(0)
     while((x > 0 && n != 0) || (x < 0 && n != -1)){
-      resNum += (n & BigInt(1)) << count;
-      count += 1;
-      n >>= 1;
+      resNum += (n & BigInt(1)) << count
+      count += 1
+      n >>= 1
     }
-    var resWidth = count + (
-      if(x == -1) {
-        2
-      } else if(signed || x == 0) {
-        1
-      } else {
-        0
-      });
-    resNum += (
-      if(x == -1) {
-        3
-      } else if(x < 0) {
-        1 << (resWidth-1)
-      } else {
-        0
-      });
+    var resWidth = count + (if(x == -1) 2 else if(signed || x == 0) 1 else 0)
+    resNum +=              (if(x == -1) 3 else if(x < 0) 1 << (resWidth-1) else 0)
     if(width != -1) {
       if(width < resWidth) {
-        ChiselError.error({"width " + width + " is too small for literal " + x});
+        ChiselError.error({"width " + width + " is too small for literal " + x})
       } else if(width > resWidth && x < 0) {
         while(width > resWidth){
-          resWidth += 1;
-          resNum   += 1 << (resWidth-1);
+          resWidth += 1
+          resNum   += 1 << (resWidth-1)
         }
       } else {
         resWidth = width
@@ -119,46 +99,37 @@ object Literal {
   }
 
   private def sizeof(base: Char, x: String): Int = {
-    var res = 0;
-    var first = true;
-    val size =
-      if(base == 'b') {
-        1
-      } else if(base == 'h') {
-        4
-      } else if(base == 'o') {
-        3
-      } else {
-        -1
-      }
+    var res = 0
+    var first = true
+    val size = if(base == 'b') 1 else if(base == 'h') 4 else if(base == 'o') 3 else -1
     for(c <- x)
       if (c == '_') {
 
       } else if(first) {
-        first = false;
-        res += sizeof(c.asDigit);
+        first = false
+        res += sizeof(c.asDigit)
       } else if (c != '_') {
-        res += size;
+        res += size
       }
     res
   }
-  val hexNibbles = "0123456789abcdef";
+  val hexNibbles = "0123456789abcdef"
   def toHexNibble(x: String, off: Int): Char = {
-    var res = 0;
+    var res = 0
     for (i <- 0 until 4) {
-      val idx = off + i;
-      val c   = if (idx < 0) '0' else x(idx);
-      res     = 2 * res + (if (c == '1') 1 else 0);
+      val idx = off + i
+      val c   = if (idx < 0) '0' else x(idx)
+      res     = 2 * res + (if (c == '1') 1 else 0)
     }
     hexNibbles(res)
   }
-  val pads = Vector(0, 3, 2, 1);
+  val pads = Vector(0, 3, 2, 1)
   def toHex(x: String): String = {
-    var res = "";
-    val numNibbles = (x.length-1) / 4 + 1;
-    val pad = pads(x.length % 4);
+    var res = ""
+    val numNibbles = (x.length-1) / 4 + 1
+    val pad = pads(x.length % 4)
     for (i <- 0 until numNibbles) {
-      res += toHexNibble(x, i*4 - pad);
+      res += toHexNibble(x, i*4 - pad)
     }
     res
   }
@@ -167,11 +138,11 @@ object Literal {
   }
 
   def toLitVal(x: String, shamt: Int): BigInt = {
-    var res = BigInt(0);
+    var res = BigInt(0)
     for(c <- x)
       if(c != '_'){
-        if(!(hexNibbles + "?").contains(c.toLower)) ChiselError.error({"Literal: " + x + " contains illegal character: " + c});
-        res = res * shamt + c.asDigit;
+        if(!(hexNibbles + "?").contains(c.toLower)) ChiselError.error({"Literal: " + x + " contains illegal character: " + c})
+        res = res * shamt + c.asDigit
       }
     res
   }
@@ -187,22 +158,22 @@ object Literal {
   }
 
   def parseLit(x: String): (String, String, Int) = {
-    var bits = "";
-    var mask = "";
-    var width = 0;
+    var bits = ""
+    var mask = ""
+    var width = 0
     for (d <- x) {
       if (d != '_') {
-        if(!"01?".contains(d)) ChiselError.error({"Literal: " + x + " contains illegal character: " + d});
-        width += 1;
-        mask   = mask + (if (d == '?') "0" else "1");
-        bits   = bits + (if (d == '?') "0" else d.toString);
+        if(!"01?".contains(d)) ChiselError.error({"Literal: " + x + " contains illegal character: " + d})
+        width += 1
+        mask   = mask + (if (d == '?') "0" else "1")
+        bits   = bits + (if (d == '?') "0" else d.toString)
       }
     }
     (bits, mask, width)
   }
   def stringToVal(base: Char, x: String): BigInt = {
     if(base == 'x') {
-      toLitVal(x);
+      toLitVal(x)
     } else if(base == 'd') {
       BigInt(x.toInt)
     } else if(base == 'h') {
@@ -224,16 +195,12 @@ object Literal {
     // We have seen unexpected values (one too small) when using .bitLength on negative BigInts,
     // so use the positive value instead.
     val usePositiveValueForBitLength = false
-    (if (usePositiveValueForBitLength && b < 0) {
-      -b
-    } else {
-      b
-    }).bitLength
+    (if (usePositiveValueForBitLength && b < 0) -b else b).bitLength
   }
   /** Creates a *Literal* instance from a scala integer.
     */
   def apply(x: BigInt, width: Int = -1, signed: Boolean = false): Literal = {
-    val res = new Literal();
+    val res = new Literal()
     // Check for signedness
     // We get unexpected values (one too small) when using .bitLength on negative BigInts,
     // so use the positive value instead.
@@ -249,10 +216,10 @@ object Literal {
     if(xWidth > width && width != -1) {
       // Is this a zero-width wire with value 0
       if (!(x == 0 && width == 0 && Driver.isSupportW0W)) {
-        ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth});
+        ChiselError.error({"width " + width + " is too small for literal " + x + ". Smallest allowed width is " + xWidth})
       }
     }
-    res.init("0x" + xString, w);
+    res.init("0x" + xString, w)
     res.hasInferredWidth = width == -1
     res
   }
@@ -261,22 +228,22 @@ object Literal {
     of the string indicates the base for the suffix characters.
     */
   def apply(n: String, width: Int): Literal =
-    apply(width, n(0), n.substring(1, n.length));
+    apply(width, n(0), n.substring(1, n.length))
 
   def apply(width: Int, base: Char, literal: String): Literal = {
     if (!"dhbo".contains(base)) {
-      ChiselError.error("no base specified");
+      ChiselError.error("no base specified")
     }
-    val res = new Literal();
+    val res = new Literal()
     if(width == -1) {
-      res.init(removeUnderscore(literal), sizeof(base, literal));
+      res.init(removeUnderscore(literal), sizeof(base, literal))
     } else {
-      res.init(removeUnderscore(literal), width);
+      res.init(removeUnderscore(literal), width)
       if(width < sizeof(base, literal)) {
         ChiselError.error({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)})
       }
     }
-    res.base = base;
+    res.base = base
     if (base == 'b') res.isZ = literal.contains('?')
     res
   }
@@ -287,11 +254,11 @@ object Literal {
   */
 class Literal extends Node {
   var hasInferredWidth = false
-  var isZ = false;
-  var base = 'x';
-  lazy val value: BigInt = stringToVal(base, name);
-  override def litOf: Literal = this
-  override def toString: String = name;
+  var isZ = false
+  var base = 'x'
+  lazy val value: BigInt = Literal.stringToVal(base, name)
+  override def litOpt: Option[Literal] = Some(this)
+  override def toString: String = name
   override lazy val isInVCD: Boolean = false
 
   override def canCSE: Boolean = true

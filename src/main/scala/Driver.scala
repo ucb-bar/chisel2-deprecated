@@ -30,9 +30,8 @@
 
 package Chisel
 
-import collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, LinkedHashSet, Queue => ScalaQueue}
-import scala.sys.process._
-import scala.math.min
+import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
+import sys.process.stringSeqToProcess
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -48,10 +47,9 @@ object Driver extends FileSystemUtilities{
     }
   }
 
-  def apply[T <: Module](args: Array[String], gen: () => T,
-                         ftester: T => Tester[T], wrapped:Boolean): T = {
+  def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T], wrapped:Boolean): T = {
     val mod = apply(args, gen, wrapped)
-    if (isTesting) test(mod, ftester)
+    if (isTesting) ftester(mod).finish
     mod
   }
 
@@ -94,36 +92,23 @@ object Driver extends FileSystemUtilities{
       backend.elaborate(c)
       if (isCompiling && isGenHarness) backend.compile(c)
       if(chiselConfigDump && !Dump.dump.isEmpty) {
-        val w = createOutputFile(appendString(Some(topComponent.name),chiselConfigClassName) + ".prm")
+        val w = createOutputFile(appendString(Some(c.name),chiselConfigClassName) + ".prm")
         w.write(Dump.getDump); w.close
       }
     }
     c
   }
 
-  private def test[T <: Module](mod: T, ftester: T => Tester[T]): Unit = {
-    var res = false
-    var tester: Tester[T] = null
-    try {
-      tester = ftester(mod)
-    } finally {
-      if (tester != null && tester.process != null)
-        res = tester.finish()
-    }
-    println(if (res) "PASSED" else "*** FAILED ***")
-    if(!res) throwException("Module under test FAILED at least one test vector.")
-  }
-
   def elapsedTime: Long = System.currentTimeMillis - startTime
 
-  def setTopComponent(mod: Module): Unit = {
-    topComponent = mod
-    implicitReset.component = topComponent
-    implicitClock.component = topComponent
-    topComponent.reset = implicitReset
-    topComponent.hasExplicitReset = true
-    topComponent.clock = implicitClock
-    topComponent.hasExplicitClock = true
+  def setTopComponent(mod: Module) {
+    topComponent = Some(mod)
+    implicitReset.compOpt = topComponent
+    implicitClock.compOpt = topComponent 
+    mod._reset = Some(implicitReset)
+    mod._clock = Some(implicitClock)
+    mod.hasExplicitReset = true
+    mod.hasExplicitClock = true
   }
 
   def bfs (visit: Node => Unit) = {
@@ -138,36 +123,27 @@ object Driver extends FileSystemUtilities{
       queue enqueue io
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        queue enqueue c.defaultResetPin
+      c._reset match {
+        case Some(r) if r != implicitReset => queue enqueue r.getNode
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        queue enqueue c._reset.getNode
-      }
+      for (pin <- c.resets.values)
+        queue enqueue pin
     }
 
     // Do BFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](queue:_*)
+    def walked(node: Node) = _walked contains node
+    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
+    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
-      walked += top
       visit(top)
       top match {
-        case b: Bundle =>
-          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
-            queue enqueue io
-            walked += io
-          }
-        case v: Vec[_] =>
-          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
-            queue enqueue e
-            walked += e
-          }
-        case _ =>
-      }
-      for (i <- top.inputs; if !(i == null) && !(walked contains i)) {
-        queue enqueue i
-        walked += i
+        case b: Bundle => enqueueElems(b)
+        case v: Vec[_] => enqueueElems(v) ; enqueueInputs(v)
+        case _ => enqueueInputs(top)
       }
     }
   }
@@ -179,12 +155,12 @@ object Driver extends FileSystemUtilities{
       stack push io
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        stack push c.defaultResetPin
+      c._reset match {
+        case Some(r) if r != implicitReset => stack push r.getNode
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        stack push c._reset.getNode
-      }
+      for (pin <- c.resets.values)
+        stack push pin
     }
     for (c <- components; a <- c.debugs)
       stack push a
@@ -192,33 +168,18 @@ object Driver extends FileSystemUtilities{
       stack push b.io
 
     // Do DFS
-    val walked = HashSet[Node]()
+    val _walked = HashSet[Node](stack:_*)
+    def walked(node: Node) = _walked contains node
+    def pushNode(node: Node) { stack push node ; _walked += node }
+    def pushInputs(top: Node) { top.inputs.toList filterNot walked foreach pushNode }
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
-      walked += top
       visit(top)
       top match {
-        case b: Bundle =>
-          for ((n, io) <- b.flatten; if !(io == null) && !(walked contains io)) {
-            stack push io
-            walked += io
-          }
-        case v: Vec[_] => {
-          for ((n, e) <- v.flatten; if !(e == null) && !(walked contains e)) {
-            stack push e
-            walked += e
-          }
-          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
-        case _ => {
-          for (i <- top.inputs; if !(i == null) && !(walked contains i) && !i.isIo) {
-            stack push i
-            walked += i
-          }
-        }
+        case b: Bundle => pushElems(b)
+        case v: Vec[_] => pushElems(v) ; pushInputs(v)
+        case _ => pushInputs(top)
       }
     }
   }
@@ -248,17 +209,16 @@ object Driver extends FileSystemUtilities{
       pushInitialNode(a)
     for(b <- blackboxes)
       pushInitialNode(b.io)
-    for(c <- components; (n, io) <- c.wires) {
+    for(c <- components; (n, io) <- c.wires)
       pushInitialNode(io)
-    }
     // Ensure any nodes connected to reset are visited.
     for (c <- components) {
-      if (!(c.defaultResetPin == null)) {
-        pushInitialNode(c.defaultResetPin)
+      c._reset match {
+        case Some(r) if r != implicitReset => pushInitialNode(r.getNode)
+        case _ =>
       }
-      if (!(c._reset == null) && !(c._reset == implicitReset)) {
-        pushInitialNode(c._reset.getNode)
-      }
+      for (pin <- c.resets.values) 
+        pushInitialNode(pin)
     }
     val stack = inputs ++ res
 
@@ -269,6 +229,8 @@ object Driver extends FileSystemUtilities{
       stack.push((n, false))
     }
 
+    def visited(node: Node) = stacked contains node
+    def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot visited foreach pushBareNode }
     // Walk the graph in depth-first order,
     //  visiting nodes as we do so.
     while (!stack.isEmpty) {
@@ -282,25 +244,12 @@ object Driver extends FileSystemUtilities{
         // Put this node back on the stack, with a flag indicating we've dealt with its children
         stack push ((top, true))
         top match {
-          case v: Vec[_] => {
-            for ((n, e) <- v.flatten;
-            if !(stacked contains e)) {
-              pushBareNode(e)
-            }
-          }
-          case b: Bundle => {
-            for ((n, e) <- b.flatten;
-            if !(stacked contains e)) {
-              pushBareNode(e)
-            }
-          }
+          case v: Vec[_] => pushElems(v)
+          case b: Bundle => pushElems(b)
           case _ => {}
         }
         // Push any un-visited children
-        for (c <- top.inputs;
-        if !(stacked contains c)) {
-          pushBareNode(c)
-        }
+        for (c <- top.inputs if !(stacked contains c)) { pushBareNode(c) }
       }
     }
   }
@@ -341,13 +290,11 @@ object Driver extends FileSystemUtilities{
     isVCDinline = false
     isSupportW0W = false
     hasMem = false
-    hasSRAM = false
-    sramMaxSize = 0
-    backend = null
-    topComponent = null
+    backend = new CppBackend
+    topComponent = None
+    moduleNamePrefix = ""
     components.clear()
     sortedComps.clear()
-    nodes.clear()
     orderedNodes.clear()
     blackboxes.clear()
     chiselOneHotMap.clear()
@@ -356,11 +303,11 @@ object Driver extends FileSystemUtilities{
     parStack.clear()
     stackIndent = 0
     printStackStruct.clear()
-    clocks.clear()
     implicitReset.isIo = true
     implicitReset.setName("reset")
-    implicitClock = new Clock()
     implicitClock.setName("clk")
+    clocks.clear()
+    clocks += implicitClock
     isInGetWidth = false
     modStackPushed = false
     minimumCompatibility = Version("0.0.0")
@@ -370,7 +317,7 @@ object Driver extends FileSystemUtilities{
     chiselConfigMode = None
     chiselConfigDump = false
     startTime = System.currentTimeMillis
-
+    signalMap.clear
     readArgs(args)
   }
 
@@ -402,7 +349,7 @@ object Driver extends FileSystemUtilities{
         case "--vcd" => isVCD = true
         case "--vcdMem" => isVCDMem = true
         case "--v" => backendName = "v"
-        case "--moduleNamePrefix" => Backend.moduleNamePrefix = args(i + 1); i += 1
+        case "--moduleNamePrefix" => moduleNamePrefix = args(i + 1); i += 1
         case "--inlineMem" => isInlineMem = true
         case "--noInlineMem" => isInlineMem = false
         case "--assert" => isAssert = true
@@ -421,8 +368,12 @@ object Driver extends FileSystemUtilities{
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
-        case "--testCommand" => testCommand = Some(args(i + 1)); i += 1
-        case "--targetDir" => targetDir = args(i + 1); i += 1
+        case "--testCommand" => 
+          var cmd = ""
+          while(i + 1 < args.size && args(i + 1).substring(0,2) != "--") {
+            cmd += args(i + 1) + " " ; i += 1 }
+          testCommand = Some(cmd); i += 1
+        case "--targetDir" => targetDir = ensureDir(args(i + 1)); i += 1
         case "--include" => includeArgs = args(i + 1).split(' ').toList; i += 1
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
@@ -492,7 +443,7 @@ object Driver extends FileSystemUtilities{
   var isGenHarness = false
   var isReportDims = false
   var includeArgs: List[String] = Nil
-  var targetDir: String = null
+  var targetDir: String = "."
   var isCompiling = false
   var isCheckingPorts = false
   var isTesting = false
@@ -511,13 +462,11 @@ object Driver extends FileSystemUtilities{
   var isVCDinline = false
   var isSupportW0W = false
   var hasMem = false
-  var hasSRAM = false
-  var sramMaxSize = 0
-  var backend: Backend = null
-  var topComponent: Module = null
+  var backend: Backend = new CppBackend
+  var topComponent: Option[Module] = None 
+  var moduleNamePrefix = ""
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
-  val nodes = ArrayBuffer[Node]()
   val orderedNodes = ArrayBuffer[Node]()
   val blackboxes = ArrayBuffer[BlackBox]()
   val chiselOneHotMap = HashMap[(UInt, Int), UInt]()
@@ -528,7 +477,7 @@ object Driver extends FileSystemUtilities{
   val printStackStruct = ArrayBuffer[(Int, Module)]()
   val clocks = ArrayBuffer[Clock]()
   val implicitReset = Bool(INPUT)
-  var implicitClock: Clock = null
+  val implicitClock = Clock()
   var isInGetWidth: Boolean = false
   var modStackPushed: Boolean = false
   var modAdded: Boolean = false
@@ -540,6 +489,14 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  /* For tester */
+  val signalMap = LinkedHashMap[Node, Int]()
+  var nodeId = 0
+  def getNodeId = {
+    val id = nodeId
+    nodeId +=1
+    id
+  }
 
   def appendString(s1:Option[String],s2:Option[String]):String = {
     if(s1.isEmpty && s2.isEmpty) "" else {

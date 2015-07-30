@@ -30,8 +30,18 @@
 
 package Chisel
 
-trait IODirection;
+abstract class IODirection {
+  def toString: String
+}
 
-object INPUT extends IODirection;
+object INPUT extends IODirection {
+  override def toString = "INPUT"
+}
 
-object OUTPUT extends IODirection;
+object OUTPUT extends IODirection {
+  override def toString = "OUTPUT"
+}
+
+object NODIR extends IODirection {
+  override def toString = "NODIR"
+}

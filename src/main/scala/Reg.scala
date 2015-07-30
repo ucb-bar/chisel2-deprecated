@@ -29,10 +29,6 @@
 */
 
 package Chisel
-import Node._
-import Reg._
-import ChiselError._
-import scala.reflect._
 
 class GetWidthException(s: String) extends Exception(s)
 
@@ -42,7 +38,7 @@ object Reg {
     if (Driver.isInGetWidth) {
       throw new GetWidthException("getWidth was called on a Register or on an object connected in some way to a Register that has a statically uninferrable width")
     } else {
-      maxWidth(m)
+      Node.maxWidth(m)
     }
 
   // Rule: If no width is specified, use max width. Otherwise, use the specified width.
@@ -60,7 +56,7 @@ object Reg {
     if (! w.isKnown) {
       regMaxWidth _ ;
     } else {
-      fixWidth(w.needWidth())  // TODO 0WW
+      Node.fixWidth(w.needWidth())  // TODO 0WW
     }
 
   /** Rule: if r is using an inferred width, then don't enforce a width. If it is using a user inferred
@@ -69,91 +65,79 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: => Node) = {
-    val rLit = r.litOf
-    if (rLit != null && rLit.hasInferredWidth) {
-      regMaxWidth _
-    } else {
-      fixWidth(r.getWidth)
-    }
+  def regWidth(r: => Node) = r.litOpt match { 
+    case Some(rl) if rl.hasInferredWidth => regMaxWidth _
+    case _ => Node.fixWidth(r.getWidth)
   }
 
   def validateGen[T <: Data](gen: => T) {
-    for ((n, i) <- gen.flatten)
-      if (!i.inputs.isEmpty)
-        throwException("Invalid Type Specifier for Reg")
+    for ((n, i) <- gen.flatten if !i.inputs.isEmpty)
+      throwException("Invalid Type Specifier for Reg")
   }
 
   /** *type_out* defines the data type of the register when it is read.
     *update* and *reset* define the update and reset values
     respectively.
     */
-  def apply[T <: Data](outType: T = null, next: T = null, init: T = null,
-    clock: Clock = null): T = {
-    var mType = outType
-    if(mType == null) {
-      mType = next
-    }
-    if(mType == null) {
-      mType = init
-    }
-    if(mType == null) {
-      throw new Exception("cannot infer type of Reg.")
-    }
+  def apply[T <: Data](outType: T = null, next: T = null, init: T = null, clock: Clock = null): T =
+    apply(Option(outType), Option(next), Option(init), Option(clock))
 
-    val gen = mType.cloneType
+  def apply[T <: Data](outType: Option[T], next: Option[T], init: Option[T], clock: Option[Clock]): T = {
+    val gen = (outType match {case Some(t) => t case None => 
+      next match { case Some(t) => t case None => 
+      init match { case Some(t) => t case None =>
+        throw new Exception("cannot infer type of Reg.")}}}).cloneType
     validateGen(gen)
 
     // asOutput flip the direction and returns this.
     val res = gen.asOutput
-
-    if (init != null) for (((res_n, res_i), (rval_n, rval_i)) <- res.flatten zip init.flatten) {
-      if (rval_i.getWidth < 0) ChiselError.error("Negative width to wire " + res_i)
-      res_i.comp = new RegReset
-      res_i.comp.init("", regWidth(rval_i), res_i.comp, rval_i)
-      res_i.inputs += res_i.comp
-    } else for ((res_n, res_i) <- res.flatten) {
-      res_i.comp = new Reg
-      val w = res_i.getWidthW()
-      res_i.comp.init("", regWidth(w), res_i.comp)
-      res_i.inputs += res_i.comp
+    init match {
+      case None => for (r <- res.flatten.unzip._2) {
+        val p = new Reg
+        val w = r.getWidthW()
+        p.init("", regWidth(w), p)
+        r.inputs += p
+        r.comp = Some(p)
+      }
+      case Some(p) => for ((r, i) <- res.flatten.unzip._2 zip p.flatten.unzip._2) {
+        if (i.getWidth < 0) ChiselError.error("Negative width to wire " + res)
+        val p = new RegReset
+        p.init("", regWidth(i), p, i)
+        r.inputs += p
+        r.comp = Some(p)
+      }
     }
-
-    if (next != null) for (((res_n, res_i), (next_n, next_i)) <- res.flatten zip next.flatten) {
-      res_i.comp.doProcAssign(next_i, Bool(true))
+    next match {
+      case None =>
+      case Some(p) => for ((r, n) <- res.flatten.unzip._2 zip p.flatten.unzip._2) {
+        r.comp match {
+          case None => // Todo: Error!
+          case Some(p) => p doProcAssign (n, Bool(true))
+        }
+      }
     }
-
     res.setIsTypeNode
-
     // set clock
-    for ((name, sig) <- res.flatten) {
-      if (sig.comp != null)
-        sig.comp.clock = clock
-      else
-        sig.clock = clock
-    }
-
+    res.flatten.unzip._2 foreach (sig => sig.comp match {
+      case None => sig.clock = clock
+      case Some(p) => p.clock = clock
+    })
     res
   }
 
   /* Without this method, the scala compiler is not happy
    when we declare registers as Reg(signal). */
-  def apply[T <: Data](outType: T): T = Reg[T](outType, null.asInstanceOf[T], null.asInstanceOf[T])
+  def apply[T <: Data](outType: T): T = Reg[T](Some(outType), None, None, None)
 }
 
 
 object RegNext {
-
-  def apply[T <: Data](next: T): T = Reg[T](next, next, null.asInstanceOf[T])
-
-  def apply[T <: Data](next: T, init: T): T = Reg[T](next, next, init)
-
+  def apply[T <: Data](next: T): T = Reg[T](Some(next), Some(next), None, None)
+  def apply[T <: Data](next: T, init: T): T = Reg[T](Some(next), Some(next), Some(init), None)
 }
 
 object RegInit {
-
-  def apply[T <: Data](init: T): T = Reg[T](init, null.asInstanceOf[T], init)
-
+  def apply[T <: Data](init: T): T = Reg[T](Some(init), None, Some(init), None)
 }
 
 class RegReset extends Reg {
