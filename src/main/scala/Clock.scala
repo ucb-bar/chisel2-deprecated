@@ -30,40 +30,33 @@
 
 package Chisel
 
-import scala.collection.mutable.ArrayBuffer
+object Clock {
+  def apply(reset: Bool = Driver.implicitReset, src: Option[Clock] = None, period: Double = 1.0) = {
+    new Clock(reset, src, period)
+  }
 
-class Clock(reset: Bool = Driver.implicitReset) extends Node {
-  val stateElms = new ArrayBuffer[Node]
-  Driver.clocks += this
+  implicit def toOption(c: Clock) = Option(c)
+}
+
+class Clock(reset: Bool = Driver.implicitReset, 
+  private[Chisel] val srcClock: Option[Clock] = None, 
+  private[Chisel] val period: Double = 1.0 /* in ps */) extends Node {
+
   init("", 1)
-
-  var srcClock: Clock = null
-  var initStr = ""
-
-  var period = "1ps"
+  Driver.clocks += this
 
   // returns a reset pin connected to reset for the component in scope
   def getReset: Bool = {
-    if (Driver.compStack.length != 0) {
+    if (!Driver.compStack.isEmpty) {
       Driver.compStack.top.addResetPin(reset)
     } else {
       reset
     }
   }
 
-  def * (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " * " + x + ";\n"
-    clock
-  }
+  override lazy val isInObject: Boolean = true
+  override lazy val isInVCD: Boolean = Driver.isVCD
 
-  def / (x: Int): Clock = {
-    val clock = new Clock(reset)
-    clock.init("", 1)
-    clock.srcClock = this
-    clock.initStr = " / " + x + ";\n"
-    clock
-  }
+  def * (x: Int) = Clock(reset, Some(this), period * x.toDouble)
+  def / (x: Int) = Clock(reset, Some(this), period / x.toDouble)
 }

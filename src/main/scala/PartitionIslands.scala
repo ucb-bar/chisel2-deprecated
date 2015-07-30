@@ -30,9 +30,7 @@
 
 package Chisel
 
-import scala.collection.mutable.{ArrayBuffer, Set, HashSet, HashMap, ListBuffer, Map, Queue=>ScalaQueue, Stack}
-import collection.mutable
-import scala.collection.mutable.Map
+import scala.collection.mutable.{ArrayBuffer, Set, HashSet, Map, HashMap, Stack}
 
 object PartitionIslands {
   type IslandNodes = scala.collection.immutable.HashSet[Node]
@@ -247,7 +245,7 @@ object PartitionIslands {
     }
     // Add all the real inputs to island 1 (just to give the dot backend a place to put them).
     val allNonDelayLeaves = (inputs ++ lits ++ barren ++ bogus)
-    val allNonDelayLeavesBuffer = allNonDelayLeaves.to[mutable.ArrayBuffer]
+    val allNonDelayLeavesBuffer = allNonDelayLeaves.to[ArrayBuffer]
     val allLeaves = allNonDelayLeaves ++ delays
     // First we mark all the "input" nodes.
     // This includes all the "true" input nodes, plus any Reg or Mem nodes,
@@ -408,7 +406,7 @@ object PartitionIslands {
     } else if (! islands.exists(_.nodes.size > 0)) {
       // No islands with nodes.
       // Construct an array with a single entry containing an empty set.
-      return Array[NodeIdIslands](scala.collection.immutable.HashSet.empty)
+      return Array[NodeIdIslands](new NodeIdIslands())
     }
     // Find the maximum node _id
     val maxIslandId = islands.map(_.nodes.map(_._id).max).max

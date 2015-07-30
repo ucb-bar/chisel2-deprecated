@@ -29,10 +29,8 @@
 */
 
 package Chisel
-import scala.math.max
-import Node._
-import Literal._
 import Op._
+import Node._
 
 object chiselCast {
   def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
@@ -164,6 +162,7 @@ object Op {
   val floatWidth = 32
   val doubleWidth = 64
   val logicalChars = """^([!=<>]=)|([<>])$""".r
+
   def apply(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
     // It's a binary operator. Is it a logical op?
     if (logicalChars.findFirstIn(name).nonEmpty) {
@@ -172,262 +171,209 @@ object Op {
       OpGen2({ new BinaryOp(_)})(name, widthInfer, a, b)
     }
   }
+
   def OpGen2(makeObj: String => Op)(name: String, widthInfer: (=> Node) => Width, a: Node, b: Node): Node = {
-    val (a_lit, b_lit) = (a.litOf, b.litOf)
-    if (a_lit != null) name match {
-      case "==" => if (a_lit.isZ) return zEquals(b, a)
-      case "!=" => if (a_lit.isZ) return !zEquals(b, a)
-      case "<<" | ">>" | "s>>" => if (a_lit.value == 0) return Literal(0)
-      case _ => ;
+    def error {
+      ChiselError.error("Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?")
     }
-    if (b_lit != null) name match {
-      case "==" => if (b_lit.isZ) return zEquals(a, b)
-      case "!=" => if (b_lit.isZ) return !zEquals(a, b)
-      case _ => ;
-    }
-    // isZ is unsupported for all other operators. 
-    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ) {
-      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
-      return Literal(0)
-    }
-    if (a_lit != null && b_lit != null && a_lit.isKnownWidth && b_lit.isKnownWidth) {
-      val (aw, bw) = (a_lit.needWidth(), b_lit.needWidth());
-      val (av, bv) = (a_lit.value, b_lit.value);
-      name match {
-        case "==" => return Literal(if (av == bv) 1 else 0)
-        case "!=" => return Literal(if (av != bv) 1 else 0);
-        case "<"  => return Literal(if (av <  bv) 1 else 0);
-        case "<=" => return Literal(if (av <= bv) 1 else 0);
-        case "##" => return Literal(av << bw | bv, aw + bw);
-        // "+" and "-" should NOT widen the result.
-        case "+"  => return Literal(av + bv, max(aw, bw))
-        case "-"  => return Literal(av - bv, max(aw, bw))
-        case "|"  => return Literal(av | bv, max(aw, bw));
-        case "&"  => return Literal(av & bv, max(aw, bw));
-        case "^"  => return Literal(av ^ bv, max(aw, bw));
-        case "<<" => return Literal(av << bv.toInt, aw + bv.toInt);
-        case ">>" => return Literal(av >> bv.toInt, aw - bv.toInt);
-        case _ => ;
+    def default = { 
+      (a.litOpt, b.litOpt) match { 
+        case (Some(al), Some(bl)) if al.isZ && bl.isZ => error
+        case _ => 
       }
-    }
-    if (a.isInstanceOf[Flo] && b.isInstanceOf[Flo]) {
-      if (a_lit != null && b_lit != null) {
-      val (fa_val, fb_val) = (a_lit.floLitValue, b_lit.floLitValue)
-      name match {
-        case "f+" => return Flo(fa_val + fb_val);
-        case "f-" => return Flo(fa_val - fb_val);
-        case "f*" => return Flo(fa_val * fb_val);
-        case "f/" => return Flo(fa_val / fb_val);
-        case "f%" => return Flo(fa_val % fb_val);
-        case "f==" => return Bool(fa_val == fb_val);
-        case "f!=" => return Bool(fa_val != fb_val);
-        case "f>" => return Bool(fa_val > fb_val);
-        case "f<" => return Bool(fa_val < fb_val);
-        case "f>=" => return Bool(fa_val >= fb_val);
-        case "f<=" => return Bool(fa_val <= fb_val);
-        case _ => ;
-      }
-      } else if (a_lit != null) {
-        val fa_val = a_lit.floLitValue
-        if (fa_val == 0.0) {
-          name match {
-            case "f+" => return b;
-            case "f*" => return Flo(0.0.toFloat);
-            case "f/" => return Flo(0.0.toFloat);
-            case _ => ;
-          }
-        } else if (fa_val == 1.0) {
-          name match {
-            case "f*" => return b;
-            case _ => ;
-          }
-        }
-      } else if (b_lit != null) {
-        val fb_val = b_lit.floLitValue
-        if (fb_val == 0.0) {
-          name match {
-            case "f+" => return a;
-            case "f*" => return Flo(0.0.toFloat);
-            case _ => ;
-          }
-        } else if (fb_val == 1.0) {
-          name match {
-            case "f*" => return a;
-            case "f/" => return a;
-            case "f%" => return a;
-            case _ => ;
-          }
-        }
-      }
+      val res = makeObj(name) ; res.init("", widthInfer, a, b) ; res 
     }
 
-    if (a.isInstanceOf[Dbl] && b.isInstanceOf[Dbl]) {
-      if (a_lit != null && b_lit != null) {
-      val (fa_val, fb_val) = (a_lit.dblLitValue, b_lit.dblLitValue)
-        // println(" FOLDING " + name + " " + fa_val + " " + fb_val);
-      name match {
-        case "d+" => return Dbl(fa_val + fb_val);
-        case "d-" => return Dbl(fa_val - fb_val);
-        case "d*" => return Dbl(fa_val * fb_val);
-        case "d/" => return Dbl(fa_val / fb_val);
-        case "d%" => return Dbl(fa_val % fb_val);
-        case "d==" => return Bool(fa_val == fb_val);
-        case "d!=" => return Bool(fa_val != fb_val);
-        case "d>" => return Bool(fa_val > fb_val);
-        case "d<" => return Bool(fa_val < fb_val);
-        case "d>=" => return Bool(fa_val >= fb_val);
-        case "d<=" => return Bool(fa_val <= fb_val);
-        case _ => ;
-      }
-    } else if (a_lit != null) {
-      val fa_val = a_lit.dblLitValue
-      // println("FA " + fa_val + " NAME " + name);
-      if (fa_val == 0.0) {
-        // println("FOLDING " + name);
-        name match {
-          case "d+" => return b;
-          case "d*" => return Dbl(0.0);
-          case "d/" => return Dbl(0.0);
-          case "d%" => return Dbl(0.0);
-          case _ => ;
-        }
-      } else if (fa_val == 1.0) {
-        // println("FOLDING " + name);
-        name match {
-          case "d*" => return b;
-          case _ => ;
-        }
-      }
-    } else if (b_lit != null) {
-      val fb_val = b_lit.dblLitValue
-      // println("FB " + fb_val + " NAME " + name);
-      if (fb_val == 0.0) {
-        // println("FOLDING " + name);
-        name match {
-          case "d+" => return a;
-          case "d*" => return Dbl(0.0);
-          case _ => ;
-        }
-      } else if (fb_val == 1.0) {
-        // println("FOLDING " + name);
-        name match {
-          case "d*" => return a;
-          case "d/" => return a;
-          case "d%" => return a;
-          case _ => ;
-        }
-      }
+    def zEquals(a: Node, b: Literal) = {
+      val (bits, mask, swidth) = Literal.parseLit(b.name)
+      val Op = OpGen2({ new BinaryOp(_)}) _
+      UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
     }
 
+    def LitOp = (a.litOpt, b.litOpt) match {
+      case (Some(al), _) if name == "==" && al.isZ => zEquals(b, al)
+      case (Some(al), _) if name == "!=" && al.isZ => !zEquals(b, al)
+      case (Some(al), _) if (name == "<<" || name == ">>" || name == "s>>") && al.value == 0 => Literal(0)
+      case (_, Some(bl)) if name == "==" && bl.isZ => zEquals(a, bl)
+      case (_, Some(bl)) if name == "!=" && bl.isZ => !zEquals(a, bl)
+      // isZ is unsupported for all other operators. 
+      case (Some(al), _) if al.isZ => error ; Literal(0)
+      case (_, Some(bl)) if bl.isZ => error ; Literal(0)
+
+      case (Some(al), Some(bl)) if al.isKnownWidth && bl.isKnownWidth =>
+        val (aw, bw) = (al.needWidth(), bl.needWidth())
+        val (av, bv) = (al.value, bl.value)
+        name match {
+          case "==" => Literal(if (av == bv) 1 else 0)
+          case "!=" => Literal(if (av != bv) 1 else 0)
+          case "<"  => Literal(if (av <  bv) 1 else 0)
+          case "<=" => Literal(if (av <= bv) 1 else 0)
+          case "##" => Literal(av << bw | bv, aw + bw)
+          // "+" and "-" should NOT widen the result.
+          case "+"  => Literal(av + bv, math.max(aw, bw))
+          case "-"  => Literal(av - bv, math.max(aw, bw))
+          case "|"  => Literal(av | bv, math.max(aw, bw))
+          case "&"  => Literal(av & bv, math.max(aw, bw))
+          case "^"  => Literal(av ^ bv, math.max(aw, bw))
+          case "<<" => Literal(av << bv.toInt, aw + bv.toInt)
+          case ">>" => Literal(av >> bv.toInt, aw - bv.toInt)
+          case _ => FloDblOp
+        }
+      case _ => FloDblOp
     }
-    if (Driver.backend.isInstanceOf[CppBackend] || Driver.backend.isInstanceOf[FloBackend]) {
-      def signAbs(x: Node): (Bool, UInt) = {
-        val f = x.asInstanceOf[SInt]
-        val s = f < SInt(0)
-        (s, Mux(s, -f, f).toUInt)
+
+    def FloDblOp = (a, b) match {
+      case (_: Flo, _: Flo) => (a.litOpt, b.litOpt) match {
+        case (Some(al), Some(bl)) if name == "f+" => Flo(al.floLitValue + bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f-" => Flo(al.floLitValue - bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f*" => Flo(al.floLitValue * bl.floLitValue)
+        case (Some(al) ,Some(bl)) if name == "f/" => Flo(al.floLitValue / bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f%" => Flo(al.floLitValue % bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f==" => Bool(al.floLitValue == bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f!=" => Bool(al.floLitValue != bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f>" => Bool(al.floLitValue > bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f<" => Bool(al.floLitValue < bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f>=" => Bool(al.floLitValue >= bl.floLitValue)
+        case (Some(al), Some(bl)) if name == "f<=" => Bool(al.floLitValue <= bl.floLitValue)
+        case (Some(al), _) if name == "f+" && al.floLitValue == 0.0 => b
+        case (Some(al), _) if name == "f*" && al.floLitValue == 0.0 => Flo(0.0.toFloat)
+        case (Some(al), _) if name == "f/" && al.floLitValue == 0.0 => Flo(0.0.toFloat)
+        case (Some(al), _) if name == "f%" && al.floLitValue == 0.0 => Flo(0.0.toFloat)
+        case (Some(al), _) if name == "f*" && al.floLitValue == 1.0 => b
+        case (_, Some(bl)) if name == "f+" && bl.floLitValue == 0.0 => a
+        case (_, Some(bl)) if name == "f*" && bl.floLitValue == 0.0 => Flo(0.0.toFloat)
+        case (_, Some(bl)) if name == "f*" && bl.floLitValue == 1.0 => a
+        case (_, Some(bl)) if name == "f/" && bl.floLitValue == 1.0 => a
+        case (_, Some(bl)) if name == "f%" && bl.floLitValue == 1.0 => a
+        case _ => CppFloOp
       }
-      name match {
-        case "s<" | "s<=" =>
-          if (name != "s<" || b.litOf == null || b.litOf.value != 0) {
-            val fixA = a.asInstanceOf[SInt]
-            val fixB = b.asInstanceOf[SInt]
-            val msbA = fixA < SInt(0)
-            val msbB = fixB < SInt(0)
-            val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
-            return Mux(msbA === msbB, ucond, msbA)
-          }
+      case (_: Dbl, _: Dbl) => (a.litOpt, b.litOpt) match {
+        case (Some(al), Some(bl)) if name == "d+" => Dbl(al.dblLitValue + bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d-" => Dbl(al.dblLitValue - bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d*" => Dbl(al.dblLitValue * bl.dblLitValue)
+        case (Some(al) ,Some(bl)) if name == "d/" => Dbl(al.dblLitValue / bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d%" => Dbl(al.dblLitValue % bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d==" => Bool(al.dblLitValue == bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d!=" => Bool(al.dblLitValue != bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d>" => Bool(al.dblLitValue > bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d<" => Bool(al.dblLitValue < bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d>=" => Bool(al.dblLitValue >= bl.dblLitValue)
+        case (Some(al), Some(bl)) if name == "d<=" => Bool(al.dblLitValue <= bl.dblLitValue)
+        case (Some(al), _) if name == "d+" && al.dblLitValue == 0.0 => b
+        case (Some(al), _) if name == "d*" && al.dblLitValue == 0.0 => Dbl(0.0)
+        case (Some(al), _) if name == "d/" && al.dblLitValue == 0.0 => Dbl(0.0)
+        case (Some(al), _) if name == "d%" && al.dblLitValue == 0.0 => Dbl(0.0)
+        case (Some(al), _) if name == "d*" && al.dblLitValue == 1.0 => b
+        case (_, Some(bl)) if name == "d+" && bl.dblLitValue == 0.0 => a
+        case (_, Some(bl)) if name == "d*" && bl.dblLitValue == 0.0 => Dbl(0.0)
+        case (_, Some(bl)) if name == "d*" && bl.dblLitValue == 1.0 => a
+        case (_, Some(bl)) if name == "d/" && bl.dblLitValue == 1.0 => a
+        case (_, Some(bl)) if name == "d%" && bl.dblLitValue == 1.0 => a
+        case _ => CppFloOp
+      }
+      case _ => CppFloOp
+    }
+    
+    def signAbs(x: Node): (Bool, UInt) = {
+      val f = x.asInstanceOf[SInt]
+      val s = f < SInt(0)
+      (s, Mux(s, -f, f).toUInt)
+    }
+    def CppFloOp = Driver.backend match {
+      case _: CppBackend | _: FloBackend => name match {
+        case "s<" | "s<=" if name != "s<" || b.litOpt == None || b.litOf.value != 0 =>
+          val fixA = a.asInstanceOf[SInt]
+          val fixB = b.asInstanceOf[SInt]
+          val msbA = fixA < SInt(0)
+          val msbB = fixB < SInt(0)
+          val ucond = Bool(OUTPUT).fromNode(LogicalOp(fixA, fixB, name.tail))
+          Mux(msbA === msbB, ucond, msbA)
         case "s*s" | "s*u" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val prod = absA * absB
-          return Mux(signA ^ signB, -prod, prod)
+          Mux(signA ^ signB, -prod, prod)
         case "s/s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val quo = absA / absB
-          return Mux(signA != signB, -quo, quo)
+          Mux(signA != signB, -quo, quo)
         case "s%s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val rem = absA % absB
-          return Mux(signA, -rem, rem)
+          Mux(signA, -rem, rem)
         case "%" =>
           val (au, bu) = (a.asInstanceOf[UInt], b.asInstanceOf[UInt])
-          return Op("-", widthInfer, au, au/bu*bu)
-        case _ =>
+          Op("-", widthInfer, au, au/bu*bu)
+        case _ => default
       }
+      case _ => default
     }
-    if (a.isLit && a.litOf.isZ || b.isLit && b.litOf.isZ)
-      ChiselError.error({"Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?"});
-    val res = makeObj(name)
-    res.init("", widthInfer, a, b);
-    res
+
+    LitOp
   }
+
   def apply(name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
     // It's a unary operator.
     OpGen1({ new UnaryOp(_)})(name, widthInfer, a)
   }
 
   def OpGen1(makeObj: String => Op)(name: String, widthInfer: (=> Node) => Width, a: Node): Node = {
-      if (a.litOf != null) {
-        if (a.litOf.isZ)
-          ChiselError.error({"Operator " + name + " with input " + a + " does not support literals with ?"});
-        val wa = a.litOf.needWidth()
-        name match {
-          case "~" => return Literal((-a.litOf.value-1)&((BigInt(1) << wa)-1), wa);
-          case _ => ;
+    def default = { val res = makeObj(name) ; res.init("", widthInfer, a) ; res }
+    a.litOpt match {
+      case Some(al) if al.isZ =>
+        ChiselError.error("Operator " + name + " with input " + a + " does not support literals with ?")
+      case _ =>
+    }
+    a.litOpt match {
+      case Some(al) if name == "~" =>
+        val wa = al.needWidth() 
+        Literal((-al.value-1)&((BigInt(1) << wa)-1), wa)
+      case _ => a match {
+        case _: Flo => a.litOpt match { 
+          case Some(al) => 
+            val fa_val = al.floLitValue 
+            name match {
+              case "fsin" => Flo(Math.sin(fa_val).toFloat)
+              case "fcos" => Flo(Math.cos(fa_val).toFloat)
+              case "ftan" => Flo(Math.tan(fa_val).toFloat)
+              case "fasin" => Flo(Math.asin(fa_val).toFloat)
+              case "facos" => Flo(Math.acos(fa_val).toFloat)
+              case "fatan" => Flo(Math.atan(fa_val).toFloat)
+              case "fsqrt" => Flo(Math.sqrt(fa_val).toFloat)
+              case "flog" => Flo(Math.log(fa_val).toFloat)
+              case "ffloor" => Dbl(Math.floor(fa_val).toFloat)
+              case "fceil" => Dbl(Math.ceil(fa_val).toFloat)
+              case "fround" => Dbl(Math.round(fa_val).toFloat)
+              case "fToFix" => Literal(fa_val.toLong)
+              case _ => default
+            }
+          case None => default
         }
-      }
-      val a_lit = a.litOf
-    if (a.isInstanceOf[Dbl]) {
-      if (a_lit != null) {
-      val fa_val = a_lit.dblLitValue
-      name match {
-        case "dsin" => return Dbl(Math.sin(fa_val));
-        case "dcos" => return Dbl(Math.cos(fa_val));
-        case "dtan" => return Dbl(Math.tan(fa_val));
-        case "dasin" => return Dbl(Math.asin(fa_val));
-        case "dacos" => return Dbl(Math.acos(fa_val));
-        case "datan" => return Dbl(Math.atan(fa_val));
-        case "dsqrt" => return Dbl(Math.sqrt(fa_val));
-        case "dlog" => return Dbl(Math.log(fa_val));
-        case "dfloor" => return Dbl(Math.floor(fa_val));
-        case "dceil" => return Dbl(Math.ceil(fa_val));
-        case "dround" => return Dbl(Math.round(fa_val));
-        case "dToFix" => return Literal(fa_val.toInt);
-        case _ => ;
-      }
-      }
-    }
-    if (a.isInstanceOf[Flo]) {
-      if (a_lit != null) {
-      val fa_val = a_lit.floLitValue
-      name match {
-        case "fsin" => return Flo(Math.sin(fa_val).toFloat);
-        case "fcos" => return Flo(Math.cos(fa_val).toFloat);
-        case "ftan" => return Flo(Math.tan(fa_val).toFloat);
-        case "fasin" => return Flo(Math.asin(fa_val).toFloat);
-        case "facos" => return Flo(Math.acos(fa_val).toFloat);
-        case "fatan" => return Flo(Math.atan(fa_val).toFloat);
-        case "fsqrt" => return Flo(Math.sqrt(fa_val).toFloat);
-        case "flog" => return Flo(Math.log(fa_val).toFloat);
-        case "ffloor" => return Dbl(Math.floor(fa_val).toFloat);
-        case "fceil" => return Dbl(Math.ceil(fa_val).toFloat);
-        case "fround" => return Dbl(Math.round(fa_val).toFloat);
-        case "fToFix" => return Literal(fa_val.toLong);
-        case _ => ;
-      }
+        case _: Dbl => a.litOpt match {
+          case Some(al) => 
+            val fa_val = al.dblLitValue 
+            name match {
+              case "dsin" => Dbl(Math.sin(fa_val))
+              case "dcos" => Dbl(Math.cos(fa_val))
+              case "dtan" => Dbl(Math.tan(fa_val))
+              case "dasin" => Dbl(Math.asin(fa_val))
+              case "dacos" => Dbl(Math.acos(fa_val))
+              case "datan" => Dbl(Math.atan(fa_val))
+              case "dsqrt" => Dbl(Math.sqrt(fa_val))
+              case "dlog" => Dbl(Math.log(fa_val))
+              case "dfloor" => Dbl(Math.floor(fa_val))
+              case "dceil" => Dbl(Math.ceil(fa_val))
+              case "dround" => Dbl(Math.round(fa_val))
+              case "dToFix" => Literal(fa_val.toInt)
+              case _ => default
+            } 
+          case None => default
+        }
+        case _ => default
       }
     }
-    val res = makeObj(name)
-    res.init("", widthInfer, a);
-    res
-  }
-
-  private def zEquals(a: Node, b: Node) = {
-    val (bits, mask, swidth) = parseLit(b.litOf.name)
-    val Op = OpGen2({ new BinaryOp(_)}) _
-    UInt(Op("==", fixWidth(1), Op("&", maxWidth _, a, Literal(BigInt(mask, 2))), Literal(BigInt(bits, 2))))
   }
 }
 
@@ -448,7 +394,7 @@ abstract class Op extends Node {
         if (inputs(0).widthW != widthW) inputs(0) = inputs(0).matchWidth(widthW)
         if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
       } else if (List("==", "!=", "<", "<=").contains(op)) {
-        val w = max(inputs(0).needWidth(), inputs(1).needWidth())
+        val w = math.max(inputs(0).needWidth(), inputs(1).needWidth())
         if (inputs(0).needWidth() != w) inputs(0) = inputs(0).matchWidth(Width(w))
         if (inputs(1).needWidth() != w) inputs(1) = inputs(1).matchWidth(Width(w))
  /* Issue #242 - This breaks Verilog simulation:
@@ -498,7 +444,7 @@ abstract class Op extends Node {
     case "d/"  => 1
     case "d%"  => 1
     case "dpow"  => 1
-    case "==" | "!=" | "<" | ">" | "<=" | ">=" => 0
+    case "==" | "!=" | "<" | ">" | "<=" | ">=" | "s<" | "s<=" => 0
   }
 
   // Transform an operator with one or more zero-width children into an operator without.
@@ -522,7 +468,10 @@ abstract class Op extends Node {
              *  We need to create it with a non-zero-width (to avoid complaints from the constructor),
              *  the force its width to zero.
              */
-            val identity = UInt(identityFromNode, 1)
+            val identity = c match {
+              case s: SInt => SInt(identityFromNode, 2) // '2' is the smallest allowed width for a signed integer. We'll fix it up below.
+              case _ => UInt(identityFromNode, 1)
+            }
             identity.setWidth(0)
             inputs(i) = identity
             modified = true
@@ -613,7 +562,7 @@ abstract class Op extends Node {
               }
             }
             /* A zero-width node is always less than a non-zero width node. */
-            case "<" | "<=" => {
+            case "<" | "<=" | "s<" | "s<=" => {
               /* True if the zero-width child is the first operand. */
               replaceTree(if (zeroChildId < nonzeroChildId) trueNode else falseNode)
             }

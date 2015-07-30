@@ -29,9 +29,6 @@
 */
 
 package Chisel
-import ChiselError._
-import Node._
-import scala.reflect._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 /** *seqRead* means that if a port tries to read the same address that another
@@ -45,14 +42,10 @@ object Mem {
     val gen = out.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
-    if (!(clock == null)) res.clock = clock
+    if (clock != null) res.clock = Some(clock)
     Driver.hasMem = true
-    Driver.hasSRAM = Driver.hasSRAM | seqRead
-    if (seqRead) {
-      Driver.sramMaxSize = math.max(Driver.sramMaxSize, n)
-      if (Driver.minimumCompatibility > "2")
-        ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
-    }
+    if (Driver.minimumCompatibility > "2" && seqRead)
+      ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     res
   }
 }
@@ -75,34 +68,29 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   val readwrites = ArrayBuffer[MemReadWrite]()
   val data = gen().toNode
 
-  inferWidth = fixWidth(data.getWidth)
+  inferWidth = Node.fixWidth(data.getWidth)
 
   private val readPortCache = HashMap[UInt, T]()
-  def read(addr: UInt): T = {
-    if (readPortCache.contains(addr)) {
-      return readPortCache(addr)
-    }
-
+  def read(addr: UInt): T = readPortCache getOrElseUpdate (addr, {
     val addrIsReg = addr.getNode.isInstanceOf[Reg]
     val rd = if (seqRead && !Driver.isInlineMem && addrIsReg) {
       (seqreads += new MemSeqRead(this, addr.getNode)).last
     } else {
       (reads += new MemRead(this, addr)).last
     }
-    val data = gen().fromNode(rd).asInstanceOf[T]
-    readPortCache += (addr -> data)
-    data
-  }
+    gen().fromNode(rd).asInstanceOf[T]
+  })
 
-  def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: UInt): Unit = {
+  def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: Option[UInt]): Unit = {
     val cond = // add bounds check if depth is not a power of 2
       condIn && (Bool(isPow2(n)) || addr(log2Up(n)-1,0) < UInt(n))
-    val wmask = // remove constant-1 write masks
-      if (!(wmaskIn == null) && wmaskIn.litOf != null && wmaskIn.litOf.value == (BigInt(1) << data.getWidth)-1) {
-        null
-      } else {
-        wmaskIn
+    val wmask = wmaskIn match { // remove constant-1 write masks 
+      case Some(mask) => mask.litOpt match {
+        case Some(l) if l.value == (BigInt(1) << data.getWidth)-1 => None
+        case _ => wmaskIn
       }
+      case _ => wmaskIn
+    }
 
     if (orderedWrites) // enforce priority ordering of write ports
       for (w <- writes)
@@ -120,20 +108,20 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
       // generate bogus data when reading & writing same address on same cycle
       val random16 = LFSR16()
       val random_data = Cat(random16, Array.fill((needWidth()-1)/16){random16}:_*)
-      doWrite(Reg(next=addr), Reg(next=cond), Reg(next=data), null.asInstanceOf[UInt])
-      doWrite(addr, cond, random_data, null.asInstanceOf[UInt])
+      doWrite(Reg(next=addr), Reg(next=cond), Reg(next=data), None)
+      doWrite(addr, cond, random_data, None)
     } else {
-      doWrite(addr, cond, data, null.asInstanceOf[UInt])
+      doWrite(addr, cond, data, None)
     }
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit =
     if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
-    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), null.asInstanceOf[UInt])
+    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), None)
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)
-    rdata.comp = new PutativeMemWrite(this, addr)
+    rdata.comp = Some(new PutativeMemWrite(this, addr))
     rdata
   }
 
@@ -168,7 +156,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   def isInline = Driver.isInlineMem || !reads.isEmpty
 
   override def assignClock(clk: Clock): Unit = {
-    for (w <- writes) w.clock = clk
+    for (w <- writes) w.clock = Some(clk)
     super.assignClock(clk)
   }
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
@@ -195,7 +183,7 @@ class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def cond = Bool(true)
 
   inputs += mem
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = "cread"
@@ -213,7 +201,7 @@ class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri)
   }
 
   inputs += mem
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   override def toString: String = mem + "[" + addr + "]"
   override def getPortType: String = "read"
@@ -221,7 +209,7 @@ class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri)
 
 class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc {
   override def procAssign(src: Node) =
-    mem.doWrite(addri, Module.current.whenCond, src, null)
+    mem.doWrite(addri, Module.current.whenCond, src, None)
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
   override def isTypeOnly = false
 }
@@ -232,17 +220,16 @@ class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(
   override def getPortType = if (write.isMasked) "mrw" else "rw"
 }
 
-class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski: Node) extends MemAccess(mem, addri) {
+class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski: Option[Node]) extends MemAccess(mem, addri) {
   override def cond = inputs(1)
   def cond_=(c: Bool) = inputs(1) = c
   clock = mem.clock
 
-  inferWidth = fixWidth(mem.data.getWidth)
+  inferWidth = Node.fixWidth(mem.data.getWidth)
 
   inputs += condi
   inputs += datai
-  if (maski != null)
-    inputs += maski
+  maski match { case Some(m) => inputs += m case None => }
 
   override def forceMatchingWidths = {
     super.forceMatchingWidths
@@ -250,7 +237,6 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
     if (isMasked) inputs(3) = inputs(3).matchWidth(mem.widthW)
   }
 
-  var pairedRead: MemSeqRead = null
   def emitRWEnable(r: MemSeqRead) = {
     def getProducts(x: Node): List[Node] = {
       if (x.isInstanceOf[Op] && x.asInstanceOf[Op].op == "&") {

@@ -31,9 +31,6 @@
 package Chisel
 
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.ArrayBuffer
-import Node._
-import ChiselError._
 
 class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
   inputs += condIn || resetIn
@@ -44,13 +41,13 @@ class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
 
 class BitsInObject(x: Node) extends UInt {
   inputs += x
-  inferWidth = widthOf(0)
+  inferWidth = Node.widthOf(0)
   override lazy val isInObject: Boolean = true
 }
 
 class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   inputs ++= argsIn.map(a => new BitsInObject(a))
-  def args: ArrayBuffer[Node] = inputs
+  def args = inputs 
   override lazy val isInObject: Boolean = true
   def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
   def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
@@ -92,18 +89,12 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   }
 
   def argWidth: (=> Node) => Width = { (x) => {
-    if (x != null) {
-      var unknown = false
-      val argLength = formats.zip(inputs).map{case (a,b) => {
-        lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
-      }}.sum
-      if (unknown)
-        Width()
-      else
-        Width(8*(format.length - 2*formats.length + argLength))
-    } else {
-      Width()
-    }
+    var unknown = false
+    val argLength = formats.zip(inputs).map{case (a,b) => {
+      lengths(a)({ val w = b.widthW;if (w.isKnown) w.needWidth() else {unknown = true; 0}})
+    }}.sum
+    if (unknown) Width()
+    else Width(8*(format.length - 2*formats.length + argLength))
   }}
   inferWidth = argWidth
 
@@ -115,7 +106,7 @@ class Sprintf(formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, 
 
 class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBase(formatIn, argsIn) {
   inputs += condIn
-  override def args: ArrayBuffer[Node] = inputs.init
+  override def args = inputs.init // : ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
-  def assignClock(clk: Clock): Unit = { clock = clk }
+  def assignClock(clk: Clock) { clock = Some(clk) }
 }

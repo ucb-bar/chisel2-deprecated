@@ -144,9 +144,7 @@ class TesterTest extends TestSuite {
       io.o_value := io.i_value
     } 
     
-    class PokeNegTests(c:PokeNegModule) extends AdvTester(c){
-      isTrace = true
-    
+    class PokeNegTests(c:PokeNegModule) extends AdvTester(c, true){
       wire_poke(c.io.i_value, 0x7100a000a000a000L)
       expect(c.io.o_value, 0x7100a000a000a000L)
     
@@ -185,9 +183,7 @@ class TesterTest extends TestSuite {
         io.o_value := io.i_value
       } 
       
-      class PokeWideTests(c:PokeWideModule) extends AdvTester(c){
-        isTrace = true
-      
+      class PokeWideTests(c:PokeWideModule) extends AdvTester(c, true){
         wire_poke(c.io.i_value, 0x7100a000a000a000L)
         expect(c.io.o_value, 0x7100a000a000a000L)
       
