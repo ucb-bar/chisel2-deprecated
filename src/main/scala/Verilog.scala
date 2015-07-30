@@ -410,12 +410,11 @@ class VerilogBackend extends Backend {
         harness write "    %s_len = %s;\n".format(clk.name, initStr)
     })
     if (clocks.size > 1) clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name)) 
-    harness write "    $init_top(%s);\n".format(c.name)
     harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
     harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
-    harness write "    $init_sigs();\n"
+    harness write "    $init_sigs(%s);\n".format(c.name)
 
     if (Driver.isVCD) {
       harness write "    /*** VPD dump ***/\n"
@@ -429,13 +428,13 @@ class VerilogBackend extends Backend {
       harness write "  initial forever begin\n"
       clocks foreach (clk => harness write "    if (%s_cnt < min) min = %s_cnt;\n".format(clk.name, clk.name))   
       clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
-      harness write "    #min $init_tick(min - 0.1);\n"
-      harness write "    #min\n"    
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
+      harness write "    #min $init_tick(min + 0.1);\n"
+      harness write "    #min ;\n"    
       harness write "  end\n"
     } else {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
-      harness write "    $init_tick(%s_len - 0.1);\n".format(mainClk.name)
+      harness write "    $init_tick(%s_len + 0.1);\n".format(mainClk.name)
       harness write "  end\n\n"
     } 
     harness write "endmodule\n"

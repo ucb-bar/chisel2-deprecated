@@ -30,12 +30,6 @@ public:
     vpi_free_object(vpi_register_cb(&data_s));
   }
 
-  void init_top() {
-    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-    top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
-  }
-
-  
   void init_clks() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
@@ -74,6 +68,8 @@ public:
   }
 
   void init_sigs() {
+    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+    top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
     search_signals();
   }
 
