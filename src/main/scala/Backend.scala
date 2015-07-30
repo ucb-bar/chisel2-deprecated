@@ -250,6 +250,8 @@ abstract class Backend extends FileSystemUtilities{
         node.name
       case _: Reg =>
         if (node.named) node.name else "R" + node.emitIndex
+      case _: Clock =>
+        if (node.named) node.name else "C" + node.emitIndex
       case _ =>
         if (node.named) node.name else "T" + node.emitIndex
     }

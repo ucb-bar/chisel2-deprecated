@@ -1078,8 +1078,13 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
-        out_h.write(emitDec(m))
+      val uniqueDec = new ArrayBuffer[String]
+      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc)) {
+        if ( !( uniqueDec contains emitDec(m) ) ) {
+          uniqueDec += emitDec(m)
+          out_h.write(emitDec(m))
+        }
+      }
       for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
         out_h.write(vcd.emitDec(m))
       for (clock <- Driver.clocks)
@@ -1343,7 +1348,7 @@ class CppBackend extends Backend {
           "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) 
       } mkString "")
       llm addString (Driver.clocks map { clk =>
-        "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
+        "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(emitRef(clk), emitRef(clk))
       } mkString "")
 
       llm.done()
