@@ -113,4 +113,49 @@ class MultiClockSuite extends TestSuite {
       () => Module(new TestMultiClock2()))
     assertFile("MultiClockSuite_TestMultiClock2_1.v")
   }
+
+  @Test def testSingleReset() {
+    class ClockedSubComp extends Module {
+      val io = new Bundle {
+        val ready = Bool(INPUT)
+        val valid_A = Bool(OUTPUT)
+        val valid_B = Bool(OUTPUT)
+      }
+      val stored_A = Reg(init=Bool(false), next=io.ready, clock=new Clock(this.reset))
+      val stored_B = Reg(init=Bool(false), next=io.ready, clock=new Clock(this.reset))
+      io.valid_A := stored_A
+      io.valid_B := stored_B
+    }
+
+    class SingleReset extends Module {
+      val io = new Bundle {
+        val data     = Bool(INPUT)
+        val result_A = Bool(OUTPUT)
+        val result_B = Bool(OUTPUT)
+      }
+      val sub = Module(new ClockedSubComp())
+      sub.io.ready := io.data
+      io.result_A := RegNext(sub.io.valid_A)
+      io.result_B := RegNext(sub.io.valid_B)
+    }
+
+    class SingleResetTests(c : SingleReset) extends Tester(c) {
+      poke(c.io.data, BigInt(1))
+      step(2)
+      expect(c.io.result_A, BigInt(1))
+      expect(c.io.result_B, BigInt(1))
+      poke(c.io.data, BigInt(0))
+      step(2)
+      expect(c.io.result_A, BigInt(0))
+      expect(c.io.result_B, BigInt(0))
+    }
+
+    launchCppTester((c: SingleReset) => new SingleResetTests(c))
+
+    chiselMain(Array[String]("--v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new SingleReset()))
+    assertFile("MultiClockSuite_SingleReset_1.v")
+  }
+
 }
