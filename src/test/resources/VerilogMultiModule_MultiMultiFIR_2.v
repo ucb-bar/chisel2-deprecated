@@ -7,11 +7,11 @@ module VerilogMultiModule_MultiMultiFIR_2_MultiFIR_FilterSection(
     output[31:0] io_out_bits
 );
 
-  wire[31:0] T0;
+  wire[31:0] T1;
 
 
-  assign io_out_bits = T0;
-  assign T0 = io_in_bits f* 32'h40000000;
+  assign io_out_bits = T1;
+  assign T1 = io_in_bits f* 32'h40000000;
   assign io_out_valid = io_in_valid;
   assign io_in_ready = io_out_ready;
 endmodule
@@ -26,32 +26,32 @@ module Queue(input clk, input reset,
     output[2:0] io_count
 );
 
-  wire[2:0] T0;
+  wire[2:0] T19;
   wire[1:0] ptr_diff;
   reg [1:0] R1;
-  wire[1:0] T16;
-  wire[1:0] T2;
-  wire[1:0] T3;
+  wire[1:0] T20;
+  wire[1:0] T21;
+  wire[1:0] T22;
   wire do_deq;
   reg [1:0] R4;
-  wire[1:0] T17;
-  wire[1:0] T5;
-  wire[1:0] T6;
+  wire[1:0] T23;
+  wire[1:0] T24;
+  wire[1:0] T25;
   wire do_enq;
-  wire T7;
+  wire T26;
   wire ptr_match;
   reg  maybe_full;
-  wire T18;
-  wire T8;
-  wire T9;
-  wire[31:0] T10;
+  wire T27;
+  wire T28;
+  wire T29;
+  wire[31:0] T30;
   reg [31:0] ram [3:0];
-  wire[31:0] T11;
-  wire[31:0] T12;
-  wire T13;
+  wire[31:0] T31;
+  wire[31:0] T32;
+  wire T33;
   wire empty;
-  wire T14;
-  wire T15;
+  wire T34;
+  wire T35;
   wire full;
 
 `ifndef SYNTHESIS
@@ -68,51 +68,51 @@ module Queue(input clk, input reset,
 // synthesis translate_on
 `endif
 
-  assign io_count = T0;
-  assign T0 = {T7, ptr_diff};
+  assign io_count = T19;
+  assign T19 = {T26, ptr_diff};
   assign ptr_diff = R4 - R1;
-  assign T16 = reset ? 2'h0 : T2;
-  assign T2 = do_deq ? T3 : R1;
-  assign T3 = R1 + 2'h1;
+  assign T20 = reset ? 2'h0 : T21;
+  assign T21 = do_deq ? T22 : R1;
+  assign T22 = R1 + 2'h1;
   assign do_deq = io_deq_ready & io_deq_valid;
-  assign T17 = reset ? 2'h0 : T5;
-  assign T5 = do_enq ? T6 : R4;
-  assign T6 = R4 + 2'h1;
+  assign T23 = reset ? 2'h0 : T24;
+  assign T24 = do_enq ? T25 : R4;
+  assign T25 = R4 + 2'h1;
   assign do_enq = io_enq_ready & io_enq_valid;
-  assign T7 = maybe_full & ptr_match;
+  assign T26 = maybe_full & ptr_match;
   assign ptr_match = R4 == R1;
-  assign T18 = reset ? 1'h0 : T8;
-  assign T8 = T9 ? do_enq : maybe_full;
-  assign T9 = do_enq != do_deq;
-  assign io_deq_bits = T10;
-  assign T10 = ram[R1];
-  assign T12 = io_enq_bits;
-  assign io_deq_valid = T13;
-  assign T13 = empty ^ 1'h1;
-  assign empty = ptr_match & T14;
-  assign T14 = maybe_full ^ 1'h1;
-  assign io_enq_ready = T15;
-  assign T15 = full ^ 1'h1;
+  assign T27 = reset ? 1'h0 : T28;
+  assign T28 = T29 ? do_enq : maybe_full;
+  assign T29 = do_enq != do_deq;
+  assign io_deq_bits = T30;
+  assign T30 = ram[R1];
+  assign T32 = io_enq_bits;
+  assign io_deq_valid = T33;
+  assign T33 = empty ^ 1'h1;
+  assign empty = ptr_match & T34;
+  assign T34 = maybe_full ^ 1'h1;
+  assign io_enq_ready = T35;
+  assign T35 = full ^ 1'h1;
   assign full = ptr_match & maybe_full;
 
   always @(posedge clk) begin
     if(reset) begin
       R1 <= 2'h0;
     end else if(do_deq) begin
-      R1 <= T3;
+      R1 <= T22;
     end
     if(reset) begin
       R4 <= 2'h0;
     end else if(do_enq) begin
-      R4 <= T6;
+      R4 <= T25;
     end
     if(reset) begin
       maybe_full <= 1'h0;
-    end else if(T9) begin
+    end else if(T29) begin
       maybe_full <= do_enq;
     end
     if (do_enq)
-      ram[R4] <= T12;
+      ram[R4] <= T32;
   end
 endmodule
 
