@@ -822,7 +822,7 @@ class CppBackend extends Backend {
           if (!unoptimizedFiles.contains(basename)) {
             cc(dir, basename, allFlags + " " + optim2)
           }
-          objects += basename
+          objects += basename + ".o"
         }
         objects += (n + "-emulator.o")
         link(dir, n, objects)
@@ -1312,7 +1312,7 @@ class CppBackend extends Backend {
       val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod")))
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
       var id = 0
-      Driver.bfs {
+      Driver.orderedNodes.map {
         case m: Mem[_] => 
           Driver.signalMap(m) = id
           id += m.n
