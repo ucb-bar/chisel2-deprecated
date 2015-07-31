@@ -54,14 +54,11 @@ class CppBackend extends Backend {
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
   protected[this] val onceOnlyFiles = HashSet[String]()
-  protected[this] var cloneFile: String = ""
   protected[this] var maxFiles: Int = 0
   protected[this] val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
   // If we're dealing with multiple files for the purpose of separate
   //   optimization levels indicate we expect to compile multiple files.
   protected[this] val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
-  // Compile the clone method at -O0
-  protected[this] val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   protected[this] val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
@@ -755,9 +752,6 @@ class CppBackend extends Backend {
     }
 
     // Compile all the unoptimized files at a (possibly) lower level of optimization.
-    if (cloneCompiledO0) {
-      onceOnlyFiles += cloneFile
-    }
     // Set the default optimization levels.
     var optim0 = "-O0"
     var optim1 = "-O1"
@@ -828,7 +822,7 @@ class CppBackend extends Backend {
           if (!unoptimizedFiles.contains(basename)) {
             cc(dir, basename, allFlags + " " + optim2)
           }
-          objects += basename
+          objects += basename + ".o"
         }
         objects += (n + "-emulator.o")
         link(dir, n, objects)
@@ -1151,8 +1145,8 @@ class CppBackend extends Backend {
         out_h.write("  %s_api_t(mod_t* m) : emul_api_t(m) { }\n".format(c.name))
         if (nSimMethods > 1) {
           out_h.write(" private:\n")
-          for (i <- 0 until nDumpInitMethods - 1) {
-            out_h.write("  void init_sim_data_" + i + "();\n")
+          for (i <- 0 until nSimMethods - 1) {
+            out_h.write("  void init_sim_data_" + i + "(" + c.name + "_t* mod );\n")
           }
           out_h.write(" public:\n")
         }
@@ -1315,10 +1309,10 @@ class CppBackend extends Backend {
                  s"  sim_data.signals.clear();\n" +
                  s"  ${c.name}_t* mod = dynamic_cast<${c.name}_t*>(module);\n" +
                  s"  assert(mod);\n"
-      val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
+      val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod")))
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
       var id = 0
-      Driver.bfs {
+      Driver.orderedNodes.map {
         case m: Mem[_] => 
           Driver.signalMap(m) = id
           id += m.n
@@ -1641,7 +1635,7 @@ class CppBackend extends Backend {
     createCppFile()
     val nDumpMethods = genDumpMethod(vcd)
 
-    // If we're compiling initialization methods -O0, add the current files
+    // If we're compiling initialization methods -O0 or -O1, add the current files
     //  to the unoptimized file list.
     //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
     if (compileInitializationUnoptimized) {
@@ -1657,6 +1651,12 @@ class CppBackend extends Backend {
     val nSimMethods = if (Driver.isGenHarness) {
       advanceCppFile()
       createCppFile()
+      // If we're compiling initialization methods -O0, add the current file to the unoptimized file list.
+      //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
+      if (compileInitializationUnoptimized) {
+        val trimLength = ".cpp".length()
+        onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
+      }
       genInitSimDataMethod(c) 
     } else 0
 
