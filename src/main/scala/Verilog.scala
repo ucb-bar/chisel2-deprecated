@@ -122,9 +122,8 @@ class VerilogBackend extends Backend {
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, Option[String])*): String =
-      ports.toList map { 
-        case (s, None) => "" 
-        case (s, Some(p)) => List("    .", prefix, idx, s, "(", p, ")").mkString 
+      ports.toList filter (_._2 != None) map { 
+        case (x, y) => List("    .", prefix, idx, x, "(", y.get, ")").mkString 
       } mkString ",\n"
 
     m match {
@@ -262,7 +261,7 @@ class VerilogBackend extends Backend {
         val mask_grans = mask_writers.map(x => find_gran(x.mask))
         val mask_gran = if (!mask_grans.isEmpty && mask_grans.forall(_ == mask_grans(0))) mask_grans(0) else 1
         val configStr = List(
-         " depth ", m.n.toString,
+         " depth ", m.n,
          " width ", m.needWidth(),
          " ports ", m.ports map (_.getPortType) mkString ",",
          (if (mask_gran != 1) " mask_gran " + mask_gran else ""), "\n").mkString
