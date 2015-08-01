@@ -218,7 +218,7 @@ class VerilogBackend extends Backend {
     val res = node match {
       case x: Bits if x.isIo && x.dir == INPUT => ""
       case x: Bits if node.inputs.isEmpty => 
-        ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
+        if (Driver.saveConnectionWarnings) ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
         List("  assign ", emitTmp(node), " = ", emitRand(node), ";\n").mkString
       case x: Bits =>
         List("  assign ", emitTmp(node), " = ", emitRef(node.inputs(0)), ";\n").mkString
