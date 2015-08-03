@@ -834,20 +834,6 @@ class CppBackend extends Backend {
     }
   }
 
-  def emitDefLos(c: Module): String = {
-    val res = new StringBuilder
-    for ((n, io) <- c.wires if io.dir == INPUT) {
-      res append ("  " + emitRef(c) + "->" + n + " = " + emitRef(io.inputs(0)) + ";\n")
-    }
-    res append (emitRef(c) + "->clock_lo(reset);\n")
-    for ((n, io) <- c.wires if io.dir == OUTPUT) {
-      res append ("  " + emitRef(io.consumers.head) + " = " + emitRef(c) + "->" + n + ";\n")
-    }
-    res.result
-  }
-
-  def emitDefHis(c: Module): String = emitRef(c) + "->clock_hi(reset);\n"
-
   override def elaborate(c: Module): Unit = {
     val minimumLinesPerFile = Driver.minimumLinesPerFile
     val partitionIslands = Driver.partitionIslands
@@ -1373,19 +1359,6 @@ class CppBackend extends Backend {
     }
     val maxIslandId = islands.map(_.islandId).max
     val nodeToIslandArray = generateNodeToIslandArray(islands)
-
-    /** Walk the node structure, eliminating unnecessary data structures.
-      *  
-      */
-    def eliminateAuxilliaryData() {
-      for (n <- Driver.orderedNodes) {
-        if (n.consumers.size > 1) {
-          val consumerHead = n.consumers.head
-          n.consumers.clear
-          n.consumers += consumerHead
-        }
-      }
-    }
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]

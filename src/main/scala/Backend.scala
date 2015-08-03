@@ -714,27 +714,21 @@ abstract class Backend extends FileSystemUtilities{
 
   def flattenAll {
     // Reset indices for temporary nodes
-    Driver.sortedComps foreach (_.nindex = None)
+    Driver.components foreach (_.nindex = None)
 
     // Flatten all signals
-    for (c <- Driver.components ; if c != topMod) {
-      topMod.debugs ++= c.debugs
-      topMod.nodes ++= c.nodes
-    }
+    val nodes = Driver.components flatMap (_.nodes)
+    val debugs = Driver.components flatMap (_.debugs)
 
     // Find roots
-    val roots = ArrayBuffer[Node]()
-    for (c <- Driver.components)
-      roots ++= c.debugs
-    for ((n, io) <- topMod.wires)
-      roots += io
-    for (b <- Driver.blackboxes)
-      roots += b.io
-    topMod.nodes foreach {
-      case io: Bits if io.dir == OUTPUT && io.consumers.isEmpty => roots += io
-      case d: Delay => roots += d
-      case _ =>
-    }
+    val roots = debugs ++ 
+      (topMod.wires map (_._2)) ++ 
+      (Driver.blackboxes map (_.io)) ++ 
+      (nodes filter { 
+        case io: Bits => io.dir == OUTPUT && io.consumers.isEmpty
+        case _: Delay => true
+        case _ => false 
+      })
 
     // visit nodes and find ordering
     val stack = Stack[(Node, Option[Int])]((roots.reverse map ((_, Some(0)))):_*)
