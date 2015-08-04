@@ -97,6 +97,12 @@ abstract class Bits extends Data with proc {
   }
 
   override def procAssign(src: Node): Unit = {
+    if (assigned) {
+      // override any previous bulk connection
+      assigned = false
+      inputs.clear
+    }
+
     if (Driver.topComponent != None || checkAssign(src)) {
       if (defaultMissing && Module.current.whenCond.canBeUsedAsDefault)
         setDefault(src)
