@@ -38,12 +38,12 @@ class SysCBackend extends CppBackend {
       super.elaborate(c)
       println(c)
       println(c.name)
-  
+
       //Create component definition for System C
     val top_bundle = c.io.asInstanceOf[Bundle] //Is this safe?
     //  No, but it will throw an exception that should explain the issue reasonably
     val cdef = new ComponentDef(c.name + "_t", c.name)
-    val badElements = HashMap[String, Data]()
+    val badElements = scala.collection.mutable.HashMap[String, Data]()
     for ((name, elt) <- top_bundle.elements) {
       elt match {
         case delt:DecoupledIO[_] => {
@@ -77,7 +77,7 @@ class SysCBackend extends CppBackend {
         case _ => badElements(name) = elt
       }
     }
-  
+
     if (badElements.size > 0) {
       val invalidIOMessage = "SystemC requires that all top-level wires are decoupled bits - <%s>"
       for ((name, elt) <- badElements) {
@@ -89,11 +89,11 @@ class SysCBackend extends CppBackend {
         }
       }
     } else {
-  
-      //Print out component definition
+
+      //Print out the component definition.
       println(cdef)
-  
-      //Generate file
+
+      //Generate the file.
       val out_p = createOutputFile("SCWrapped" + c.name + ".cpp");
       SCWrapper.genwrapper(cdef, out_p)
     }

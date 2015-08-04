@@ -7,7 +7,7 @@ RM_DIRS 	:= test-outputs test-reports
 CLEAN_DIRS	:= doc
 
 SRC_DIR	?= .
-SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
+#SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
 SYSCTESTS ?= $(addsuffix .sysctest,$(notdir $(basename $(wildcard $(SRC_DIR)/src/test/scala/SysCTest/*.scala))))
 CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
 TEST_OUTPUT_DIR ?= ./test-outputs
@@ -48,9 +48,15 @@ jenkins-build: clean
 	$(SBT) $(SBT_FLAGS) scalastyle coverage test
 	$(SBT) $(SBT_FLAGS) coverageReport
 
-sysctests: $(SYSCTESTS)
+.PHONY:	SYSCDIR
 
-sysctest:  $(firstword $(SYSCTESTS))
+SYSCDIR:
+	@if [ -z "$(SYSTEMC)" ]; then echo "Please define SYSTEMC (the root of the systemc distribution) in your environment"; exit 1; fi
+	@if [ ! -d "$(SYSTEMC)" ]; then echo "SYSTEMC isn't a valid directory - $(SYSTEMC)"; exit 1; fi
+
+sysctests: $(SYSCTESTS) SYSCDIR
+
+sysctest:  $(firstword $(SYSCTESTS)) SYSCDIR
 
 %.sysctest:
 	mkdir -p $(TEST_OUTPUT_DIR)
