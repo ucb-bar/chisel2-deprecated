@@ -30,15 +30,26 @@
 
 package Chisel
 
+/** An object for creating C style Enums */
 object Enum {
   import Literal.sizeof
-  /** create n enum values of given type */
+  /** create n enum values of given type
+    * @param nodeType the type of node to create
+    * @param n the number of nodes to create
+    * @example {{{ val s1 :: s2 :: s3 :: Nil = Enum(UInt(), 3) }}}
+    * @note When declaring vals the first character must be lower case, ie S1 is illegal */
   def apply[T <: UInt](nodeType: T, n: Int): List[T] = (Range(0, n, 1).map(x => (Lit(x, sizeof(n-1))(nodeType)))).toList;
 
-  /** create enum values of given type and names */
+  /** create enum values of given type and names
+    * @param nodeType the type of node to create
+    * @param l any number of Symbols to create as an Enum
+    * @return a map from Symbol to the node created*/
   def apply[T <: UInt](nodeType: T, l: Symbol *): Map[Symbol, T] = (l.toList zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))(nodeType)))).toMap;
 
-  /** create enum values of given type and names */
+  /** create enum values of given type and names
+    * @param nodeType the type of node to create
+    * @param l a list of symbols
+    * @return a map of symbols to a node created */
   def apply[T <: UInt](nodeType: T, l: List[Symbol]): Map[Symbol, T] = (l zip (Range(0, l.length, 1).map(x => Lit(x, sizeof(l.length-1))(nodeType)))).toMap;
 
 }

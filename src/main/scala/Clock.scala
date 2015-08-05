@@ -30,7 +30,13 @@
 
 package Chisel
 
+/** Create a new Clock */
 object Clock {
+  // TODO: make src and period private like Clock Class?
+  /** @param reset the reset for this clock
+    * @param src the source clock for this clock
+    * @param period the period in ps for this clock, implicitClock has period of 1ps
+    */
   def apply(reset: Bool = Driver.implicitReset, src: Option[Clock] = None, period: Double = 1.0) = {
     new Clock(reset, src, period)
   }
@@ -38,6 +44,9 @@ object Clock {
   implicit def toOption(c: Clock) = Option(c)
 }
 
+/** Create a new clock
+  * @param reset The reset for this clock
+  */
 class Clock(reset: Bool = Driver.implicitReset, 
   private[Chisel] val srcClock: Option[Clock] = None, 
   private[Chisel] val period: Double = 1.0 /* in ps */) extends Node {
@@ -45,7 +54,7 @@ class Clock(reset: Bool = Driver.implicitReset,
   init("", 1)
   Driver.clocks += this
 
-  // returns a reset pin connected to reset for the component in scope
+  /** @return a reset pin connected to reset for the component in scope */
   def getReset: Bool = {
     if (!Driver.compStack.isEmpty) {
       Driver.compStack.top.addResetPin(reset)
@@ -57,6 +66,10 @@ class Clock(reset: Bool = Driver.implicitReset,
   override lazy val isInObject: Boolean = true
   override lazy val isInVCD: Boolean = Driver.isVCD
 
+  /** multiply the period of the clock
+    * Will create another clock with the respective period */
   def * (x: Int) = Clock(reset, Some(this), period * x.toDouble)
+  /** divide the clock period
+    * Will create another clock with the respective period */
   def / (x: Int) = Clock(reset, Some(this), period / x.toDouble)
 }
