@@ -330,7 +330,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
        "EXPECT " + dumpName(data) + " <- " + gotFLoat + " == " + expectedFloat)
   }
 
-  val rnd = if (Driver.testerSeedValid) new Random(Driver.testerSeed) else new Random()
+  // Always use a specific seed so results (whenever) are reproducible.
+  val rnd = new Random(Driver.testerSeed)
   val process: Process = {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val target = Driver.targetDir + "/" + n
