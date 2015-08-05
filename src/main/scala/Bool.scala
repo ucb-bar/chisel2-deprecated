@@ -55,10 +55,12 @@ class Bool extends UInt {
     Bool(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
+  /** Create a Bool from an Int */
   override def fromInt(x: Int): this.type = {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
+  /** Implementation of := operator, assigns value to this Bool */
   override protected def colonEquals(src: Bits): Unit = src match {
     case _: Bool => super.colonEquals(src(0))
     case _ => {
@@ -72,12 +74,14 @@ class Bool extends UInt {
     }
   }
 
+  /** Logical and, is equivalent to bitwise and */
   def && (b: Bool): Bool =
     if (this.isLit) { if (isTrue) b else Bool(false) }
     else if (b.isLit) b && this
     else if (this._isComplementOf(b)) Bool(false)
     else newBinaryOp(b, "&")
 
+  /** Logical or, is equivalent to bitwise or */
   def || (b: Bool): Bool =
     if (this.isLit) { if (isTrue) Bool(true) else b }
     else if (b.isLit) b || this
