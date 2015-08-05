@@ -279,4 +279,6 @@ class SeqMem[T <: Data](out: T, n: Int) {
 
   def write(addr: UInt, data: T): Unit = mem.write(addr, data)
   def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
+
+  def setName(name: String): Unit = mem.setName(name)
 }
