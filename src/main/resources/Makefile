@@ -24,12 +24,17 @@ $(ONCEONLY) $(UNOPTIMIZED) $(OPTIMIZED):  $(HFILES)
 $(EXEC):  $(ONCEONLY) $(UNOPTIMIZED) $(OPTIMIZED) Makefile
 	$(CXX) -o $@ $(filter-out Makefile,$^)
 
+ifneq (,$(ONCEONLY))
 $(ONCEONLY): %.o: %.cpp
 	$(CXX) -c -o $@ $(OPTIM0) $(CPPFLAGS) $(CXXFLAGS) $<
+endif
 
+ifneq (,$(UNOPTIMIZED))
 $(UNOPTIMIZED): %.o: %.cpp
 	$(CXX) -c -o $@ $(OPTIM1) $(CPPFLAGS) $(CXXFLAGS) $<
+endif
 
+ifneq (,$(OPTIMIZED))
 $(OPTIMIZED): %.o: %.cpp
 	$(CXX) -c -o $@ $(OPTIM2) $(CPPFLAGS) $(CXXFLAGS) $<
-	
+endif

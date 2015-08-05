@@ -9,33 +9,6 @@ PLI_INT32 tick_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
-  void init_tick() {
-    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-    vpiHandle arg_iter(vpi_iterate(vpiArgument, syscall_handle));
-
-    // Argument: clock delay
-    s_cb_data   data_s;
-    s_vpi_time  time_s;
-    s_vpi_value value_s;
-    value_s.format = vpiRealVal;
-    vpi_get_value(vpi_scan(arg_iter), &value_s);
-    time_s.type      = vpiScaledRealTime;
-    time_s.real      = value_s.value.real;
-    data_s.reason    = cbAfterDelay;
-    data_s.cb_rtn    = tick_cb;
-    data_s.obj       = syscall_handle; 
-    data_s.time      = &time_s;
-    data_s.value     = NULL;
-    data_s.user_data = NULL;
-    vpi_free_object(vpi_register_cb(&data_s));
-  }
-
-  void init_top() {
-    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-    top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
-  }
-
-  
   void init_clks() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
@@ -74,6 +47,8 @@ public:
   }
 
   void init_sigs() {
+    vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
+    top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
     search_signals();
   }
 
@@ -207,6 +182,18 @@ private:
           if (id > 0) break;
         }
       }
+
+      // Find DFF
+      if (!wire || wirepath == modname) {
+        vpiHandle udp_iter = vpi_iterate(vpiPrimitive, mod_handle);
+        while (vpiHandle udp_handle = vpi_scan(udp_iter)) {
+          if (vpi_get(vpiPrimType, udp_handle) == vpiSeqPrim) {
+            id = add_signal(udp_handle, modname);
+            break;
+          }
+        }
+      }
+      if (id > 0) break;
 
       vpiHandle sub_iter = vpi_iterate(vpiModule, mod_handle);
       while (vpiHandle sub_handle = vpi_scan(sub_iter)) {

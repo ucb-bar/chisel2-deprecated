@@ -30,6 +30,9 @@
 
 package Chisel
 
+/** If we have structured/aggregate types as top-level ports, we define suitable structures
+  * for encapsulating their components, in order to treat them as sc_fifo elements.
+  */
 class SysCBackend extends CppBackend {
    override def elaborate(c: Module): Unit = {
       super.elaborate(c)
@@ -37,41 +40,62 @@ class SysCBackend extends CppBackend {
       println(c.name)
 
       //Create component definition for System C
-      val top_bundle = c.io.asInstanceOf[Bundle] //Is this safe?
-      //  No, but it will throw an exception that should explain the issue reasonably
-      val cdef = new ComponentDef(c.name + "_t", c.name)
-      for ((name, elt) <- top_bundle.elements) {
-         val valid = elt match {
-            case delt:DecoupledIO[_] =>
-              delt.bits match {
-                case bits: Bits => {
-                  val is_input = bits.dir == INPUT
-                  val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
-                  val entry = new CEntry(name, is_input, vtype, bits.name, delt.ready.name, delt.valid.name)
-                  cdef.entries += (entry)
-                  true
-                 }
-                case _ => false
-               }
-            case _ => false
-         }
-         if (!valid) {
-           val invalidIOMessage = "SystemC requires that all top-level wires are decoupled bits!"
-           // If we have a line number for the element, use it.
-           if (elt.line != null) {
-             ChiselError.error(invalidIOMessage, elt.line)
-           } else {
-             ChiselError.error(invalidIOMessage)
-           }
-         }
+    val top_bundle = c.io.asInstanceOf[Bundle] //Is this safe?
+    //  No, but it will throw an exception that should explain the issue reasonably
+    val cdef = new ComponentDef(c.name + "_t", c.name)
+    val badElements = scala.collection.mutable.HashMap[String, Data]()
+    for ((name, elt) <- top_bundle.elements) {
+      elt match {
+        case delt:DecoupledIO[_] => {
+          delt.bits match {
+            case bits: Bits => {
+              val is_input = bits.dir == INPUT
+              val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
+              val entry = new CEntry(name, is_input, vtype, bits.name, delt.ready.name, delt.valid.name)
+              cdef.entries += (entry)
+            }
+            case aggregate: Aggregate => {
+              // Collect all the inputs and outputs.
+              val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+              if (inputs.length > 0) {
+                val aName = "cs_" + aggregate.name + "_i"
+                cdef.structs(aName)= new CStruct(aName, inputs)
+                val entry = new CEntry(name, true, aName, aName, delt.ready.name, delt.valid.name)
+                cdef.entries += (entry)
+              }
+              val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+              if (outputs.length > 0) {
+                val aName = "cs_" + aggregate.name + "_o"
+                cdef.structs(aName) = new CStruct(aName, outputs)
+                val entry = new CEntry(name, false, aName, aName, delt.ready.name, delt.valid.name)
+                cdef.entries += (entry)
+              }
+            }
+            case _ => badElements(name) = elt
+          }
+        }
+        case _ => badElements(name) = elt
       }
+    }
 
-      //Print out component definition
+    if (badElements.size > 0) {
+      val invalidIOMessage = "SystemC requires that all top-level wires are decoupled bits - <%s>"
+      for ((name, elt) <- badElements) {
+        // If we have a line number for the element, use it.
+        if (elt.line != null) {
+          ChiselError.error(invalidIOMessage.format(name), elt.line)
+        } else {
+          ChiselError.error(invalidIOMessage.format(name))
+        }
+      }
+    } else {
+
+      //Print out the component definition.
       println(cdef)
 
-      //Generate file
+      //Generate the file.
       val out_p = createOutputFile("SCWrapped" + c.name + ".cpp");
       SCWrapper.genwrapper(cdef, out_p)
-   }
+    }
+  }
 }
-

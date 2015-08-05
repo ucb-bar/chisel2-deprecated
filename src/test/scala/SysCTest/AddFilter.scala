@@ -28,6 +28,8 @@
  MODIFICATIONS.
 */
 
+package SysCTest
+
 import Chisel._
 import collection.mutable.ArrayBuffer
 
@@ -75,7 +77,7 @@ object AddFilter {
     var argsBuild: ArrayBuffer[String] = ArrayBuffer(args : _*)
 
     //Pull out design name
-    var design:String = ""
+    var design:String = "AddFilter"
     for(i <- 0 until args.length){
        if(args(i).equals("--design")) {
           design = args(i + 1)

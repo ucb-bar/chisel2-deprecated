@@ -6,11 +6,6 @@ vpi_api_t vpi_api;
                  User Functions
 =============================================================================*/
 
-PLI_INT32 init_top_calltf(PLI_BYTE8 *user_data) {
-  vpi_api.init_top();
-  return 0;
-}
-
 PLI_INT32 init_clks_calltf(PLI_BYTE8 *user_data) {
   vpi_api.init_clks();
   return 0;
@@ -36,8 +31,8 @@ PLI_INT32 init_sigs_calltf(PLI_BYTE8 *user_data) {
   return 0;
 }
 
-PLI_INT32 init_tick_calltf(PLI_BYTE8 *user_data) {
-  vpi_api.init_tick();
+PLI_INT32 tick_calltf(PLI_BYTE8 *user_data) {
+  vpi_api.tick();
   return 0;
 }
 
@@ -49,18 +44,6 @@ PLI_INT32 tick_cb(p_cb_data cb_data) {
 /*==========================================================================
                  Registration Functions
 =============================================================================*/
-void init_top_registration() {
-  s_vpi_systf_data tf_data;
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_top";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_top_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data = NULL;
-  vpi_register_systf(&tf_data);
-  return;
-}
-
 void init_clks_registration() {
   s_vpi_systf_data tf_data;
   tf_data.type      = vpiSysTask;
@@ -121,12 +104,12 @@ void init_sigs_registration() {
   return;
 }
 
-void init_tick_registration() {
+void tick_registration() {
   s_vpi_systf_data tf_data;
   tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_tick";
+  tf_data.tfname    = (PLI_BYTE8*) "$tick";
   tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_tick_calltf;
+  tf_data.calltf    = tick_calltf;
   tf_data.compiletf = NULL;
   tf_data.user_data = NULL;
   vpi_register_systf(&tf_data);
@@ -137,12 +120,11 @@ void init_tick_registration() {
                  Start-up Array
 =============================================================================*/
 void (*vlog_startup_routines[]) () = {
-  init_top_registration,
   init_clks_registration,
   init_rsts_registration,
   init_ins_registration,
   init_outs_registration,
   init_sigs_registration,
-  init_tick_registration,
+  tick_registration,
   0
 };

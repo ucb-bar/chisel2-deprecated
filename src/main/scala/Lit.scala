@@ -69,7 +69,7 @@ object Literal {
     val y = bigMax(BigInt(1), x.abs).toDouble
     val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt)
     res
-   }
+  }
 
   @deprecated("This part of the implementation is not used anymore?", "2.0")
   def signedsizeof(x: BigInt, width: Int = -1, signed: Boolean = false): (Int, String) = {
@@ -125,66 +125,47 @@ object Literal {
   }
   val pads = Vector(0, 3, 2, 1)
   def toHex(x: String): String = {
-    var res = ""
+    var res = new StringBuilder
     val numNibbles = (x.length-1) / 4 + 1
     val pad = pads(x.length % 4)
     for (i <- 0 until numNibbles) {
-      res += toHexNibble(x, i*4 - pad)
+      res append toHexNibble(x, i*4 - pad)
     }
-    res
+    res.result
   }
   def toLitVal(x: String): BigInt = {
     BigInt(x.substring(2, x.length), 16)
   }
-
   def toLitVal(x: String, shamt: Int): BigInt = {
     var res = BigInt(0)
-    for(c <- x)
-      if(c != '_'){
-        if(!(hexNibbles + "?").contains(c.toLower)) ChiselError.error({"Literal: " + x + " contains illegal character: " + c})
-        res = res * shamt + c.asDigit
-      }
-    res
-  }
-
-  def removeUnderscore(x: String): String = {
-    var res = ""
-    for(c <- x){
-      if(c != '_'){
-        res = res + c
-      }
+    for(c <- x if c != '_') {
+      if (!(hexNibbles + "?").contains(c.toLower)) ChiselError.error("Literal: " + x + " contains illegal character: " + c)
+      res = res * shamt + c.asDigit
     }
     res
   }
+
+  def removeUnderscore(x: String): String = x filterNot (_ == '_')
 
   def parseLit(x: String): (String, String, Int) = {
-    var bits = ""
-    var mask = ""
+    val bits = new StringBuilder
+    val mask = new StringBuilder
     var width = 0
-    for (d <- x) {
-      if (d != '_') {
-        if(!"01?".contains(d)) ChiselError.error({"Literal: " + x + " contains illegal character: " + d})
-        width += 1
-        mask   = mask + (if (d == '?') "0" else "1")
-        bits   = bits + (if (d == '?') "0" else d.toString)
-      }
+    for (d <- x if d != '_') {
+      if(!"01?".contains(d)) ChiselError.error("Literal: " + x + " contains illegal character: " + d)
+      width += 1
+      mask append (if (d == '?') '0' else '1')
+      bits append (if (d == '?') '0' else d)
     }
-    (bits, mask, width)
+    (bits.result, mask.result, width)
   }
-  def stringToVal(base: Char, x: String): BigInt = {
-    if(base == 'x') {
-      toLitVal(x)
-    } else if(base == 'd') {
-      BigInt(x.toInt)
-    } else if(base == 'h') {
-      toLitVal(x, 16)
-    } else if(base == 'b') {
-      toLitVal(x, 2)
-    } else if(base == 'o') {
-      toLitVal(x, 8)
-    } else {
-      BigInt(-1)
-    }
+  def stringToVal(base: Char, x: String): BigInt = base match {
+    case 'x' => toLitVal(x)
+    case 'd' => BigInt(x.toInt)
+    case 'h' => toLitVal(x, 16)
+    case 'b' => toLitVal(x, 2)
+    case 'o' => toLitVal(x, 8)
+    case  _  => BigInt(-1)
   }
 
   /** Derive the bit length for a Literal
@@ -205,12 +186,8 @@ object Literal {
     // We get unexpected values (one too small) when using .bitLength on negative BigInts,
     // so use the positive value instead.
     val bl = bitLength(x)
-    val xWidth = if (signed) {
-      bl + 1
-    } else {
-      max(bl, 1)
-    }
-    val w = if(width == -1) xWidth else width
+    val xWidth = if (signed) bl + 1 else max(bl, 1)
+    val w = if (width == -1) xWidth else width
     val xString = (if (x >= 0) x else (BigInt(1) << w) + x).toString(16)
 
     if(xWidth > width && width != -1) {
@@ -240,7 +217,7 @@ object Literal {
     } else {
       res.init(removeUnderscore(literal), width)
       if(width < sizeof(base, literal)) {
-        ChiselError.error({"width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal)})
+        ChiselError.error("width " + width + " is too small for literal: " + res + " with min width " + sizeof(base, literal))
       }
     }
     res.base = base
