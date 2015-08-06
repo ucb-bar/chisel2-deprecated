@@ -110,10 +110,14 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   }
 }
 
+/** An unsigned Fixed point representation
+  * Consider using [[Chisel.Fixed Fixed]] instead */
 object UFix {
   def apply(exp: Int, width: Int): UFix = new UFix(exp, UInt(width=width))
 }
 
+/** An unsigned Fixed point representation
+  * Consider using [[Chisel.Fixed Fixed]] instead */
 class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] {
   def Factory(exp: Int, width: Int) = UFix(exp, width)
   def toRaw(a: Bits) = a.toUInt
@@ -141,10 +145,12 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
   def %  (b: UFix): UFix = throw new Exception("% unavailable for UFix")
 }
 
+@deprecated("Use Fixed instead", "3")
 object SFix {
   def apply(exp: Int, width: Int): SFix = new SFix(exp, SInt(width=width))
 }
 
+@deprecated("Use Fixed instead", "3")
 class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt

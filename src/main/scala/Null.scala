@@ -30,6 +30,7 @@
 
 package Chisel
 
+/** A default or empty backend */
 class NullBackend extends Backend {
   val keywords = Set[String]()
   // Use the common (abstract) Backend for everything else.

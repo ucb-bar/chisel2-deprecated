@@ -30,18 +30,26 @@
 
 package Chisel
 
+/** Fill fans out a Node to multiple copies */
 object Fill {
+  /** Fan out mod n times */
   def apply(n: Int, mod: Bool): UInt = n match {
     case 0 => UInt(width=0)
     case 1 => mod
     case x if n > 1 => UInt(0,n) - mod
     case _ => throw new IllegalArgumentException(s"n (=$n) must be nonnegative integer.")
   }
+  /** Fan out mod n times */
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
+  /** Fan out mod n times */
   def apply(mod: UInt, n: Int): UInt = apply(n, mod)
 }
 
+/** NodeFill copys an instance of a Node multiple times or fans it out
+  * Any change to a Node such as setting inputs or changing width will is applied to all of them */
 object NodeFill {
+  /** @param n number of times to copy 'mod'
+    * @param mod the node to copy */
   def apply(n: Int, mod: Node): Node = {
     val w = mod.widthW
     n match {
