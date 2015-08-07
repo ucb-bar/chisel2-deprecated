@@ -61,6 +61,7 @@ class DataSuite extends TestSuite {
   //    assertTrue( tested.isInstanceOf[Literal] );
       assertFalse( tested.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testBoolFromDir() {
@@ -70,6 +71,7 @@ class DataSuite extends TestSuite {
       assertTrue( tested.dir == INPUT );
       assertFalse( tested.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testBoolFromDefault() {
@@ -79,6 +81,7 @@ class DataSuite extends TestSuite {
       assertTrue( tested.dir == NODIR );
       assertFalse( tested.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromLit() {
@@ -89,6 +92,7 @@ class DataSuite extends TestSuite {
    //   assertTrue( fixFromLit.isInstanceOf[Literal] );
       assertFalse( fixFromLit.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromLitWithWidth() {
@@ -100,6 +104,7 @@ class DataSuite extends TestSuite {
       /* XXX width was -1 here for some reason */
       assertTrue( fixFromLitWithWidth.getWidth() == 16 );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromWidthDir() {
@@ -110,6 +115,7 @@ class DataSuite extends TestSuite {
       assertTrue( fixFromWidthDir.dir == INPUT );
       assertFalse( fixFromWidthDir.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   // Testing the UInt factory methods
@@ -123,6 +129,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] );
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntValWidth() {
@@ -134,6 +141,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] )
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
@@ -160,6 +168,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] )
       assertFalse( dat.named )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntStringBaseBinary() {
@@ -171,6 +180,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] )
       assertFalse( dat.named )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntStringBaseOctal() {
@@ -182,6 +192,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] )
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
@@ -208,6 +219,7 @@ class DataSuite extends TestSuite {
       // assertTrue( dat.isInstanceOf[Literal] )
       assertFalse( dat.named )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntDirWidth() {
@@ -219,6 +231,7 @@ class DataSuite extends TestSuite {
       assertTrue( dat.dir == INPUT );
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /** The code used to bypass the width initialization resulting

@@ -53,6 +53,7 @@ class FixedSuite extends TestSuite {
       val in = BigInt(r.nextInt(1 << 30))
       assertTrue(toFixed(toDouble(in, 16), 16) == in)
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Extract a bit from a constant at a fixed position */
@@ -63,6 +64,7 @@ class FixedSuite extends TestSuite {
       assertTrue( res.getWidth == 16 )
       assertTrue( res.getFractionalWidth == 8 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testFixedEqual() {
