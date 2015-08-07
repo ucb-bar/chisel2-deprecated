@@ -44,94 +44,136 @@ class BitsSuite extends TestSuite {
 
   /** Extract a bit from a constant at a fixed position */
   @Test def testExtractConstantFixed() {
-    val res = UInt(5)(0)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litValue() == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(5)(0)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   /** Extract from a constant a fixed range of bits */
   @Test def testExtractConstantRangeFixed() {
-    val res = UInt(5)((1, 0))
-    assertTrue( res.getWidth == 2 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(5)((1, 0))
+      assertTrue( res.getWidth == 2 )
+    }
   }
 
   /** Equality */
   @Test def testEql() {
-    val res = Bits(2) === Bits(2)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litValue() == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === Bits(2)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   @Test def testEqlBundle() {
-    val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
+      assertTrue( res.getWidth == 1 )
+    }
   }
 
   @Test def testEqlVec() {
-    val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
+      assertTrue( res.getWidth == 1 )
+    }
   }
 
   @Test def testNeg() {
-    val res = ~Bits(2)
-    assertTrue( res.getWidth == 2 )
-    assertTrue( res.litValue() == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = ~Bits(2)
+      assertTrue( res.getWidth == 2 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   /* AND Reduction */
   @Test def testAndR() {
-    val res = Bits(5).andR
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).andR
+      assertTrue( res.getWidth == 1 )
+    }
   }
 
   /* OR Reduction */
   @Test def testOrR() {
-    val res = Bits(5).orR
-    assertTrue( res.getWidth == 1)
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).orR
+      assertTrue( res.getWidth == 1)
+    }
   }
 
   /* XOR Reduction */
   @Test def testXorR() {
-    val res = Bits(5).xorR
-    assertTrue( res.getWidth == 1)
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).xorR
+      assertTrue( res.getWidth == 1)
+    }
   }
 
   /* inequality */
   @Test def testNeq() {
-    val res = Bits(5) != Bits(4)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litValue() == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) != Bits(4)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   /* bitwise and */
   @Test def testAnd() {
-    val res = Bits(5) & Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litValue() == 4 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) & Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 4 )
+    }
   }
 
   /* bitwise or */
   @Test def testOr() {
-    val res = Bits(5) | Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litValue() == 5 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) | Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 5 )
+    }
   }
 
   /* bitwise xor */
   @Test def testXor() {
-    val res = Bits(5) ^ Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litValue() == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) ^ Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   /* Concatenation */
   @Test def testCat() {
-    try {
-    val res = Bits(5) ## Bits(4)
-    assertTrue( res.getWidth == 6 )
-    assertTrue( res.litValue() == 44 )
-    } catch {
-      case e : Throwable => e.printStackTrace()
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      try {
+        val res = Bits(5) ## Bits(4)
+        assertTrue( res.getWidth == 6 )
+        assertTrue( res.litValue() == 44 )
+      } catch {
+	case e : Throwable => e.printStackTrace()
+      }
     }
   }
 }
