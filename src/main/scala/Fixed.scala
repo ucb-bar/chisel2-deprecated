@@ -33,6 +33,7 @@ package Chisel
 import Node._
 import ChiselError._
 
+/** Factory methods for [[Chisel.Fixed Fixed]] */
 object Fixed {
     /** Convert a double to fixed point with a specified fractional width
       * @param x Double to convert
@@ -99,7 +100,8 @@ object Fixed {
     }
 }
 
-/** A Fixed point data type */
+/** A Fixed point data type
+  * @constructor Use [[Chisel.Fixed$ Fixed]] object to create rather than this class directly */
 class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     type T = Fixed
 

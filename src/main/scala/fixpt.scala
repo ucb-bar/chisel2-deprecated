@@ -145,12 +145,12 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
   def %  (b: UFix): UFix = throw new Exception("% unavailable for UFix")
 }
 
-@deprecated("Use Fixed instead", "3")
+@deprecated("Use [[Chisel.Fixed Fixed]] instead", "3")
 object SFix {
   def apply(exp: Int, width: Int): SFix = new SFix(exp, SInt(width=width))
 }
 
-@deprecated("Use Fixed instead", "3")
+@deprecated("Use [[Chisel.Fixed Fixed]] instead", "3")
 class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt
