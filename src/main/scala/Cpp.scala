@@ -699,7 +699,7 @@ class CppBackend extends Backend {
     harness.write(s"""  api.init_sim_data();\n""");
     if (Driver.isVCD) {
       val basedir = Driver.targetDir
-      harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
+      harness.write(s"""  FILE *f = fopen("${basedir}/${name}.vcd", "w");\n""");
     } else {
       harness.write(s"""  FILE *f = NULL;\n""");
     }
