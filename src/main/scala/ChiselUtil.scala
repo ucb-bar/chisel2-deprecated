@@ -29,9 +29,7 @@
 */
 
 package Chisel
-import Node._
-import scala.math._
-import Literal._
+import scala.math.{ceil, floor, log}
 
 object log2Up
 {
@@ -274,7 +272,7 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   val io = new ArbiterIO(gen, n)
   val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
   val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
-  val chosen = UInt(width = log2Up(n))
+  val chosen = Wire(UInt(width = log2Up(n)))
 
   for ((g, i) <- grant.zipWithIndex)
     io.in(i).ready := Mux(locked, lockIdx === UInt(i), g) && io.out.ready
@@ -386,7 +384,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Bool = null) extends Module(_reset=_reset)
+class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -582,26 +580,17 @@ object PriorityEncoderOH
   */
 object Wire
 {
-  def apply[T <: Data](t: T = null, init: T = null): T = {
-    val mType = if (t == null) init else t
-    val res = if(mType == null) {
-      ChiselError.error("cannot infer type of Init.")
-      UInt().asInstanceOf[T]
-    } else {
-      if (t != null && !t.isTypeOnly) {
-        ChiselError.error("Wire() must not wrap a node with data %s".format(t))
-      }
-      if (init != null) {
-        val x = mType.cloneType
-        // Should this be part of 'cloneType'
-        // x.component = mType.component
-        x := init
-        x
-      } else {
-        t.cloneType
-      }
+  def apply[T <: Data](t: Option[T] = None, init: Option[T] = None): T = {
+    t match { 
+      case Some(p) if !p.isTypeOnly =>
+        ChiselError.error("Wire() must not wrap a node with data %s".format(p))
+      case _ =>
     }
+    val res = init match { case Some(p) => val x = p.cloneType ; x := p ; x case None =>
+                 t match { case Some(p) => p.cloneType case None =>
+                   ChiselError.error("cannot infer type of Init.")
+                   UInt().asInstanceOf[T] } }
     res.setIsWired(true)
-    res
+    res.asDirectionless
   }
 }

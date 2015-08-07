@@ -29,18 +29,14 @@
 */
 
 package Chisel
-import ChiselError._
 import scala.util.Properties
 
-class TestIO(val format: String, val args: Seq[Data] = null)
-
+class TestIO(val format: String, val args: Seq[Data] = Seq())
 object Scanner {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
+  def apply (format: String, args: Data*): TestIO = new TestIO(format, args.toList)
 }
 object Printer {
-  def apply (format: String, args: Data*): TestIO =
-    new TestIO(format, args.toList);
+  def apply (format: String, args: Data*): TestIO = new TestIO(format, args.toList)
 }
 
 /**
@@ -84,7 +80,7 @@ class ChiselException(message: String, cause: Throwable) extends Exception(messa
 object throwException {
   def apply(s: String, t: Throwable = null) = {
     val xcpt = new ChiselException(s, t)
-    findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
+    ChiselError.findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
     // Record this as an error (for tests and error reporting).
     ChiselError.error(s)
     throw xcpt
@@ -124,10 +120,11 @@ trait proc extends Node {
     traverse(inputs(0))
   }
 
-  protected[Chisel] def next: Node = {
+  protected[Chisel] def nextOpt: Option[Node] = {
     val node = getNode
-    if (node.inputs.isEmpty) null else node.inputs(0)
+    if (node.inputs.isEmpty) None else Some(node.inputs(0))
   }
+  protected[Chisel] def next = nextOpt getOrElse throwException("Input is empty")
   protected def default = if (defaultRequired) null else this
   protected def defaultRequired: Boolean = false
   protected def defaultMissing: Boolean =
@@ -158,7 +155,7 @@ abstract class BlackBox extends Module {
 class Delay extends Node {
   override def isReg: Boolean = true
   def assignReset(rst: => Bool): Boolean = false
-  def assignClock(clk: Clock): Unit = { clock = clk }
+  def assignClock(clk: Clock) { clock = Some(clk) }
 }
 
   /** If there is an environment variable `chiselArguments`, construct an `Array[String]`

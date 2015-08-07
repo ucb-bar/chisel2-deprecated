@@ -29,19 +29,6 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.math._
-import java.io.File;
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import scala.sys.process._
-import Node._
-import Reg._
-import ChiselError._
-import Literal._
-import Module._
-import scala.collection.mutable.HashSet
 
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
@@ -64,7 +51,7 @@ class FloBackend extends Backend {
   override def emitRef(node: Node): String = { emitRef(node, node) }
 
   def emitRef(node: Node, cnode: Node): String = {
-    // if (node.litOf == null) {
+    // if (node.litOpt == None) {
       node match {
         case x: Literal =>
           "" + x.value + "'" + cnode.needWidth()
@@ -79,12 +66,12 @@ class FloBackend extends Backend {
           super.emitRef(node)
       }
     // } else {
-    //   "" + node.litOf.value
+    //   "" + node.litValue()
     // }
   }
 
   def emitRef(node: Node, sum_to: Node, other: Node): String = {
-    // if (node.litOf == null) {
+    // if (node.litOpt == None) {
       node match {
         case x: Literal =>
           "" + x.value + "'" + (sum_to.needWidth() - other.needWidth())
@@ -99,7 +86,7 @@ class FloBackend extends Backend {
           super.emitRef(node)
       }
     // } else {
-    //   "" + node.litOf.value
+    //   "" + node.litValue()
     // }
   }
 
@@ -149,11 +136,11 @@ class FloBackend extends Backend {
 
       case x: Bits =>
         if (x.inputs.length == 1) {
-          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + Driver.topComponent)
+          // println("NAME " + x.name + " DIR " + x.dir + " COMP " + x.componentOf + " TOP-COMP " + topMod)
           if (node.isInObject && x.inputs.length == 1) {
-            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == Driver.topComponent)) ||
+            // ((x.consumers.length > 1 && x.consumers.forall(x => x.componentOf == topMod)) ||
             // TODO: SHOULD HANDLE TOP OUTPUTS THAT ARE ALSO FANNED OUT -- NEED EXTRA NODE
-            if (x.dir == OUTPUT && x.component == Driver.topComponent)
+            if (x.dir == OUTPUT && x.component == topMod)
               emitDec(x) + (if (isRnd) "eat" else ("out'" + x.needWidth()))  + " " + emitRef(x.inputs(0)) + "\n"
             else
               emitDec(x) + "mov" + " " + emitRef(x.inputs(0)) + "\n"
@@ -201,27 +188,13 @@ class FloBackend extends Backend {
     }
   }
 
-  def renameNodes(nodes: ArrayBuffer[Node]) {
-    val comp = Driver.topComponent
-    for (m <- nodes) {
-      m match {
-        case _: Literal =>
-        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
-          // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.component != comp)
-            m.name = m.component.getPathName(":") + "::" + m.name
-        case _ =>
-      }
-    }
-  }
-
   override def elaborate(c: Module): Unit = {
     super.elaborate(c)
 
     flattenAll
     ChiselError.checkpoint()
 
-    renameNodes(Driver.orderedNodes)
+    renameNodes(Driver.orderedNodes, ":")
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = findGraphDims
       // ChiselError.info("NUM " + numNodes + " MAX-WIDTH " + maxWidth + " MAX-DEPTH " + maxDepth);
@@ -234,28 +207,21 @@ class FloBackend extends Backend {
     out.close();
   }
 
-  override def compile(c: Module, flagsIn: String) {
-    val flags = if (flagsIn == null) "-O2" else flagsIn
-
-    val chiselENV = java.lang.System.getenv("CHISEL")
+  override def compile(c: Module, flagsIn: Option[String]) {
+    val flags = flagsIn getOrElse "-O2" 
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
-    def run(cmd: String) {
-      val bashCmd = Seq("bash", "-c", cmd)
-      val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
-    }
     def build(name: String) {
-      val mweCmd = ArrayBuffer("flo-mwe", "--width", "32", "--depth", "64", "--input", dir + name + ".flo", "--output", dir + name + ".mwe.flo")
+      val mweCmd = List("flo-mwe", "--width", "32", "--depth", "64", "--input", dir + name + ".flo", "--output", dir + name + ".mwe.flo")
       println("EXPANDING WITH " + mweCmd)
       run(mweCmd.mkString(" "))
-      val cmd = ArrayBuffer(floDir + "lay", "-is-console")
-      cmd ++= ArrayBuffer(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString())
-      cmd ++= ArrayBuffer("<", dir + name + ".mwe.flo", "|")
-      cmd ++= ArrayBuffer(floDir + "fix-sched", ">", dir + name + ".hex")
+      val cmd = List(floDir + "lay", "-is-console") ++
+        List(":dims", DreamerConfiguration.numCols.toString() + "," + DreamerConfiguration.numRows.toString()) ++
+        List("<", dir + name + ".mwe.flo", "|") ++
+        List(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")
       println("BUILDING " + cmdString)
-      run(cmdString)
+      if (!run(cmdString)) throw new Exception("failed to build flo")
     }
     build(c.name)
   }

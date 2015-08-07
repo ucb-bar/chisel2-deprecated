@@ -30,12 +30,8 @@
 
 package Chisel
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
-import scala.io.Source._
-//import java.util._
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import java.io._
-import java.lang.String.format
 
 object SCWrapper {
   type ReplacementMap = HashMap[String, String]
@@ -169,7 +165,15 @@ object SCWrapper {
         init += "%s %s;\n    ".format(ctype, data)
         init += "int %s = 0;\n    ".format(filled)
         fill += "if(!%s){%s = %s->nb_read(%s);}\n      "format(filled, filled, in, data)
-        fill += "c->%s = %s;\n      "format(in_data, data)
+        // Is this a structured data-type?
+        if (ctype == in_data) {
+          // Unpack and distribute the inputs.
+          for((name, bits) <- c.structs(ctype).fields) {
+            fill += "c->%s = %s.%s;\n      "format(name, data, name)
+          }
+        } else {
+          fill += "c->%s = %s;\n      "format(in_data, data)
+        }
         fill += "c->%s = LIT<1>(%s);\n      "format(valid, filled)
         check += "if(c->%s.values[0]) %s = 0;\n      "format(ready, filled)
       }
@@ -190,17 +194,37 @@ object SCWrapper {
       var check = ""
       var valid_output = "";
       for(i <- 0 until fifos.size) {
+        val ctype = fifos(i).ctype
         val valid = fifos(i).valid
         val data = fifos(i).data
         val ready = fifos(i).ready
         val out = fifos(i).name
         check += "c->%s = LIT<1>(%s->num_free() > 0);\n      "format(ready, out)
-        valid_output += "if(c->%s.values[0]) %s->nb_write(c->%s);\n    "format(valid, out, data)
+        // Is this a structured data-type?
+        if (ctype == data) {
+          // Pack and distribute the inputs.
+          val indent = "      "
+          valid_output += "if(c->%s.values[0]) {\n%s"format(valid, indent)
+          valid_output += "  %s dato;\n%s".format(ctype, indent)
+          for((name, bits) <- c.structs(ctype).fields) {
+            valid_output += "  dato.%s = c->%s;\n%s"format(name, name, indent)
+          }
+          valid_output += "  %s->nb_write(dato);\n%s}\n    "format(out, indent)
+        } else {
+          valid_output += "if(c->%s.values[0]) %s->nb_write(c->%s);\n    "format(valid, out, data)
+        }
       }
       replacements += (("check_output", check))
       replacements += (("valid_output", valid_output))
     }
 
+    // If we have structured FIFO elements, we need to generate the struct definitions
+    //  and the ostream "<<" definition to keep SystemC happy.
+    val ostream_lsh = ArrayBuffer[String]()
+    for((name, struct) <- c.structs) {
+      ostream_lsh += struct.toString + "inline ostream& operator << (ostream& os, const %s& arg){  return os; }\n".format(name)
+    }
+    replacements += (("ostream_lsh", ostream_lsh.mkString("\n")))
     replacements
   }
 
@@ -307,6 +331,7 @@ class ComponentDef(a_type: String, a_name: String) {
   val ctype: String = a_type
   val name: String = a_name
   val entries = ArrayBuffer[CEntry]()
+  val structs = scala.collection.mutable.LinkedHashMap[String, CStruct]()
 
   override def toString(): String = {
     var accum: String = ":["
@@ -316,4 +341,13 @@ class ComponentDef(a_type: String, a_name: String) {
     accum += "]"
     "Component " + ctype + " " + name + accum
   }
+}
+
+case class CStruct(val name: String, val fields: Array[(String, Bits)]) {
+   override def toString(): String = {
+     "struct " + name + 
+     " {\n" +
+     fields.map { case (name, bits) => "  dat_t<" + bits.width + "> " + name + ";" }.mkString("\n") +
+     "\n};\n"
+   }
 }

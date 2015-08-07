@@ -34,10 +34,9 @@
 */
 package Chisel.AdvTester // May eventually add this to the base Chisel package
 import Chisel._
-import scala.reflect.ClassTag
 import scala.collection.mutable.ArrayBuffer
 
-class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Tester[T](dut, isTrace) {
   val defaultMaxCycles = 1024
   var cycles = 0
   var pass = true
@@ -52,6 +51,9 @@ class AdvTester[+T <: Module](val dut: T) extends Tester[T](dut, false) {
   // This section of code lets testers easily emulate have registers right before dut inputs
   //   This testing style conforms with the general ASPIRE testbench style
   // Also, to ensure difference enforced, poke 'deprecated' and replaced with wire_poke
+  def wire_poke(port: Bits,      target: Boolean)       = { super.poke(port, int(target)) }
+  def wire_poke(port: Bits,      target: Int)           = { super.poke(port, int(target)) }
+  def wire_poke(port: Bits,      target: Long)          = { super.poke(port, int(target)) }
   def wire_poke(port: Bits,      target: BigInt)        = { super.poke(port, target) }
   def wire_poke(port: Aggregate, target: Array[BigInt]) = { super.poke(port, target) }
 

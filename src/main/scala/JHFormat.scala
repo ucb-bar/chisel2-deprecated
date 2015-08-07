@@ -29,10 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
-import scala.io.Source
-import java.io._
 
 object JHFormat {
   type Space = ArrayBuffer[(String,Param[Any],Int)]

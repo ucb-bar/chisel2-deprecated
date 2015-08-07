@@ -29,13 +29,14 @@
 */
 
 package Chisel
-import Node._
-import Literal._
-import scala.collection.mutable.ArrayBuffer
 
 object ListLookup {
-  def apply[T <: Data](addr: UInt, default: List[T], mapping: Array[(UInt, List[T])]): List[T] = {
-    val map = mapping.map(m => (addr === m._1, m._2))
+  def apply[U, T <: Data](addr: UInt, default: List[T], mapping: Array[(U, List[T])]): List[T] = {
+    val map = mapping.map {
+      case (x: BitPat, y) => (addr === x, y)
+      case (x: UInt,   y) => (addr === x, y)
+      case _ => throwException("Not allowed type for mapping") 
+    }
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))
     }
@@ -43,6 +44,6 @@ object ListLookup {
 }
 
 object Lookup {
-  def apply[T <: Bits](addr: UInt, default: T, mapping: Seq[(UInt, T)]): T =
+  def apply[U, T <: Bits](addr: UInt, default: T, mapping: Seq[(U, T)]): T =
     ListLookup(addr, List(default), mapping.map(m => (m._1, List(m._2))).toArray).head
 }

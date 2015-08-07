@@ -29,22 +29,8 @@
 */
 
 package Chisel
-import scala.collection.mutable.ArrayBuffer
-import scala.math._
-import java.io.InputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import scala.sys.process._
-import sys.process.stringSeqToProcess
-import Node._
-import Reg._
-import ChiselError._
-import Literal._
-import scala.collection.mutable.HashSet
-import scala.collection.mutable.HashMap
-import PartitionIslands._
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap}
+import java.io.{BufferedReader, InputStreamReader}
 
 object CString {
   def apply(s: String): String = {
@@ -63,18 +49,16 @@ object CString {
 }
 
 class CppBackend extends Backend {
+  import PartitionIslands._
   val keywords = Set[String]()
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
   protected[this] val onceOnlyFiles = HashSet[String]()
-  protected[this] var cloneFile: String = ""
   protected[this] var maxFiles: Int = 0
   protected[this] val compileInitializationUnoptimized = Driver.compileInitializationUnoptimized
   // If we're dealing with multiple files for the purpose of separate
   //   optimization levels indicate we expect to compile multiple files.
   protected[this] val compileMultipleCppFiles = Driver.compileInitializationUnoptimized
-  // Compile the clone method at -O0
-  protected[this] val cloneCompiledO0 = true
   // Define shadow registers in the circuit object, instead of local registers in the clock hi methods.
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   protected[this] val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
@@ -150,7 +134,8 @@ class CppBackend extends Backend {
       case _ => wordMangle(x, w.toString)
     }
 
-  protected[this] def isLit(node: Node): Boolean = node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
+  protected[this] def isLit(node: Node): Boolean = 
+    node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
 
   def emitWordRef(node: Node, w: Int): String = {
     node match {
@@ -166,45 +151,35 @@ class CppBackend extends Backend {
   // Returns a list of tuples (type, name) of variables needed by a node
   protected[this] def nodeVars(node: Node): List[(String, String)] = {
     node match {
-      case x: Binding =>
-        List()
-      case l: Literal =>
-        if (isInObject(l) && words(l) > 1) {
-          // Are we maintaining a constant pool?
-          if (coalesceConstants) {
-            // Is this the node that actually defines the constant?
-            // If so, output the definition (we must do this only once).
-            if (constantPool.contains(l.name) && constantPool(l.name) == l) {
-              List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
-            } else {
-              List()
-            }
-          } else {
+      case x: Binding => List()
+      case l: Literal if isInObject(l) && words(l) > 1 =>
+        // Are we maintaining a constant pool?
+        if (coalesceConstants) {
+          // Is this the node that actually defines the constant?
+          // If so, output the definition (we must do this only once).
+          if (constantPool.contains(l.name) && constantPool(l.name) == l) {
             List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
+          } else {
+            List()
           }
         } else {
-          List()
+          List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
         }
-      case x: Reg =>
-        List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
-          if (!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) {
-            // Add an entry for the shadow register in the main object.
-            if (shadowRegisterInObject) {
-              List((s" dat_t<${node.needWidth()}>", emitRef(node) + s"__shadow"))
-            } else {
-              Nil
-            }
-          } else {
-            Nil
-          }
+      case l: Literal => List()
+      case x: Reg => List((s"dat_t<${node.needWidth()}>", emitRef(node))) ++ {
+        if ((!allocateOnlyNeededShadowRegisters || needShadow.contains(node)) && shadowRegisterInObject) {
+          // Add an entry for the shadow register in the main object.
+          List((s" dat_t<${node.needWidth()}>", emitRef(node) + s"__shadow"))
+        } else {
+          Nil
         }
+      }
       case m: Mem[_] =>
         List((s"mem_t<${m.needWidth()},${m.n}>", emitRef(m)))
       case r: ROMData =>
         List((s"mem_t<${r.needWidth()},${r.n}>", emitRef(r)))
       case c: Clock =>
-        List(("int", emitRef(node)),
-             ("int", emitRef(node) + "_cnt"))
+        List(("clk_t", emitRef(c)))
       case _ =>
         List((s"dat_t<${node.needWidth()}>", emitRef(node)))
     }
@@ -281,7 +256,7 @@ class CppBackend extends Backend {
           (if (o.op == "^") {
             val res = ArrayBuffer[String]()
             res += "val_t __x = " + (0 until words(o.inputs(0))).map(emitWordRef(o.inputs(0), _)).reduceLeft(_ + " ^ " + _)
-            for (i <- log2Up(min(bpw, o.inputs(0).needWidth()))-1 to 0 by -1)
+            for (i <- log2Up(scala.math.min(bpw, o.inputs(0).needWidth()))-1 to 0 by -1)
               res += "__x = (__x >> " + (1L << i) + ") ^ __x"
             res += emitLoWordRef(o) + " = __x & 1"
             block(res)
@@ -537,19 +512,14 @@ class CppBackend extends Backend {
           }
         })
 
-      case x: Clock =>
-        ""
+      case x: Clock => ""
 
-      case x: Bits =>
-        if (x.isInObject && x.inputs.length == 1) {
-          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = " + emitWordRef(x.inputs(0), i)))
-        } else if (x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT)) {
-          emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
-            (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
-        } else {
-          ""
-        }
+      case x: Bits if x.isInObject && x.inputs.length == 1 => 
+        emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
+          + " = " + emitWordRef(x.inputs(0), i)))
+      case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
+        emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
+          (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
 
       case m: MemRead =>
         emitTmpDec(m) + block((0 until words(m)).map(i => emitWordRef(m, i)
@@ -576,17 +546,9 @@ class CppBackend extends Backend {
           + ");\n"
           + "#endif\n")
 
-      case l: Literal =>
+      case l: Literal if !l.isInObject && words(l) > 1 =>
         // Have we already allocated this literal in the main class definition?
-        if (!l.isInObject) {
-          if (words(l) == 1) {
-            ""
-          } else {
-            s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
-          }
-        } else {
-          ""
-        }
+        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
 
       case _ =>
         ""
@@ -601,7 +563,7 @@ class CppBackend extends Backend {
         // shadow registers, assume we need the shadow register copy.
         // Otherwise, if we're allocating only needed shadow registers and this register
         // needs a shadow, now is the time to use that shadow.
-	      val useShadow = if (allocateOnlyNeededShadowRegisters) {
+	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
           next.isReg
@@ -627,12 +589,16 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock =>
-        if (x.srcClock != null) {
-          "  " + emitRef(node) + " = " + emitRef(x.srcClock) + x.initStr +
-          "  " + emitRef(node) + "_cnt = " + emitRef(node) + ";\n"
-        } else
-          ""
+      case x: Clock => List(x.srcClock match {
+        case None => 
+          "  " + emitRef(node) + ".len = %d;\n".format(x.period.round)
+        case Some(src) => 
+          val initStr = emitRef(src) + ".len" + (if (src.period > x.period) 
+            " / " + (src.period / x.period).round else 
+            " * " + (x.period / src.period).round)
+          "  " + emitRef(node) + ".len = " + initStr + ";\n"}, 
+          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ".len;\n",
+          "  " + emitRef(node) + ".values[0] = 0;\n") mkString ""
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -652,11 +618,9 @@ class CppBackend extends Backend {
         }
         res.toString
 
-      case u: Bits =>
-        if (u.driveRand && u.isInObject)
+      case u: Bits if u.driveRand && u.isInObject =>
           s"   ${emitRef(node)}.randomize(&__rand_seed);\n"
-        else
-          ""
+
       case _ =>
         ""
     }
@@ -720,75 +684,45 @@ class CppBackend extends Backend {
       harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
       var i = 0;
       for (clock <- Driver.clocks) {
-        if (clock.srcClock == null) {
-          harness.write("  " + emitRef(clock) + " = periods[" + i + "];\n")
-          harness.write("  " + emitRef(clock) + "_cnt = periods[" + i + "];\n")
+        if (clock.srcClock == None) {
+          harness.write("  " + emitRef(clock) + ".len = periods[" + i + "];\n")
+          harness.write("  " + emitRef(clock) + ".cnt = periods[" + i + "];\n")
           i += 1;
         }
       }
       harness.write("}\n\n");
     }
     harness.write(s"""int main (int argc, char* argv[]) {\n""");
-    harness.write(s"""  ${name}_t* module = new ${name}_t();\n""");
-    harness.write(s"""  module->init();\n""");
-    harness.write(s"""  ${name}_api_t* api = new ${name}_api_t();\n""");
-    harness.write(s"""  api->init(module);\n""");
+    harness.write(s"""  ${name}_t module;\n""");
+    harness.write(s"""  ${name}_api_t api(&module);\n""");
+    harness.write(s"""  module.init();\n""");
+    harness.write(s"""  api.init_sim_data();\n""");
     if (Driver.isVCD) {
-      val basedir = ensureDir(Driver.targetDir)
+      val basedir = Driver.targetDir
       harness.write(s"""  FILE *f = fopen("${basedir}${name}.vcd", "w");\n""");
     } else {
       harness.write(s"""  FILE *f = NULL;\n""");
     }
-    if (Driver.dumpTestInput) {
-      harness.write(s"""  FILE *tee = fopen("${name}.stdin", "w");\n""");
-    } else {
-      harness.write(s"""  FILE *tee = NULL;""");
-    }
-    harness.write(s"""  module->set_dumpfile(f);\n""");
-    harness.write(s"""  api->set_teefile(tee);\n""");
-    harness.write(s"""  api->read_eval_print_loop();\n""");
+    harness.write(s"""  module.set_dumpfile(f);\n""");
+    harness.write(s"""  while(!api.exit()) api.tick();\n""");
     harness.write(s"""  if (f) fclose(f);\n""");
-    harness.write(s"""  if (tee) fclose(tee);\n""");
     harness.write(s"""}\n""");
     harness.close();
   }
 
-  override def compile(c: Module, flagsIn: String) {
-    val CXXFLAGS = scala.util.Properties.envOrElse("CXXFLAGS", "" )
-    val LDFLAGS = scala.util.Properties.envOrElse("LDFLAGS", "")
-    val chiselENV = java.lang.System.getenv("CHISEL")
-
+  override def compile(c: Module, flagsIn: Option[String]) {
     val c11 = if (hasPrintfs) " -std=c++11 " else ""
-    val cxxFlags = (if (flagsIn == null) CXXFLAGS else flagsIn) + c11
-    val cppFlags = scala.util.Properties.envOrElse("CPPFLAGS", "") + " -I../ -I" + chiselENV + "/csrc/"
-    val allFlags = cppFlags + " " + cxxFlags
+    val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
+    val cppFlags = CPPFLAGS + " -I../ -I" + chiselENV + "/csrc/"
+    val allFlags = List(cppFlags, cxxFlags).mkString(" ")
     val dir = Driver.targetDir + "/"
-    val CXX = scala.util.Properties.envOrElse("CXX", "g++" )
     val parallelMakeJobs = Driver.parallelMakeJobs
-
-    def run(cmd: String) {
-      val bashCmd = Seq("bash", "-c", cmd)
-      val c = bashCmd.!
-      ChiselError.info(cmd + " RET " + c)
-    }
-    def linkOne(name: String) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + dir + name + ".o " + dir + name + "-emulator.o"
-      run(ac)
-    }
-    def linkMany(name: String, objects: Seq[String]) {
-      val ac = CXX + " " + LDFLAGS + " -o " + dir + name + " " + objects.map(dir + _ + ".o ").mkString(" ") + dir + name + "-emulator.o"
-      run(ac)
-    }
-    def cc(name: String, flags: String = allFlags) {
-      val cmd = CXX + " -c -o " + dir + name + ".o " + flags + " " + dir + name + ".cpp"
-      run(cmd)
-    }
 
     def make(args: String) {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
       val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
-      run(cmd)
+      if (!run(cmd)) throw new Exception("make failed...")
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {
@@ -818,9 +752,6 @@ class CppBackend extends Backend {
     }
 
     // Compile all the unoptimized files at a (possibly) lower level of optimization.
-    if (cloneCompiledO0) {
-      onceOnlyFiles += cloneFile
-    }
     // Set the default optimization levels.
     var optim0 = "-O0"
     var optim1 = "-O1"
@@ -873,15 +804,15 @@ class CppBackend extends Backend {
         make("-C " + Driver.targetDir + " " + nJobs)
       } else {
         // No make. Compile everything discretely.
-        cc(n + "-emulator")
+        cc(dir, n + "-emulator", allFlags)
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
           "no unoptmized files to compile for '--compileMultipleCppFiles'")
         // Compile the O0 files.
-        onceOnlyFiles.map(cc(_, allFlags + " " + optim0))
+        onceOnlyFiles.map(cc(dir, _, allFlags + " " + optim0))
 
         // Compile the remaining (O1) files.
-        unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(cc(_, allFlags + " " + optim1))
+        unoptimizedFiles.filter( ! onceOnlyFiles.contains(_) ).map(cc(dir, _, allFlags + " " + optim1))
         val objects: ArrayBuffer[String] = new ArrayBuffer(maxFiles)
         // Compile the remainder at the specified optimization level.
         for (f <- 0 until maxFiles) {
@@ -889,99 +820,19 @@ class CppBackend extends Backend {
           // If we've already compiled this file, don't do it again,
           // but do add it to the list of objects to be linked.
           if (!unoptimizedFiles.contains(basename)) {
-            cc(basename, allFlags + " " + optim2)
+            cc(dir, basename, allFlags + " " + optim2)
           }
-          objects += basename
+          objects += basename + ".o"
         }
-        linkMany(n, objects)
+        objects += (n + "-emulator.o")
+        link(dir, n, objects)
       }
     } else {
-      cc(n + "-emulator")
-      cc(n)
-      linkOne(n)
+      cc(dir, n + "-emulator", allFlags)
+      cc(dir, n, allFlags)
+      link(dir, n, List(n, n + "-emulator") map (_ + ".o"))
     }
   }
-
-  def emitDefLos(c: Module): String = {
-    var res = "";
-    for ((n, w) <- c.wires) {
-      w match {
-        case io: Bits  =>
-          if (io.dir == INPUT) {
-            res += "  " + emitRef(c) + "->" + n + " = " + emitRef(io.inputs(0)) + ";\n";
-          }
-      };
-    }
-    res += emitRef(c) + "->clock_lo(reset);\n";
-    for ((n, w) <- c.wires) {
-      w match {
-        case io: Bits =>
-          if (io.dir == OUTPUT) {
-            res += "  " + emitRef(io.consumers.head) + " = " + emitRef(c) + "->" + n + ";\n";
-          }
-      };
-    }
-    res
-  }
-
-  def emitDefHis(c: Module): String = {
-    var res = emitRef(c) + "->clock_hi(reset);\n";
-    res
-  }
-
-  /** Ensures each node such that it has a unique name across the whole
-    hierarchy by prefixing its name by a component path (except for "reset"
-    and all nodes in *c*). */
-  def renameNodes(nodes: ArrayBuffer[Node]) {
-    val comp = Driver.topComponent
-    for (m <- nodes) {
-      m match {
-        case _: Literal =>
-        case _ if m.named && (m != comp.defaultResetPin) && m.component != null =>
-          // only modify name if it is not the reset signal or not in top component
-          if (m.name != "reset" || m.name != Driver.implicitReset.name || m.component != comp)
-            m.name = m.component.getPathName + "__" + m.name
-        case _ =>
-      }
-    }
-  }
-
-  /**
-   * Takes a list of nodes and returns a list of tuples with the names attached.
-   * Used to preserve original node names before the rename process.
-   */
-  def generateNodeMapping = {
-    val mappings = new ArrayBuffer[(String, Node)]
-    for (m <- Driver.orderedNodes) {
-      if (m.chiselName != "") {
-        val mapping = (m.chiselName, m)
-        mappings += mapping
-      }
-    }
-    mappings
-  }
-
-  def emitMapping(mapping: Tuple2[String, Node]): String = {
-    val (name, node) = mapping
-    node match {
-      case x: Binding =>
-        ""
-      case x: Literal =>
-        ""
-      case x: Reg =>
-        s"""  dat_table["${name}"] = new dat_api<${node.needWidth()}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-      case m: Mem[_] =>
-        s"""  mem_table["${name}"] = new mem_api<${m.needWidth()}, ${m.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-      case r: ROMData =>
-        s"""  mem_table["${name}"] = new mem_api<${r.needWidth()}, ${r.n}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-      case c: Clock =>
-        s"""  dat_table["${name}"] = new dat_api<${node.needWidth()}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-      case _ =>
-        s"""  dat_table["${name}"] = new dat_api<${node.needWidth()}>(&mod_typed->${emitRef(node)}, "${name}", "");\n"""
-    }
-  }
-
-  def backendElaborate(c: Module) = super.elaborate(c)
 
   override def elaborate(c: Module): Unit = {
     val minimumLinesPerFile = Driver.minimumLinesPerFile
@@ -1061,15 +912,14 @@ class CppBackend extends Backend {
       }
 
       def addString(s: String) {
-        if (s == "") {
-          return
+        if (s != "") {
+          val lines = s.count(_ == '\n')
+          if (maxLines > 0 && lines + bodyLines > maxLines) {
+            newBody()
+          }
+          body.append(s)
+          bodyLines += lines
         }
-        val lines = s.count(_ == '\n')
-        if (maxLines > 0 && lines + bodyLines > maxLines) {
-          newBody()
-        }
-        body.append(s)
-        bodyLines += lines
       }
       def genCalls() {
         var offset = 0
@@ -1187,20 +1037,20 @@ class CppBackend extends Backend {
     }
 
     // Generate header file
-    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nSetCircuitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nInitMappingTableMethods: Int) {
+    def genHeader(vcd: Backend, islands: Array[Island], nInitMethods: Int, nDumpInitMethods: Int, nDumpMethods: Int, nSimMethods: Int) {
       val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-      val out_h = createOutputFile(n + ".h");
-      out_h.write("#ifndef __" + c.name + "__\n");
-      out_h.write("#define __" + c.name + "__\n\n");
-      out_h.write("#include \"emulator.h\"\n\n");
+      val out_h = createOutputFile(n + ".h")
+      out_h.write("#ifndef __" + c.name + "__\n")
+      out_h.write("#define __" + c.name + "__\n\n")
+      out_h.write("#include \"emulator.h\"\n\n")
 
       // Generate module headers
-      out_h.write("class " + c.name + "_t : public mod_t {\n");
-      out_h.write(" private:\n");
-      out_h.write("  val_t __rand_seed;\n");
-      out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n");
-      out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n");
-      out_h.write(" public:\n");
+      out_h.write("class " + c.name + "_t : public mod_t {\n")
+      out_h.write(" private:\n")
+      out_h.write("  val_t __rand_seed;\n")
+      out_h.write("  void __srand(val_t seed) { __rand_seed = seed; }\n")
+      out_h.write("  val_t __rand_val() { return ::__rand_val(&__rand_seed); }\n")
+      out_h.write(" public:\n")
 
       def headerOrderFunc(a: Node, b: Node) = {
         // pack smaller objects at start of header for better locality
@@ -1219,13 +1069,13 @@ class CppBackend extends Backend {
 
       // If we're generating multiple init methods, wrap them in private/public.
       if (nInitMethods > 1) {
-        out_h.write(" private:\n");
+        out_h.write(" private:\n")
         for (i <- 0 until nInitMethods - 1) {
-          out_h.write("  void init_" + i + " ( );\n");
+          out_h.write("  void init_" + i + " ( );\n")
         }
-        out_h.write(" public:\n");
+        out_h.write(" public:\n")
       }
-      out_h.write("  void init ( val_t rand_init = 0 );\n");
+      out_h.write("  void init ( val_t rand_init = 0 );\n")
 
       // Do we have already generated clock prototypes?
       if (clockPrototypes.length > 0) {
@@ -1233,10 +1083,10 @@ class CppBackend extends Backend {
         for (proto <- clockPrototypes) {
           out_h.write("  " + proto)
         }
-        out_h.write(" public:\n");
+        out_h.write(" public:\n")
       }
 
-      for ( clock <- Driver.clocks) {
+      for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
         out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
         out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
@@ -1246,58 +1096,49 @@ class CppBackend extends Backend {
         out_h.write("  void setClocks ( std::vector< int >& periods );\n")
       }
 
-      out_h.write("  mod_t* clone();\n");
-
-      // If we're generating multiple set_circuit methods, wrap them in private/public.
-      if (nSetCircuitMethods > 1) {
-        out_h.write(" private:\n");
-        for (i <- 0 until nSetCircuitMethods - 1) {
-          out_h.write("  void set_circuit_from_" + i + " ( " + c.name + "_t* mod_typed );\n");
-        }
-        out_h.write(" public:\n");
-      }
-      out_h.write("  bool set_circuit_from(mod_t* src);\n");
-    // For backwards compatibility, output both stream and FILE-based code.
-      out_h.write("  void print ( FILE* f );\n");
-      out_h.write("  void print ( std::ostream& s );\n");
+      // For backwards compatibility, output both stream and FILE-based code.
+      out_h.write("  void print ( FILE* f );\n")
+      out_h.write("  void print ( std::ostream& s );\n")
 
       // If we're generating multiple dump methods, wrap them in private/public.
       if (nDumpMethods > 1) {
-        out_h.write(" private:\n");
+        out_h.write(" private:\n")
         for (i <- 0 until nDumpMethods - 1) {
-          out_h.write("  void dump_" + i + " ( FILE* f );\n");
+          out_h.write("  void dump_" + i + " ( FILE* f );\n")
         }
-        out_h.write(" public:\n");
+        out_h.write(" public:\n")
       }
-      out_h.write("  void dump ( FILE* f, int t );\n");
+      out_h.write("  void dump ( FILE* f, int t );\n")
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
         out_h.write(" private:\n");
         for (i <- 0 until nDumpInitMethods - 1) {
-          out_h.write("  void dump_init_" + i + " ( FILE* f );\n");
+          out_h.write("  void dump_init_" + i + " ( FILE* f );\n")
         }
-        out_h.write(" public:\n");
+        out_h.write(" public:\n")
       }
-      out_h.write("  void dump_init ( FILE* f );\n");
+      out_h.write("  void dump_init ( FILE* f );\n")
 
       // All done with the class definition. Close it off.
-      out_h.write("\n};\n\n");
-      out_h.write(Params.toCxxStringParams);
+      out_h.write("\n};\n\n")
+      out_h.write(Params.toCxxStringParams)
 
-      // Generate API headers
-      out_h.write(s"class ${c.name}_api_t : public mod_api_t {\n");
-      // If we're generating multiple init_mapping_table( methods, wrap them in private/public.
-      if (nInitMappingTableMethods > 1) {
-        out_h.write(" private:\n");
-        for (i <- 0 until nInitMappingTableMethods - 1) {
-          out_h.write("  void init_mapping_table_" + i + " ( " + c.name + "_t* mod_typed );\n");
+      if (Driver.isGenHarness) {
+        out_h.write("#include \"emul_api.h\"\n")
+        out_h.write("class " + c.name + "_api_t : public emul_api_t {\n")
+        out_h.write(" public:\n")
+        out_h.write("  %s_api_t(mod_t* m) : emul_api_t(m) { }\n".format(c.name))
+        if (nSimMethods > 1) {
+          out_h.write(" private:\n")
+          for (i <- 0 until nSimMethods - 1) {
+            out_h.write("  void init_sim_data_" + i + "(" + c.name + "_t* mod );\n")
+          }
+          out_h.write(" public:\n")
         }
-        out_h.write(" public:\n");
+        out_h.write("  void init_sim_data();\n")
+        out_h.write("};")
       }
-
-      out_h.write(s"  void init_mapping_table();\n");
-      out_h.write(s"};\n\n");
 
       out_h.write("\n\n#endif\n");
       out_h.close();
@@ -1356,62 +1197,25 @@ class CppBackend extends Backend {
       }
 
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt < min) min = " + emitRef(clock) +"_cnt;\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) +".cnt;\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  " + emitRef(clock) + "_cnt-=min;\n")
+        writeCppFile("  " + emitRef(clock) + ".cnt-=min;\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
       }
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + "_cnt == 0) " + emitRef(clock) + "_cnt = " +
-                    emitRef(clock) + ";\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) " + emitRef(clock) + ".cnt = " +
+                    emitRef(clock) + ".len;\n")
       }
       writeCppFile("  return min;\n")
       writeCppFile("}\n")
     }
 
-    def genCloneMethod() {
-      writeCppFile(s"mod_t* ${c.name}_t::clone() {\n")
-      writeCppFile(s"  mod_t* cloned = new ${c.name}_t(*this);\n")
-      writeCppFile(s"  return cloned;\n")
-      writeCppFile(s"}\n")
-
-      // Make a special note of the clone file. We may want to compile it -O0.
-      cloneFile = out_cpps.last.name.dropRight(".cpp".length())
-    }
-
-    def genSetCircuitFromMethod(): Int = {
-      val codePrefix = s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(src);\n" +
-                 s"  assert(mod_typed);\n"
-      val codeSuffix = "  return true;\n"
-      val method = CMethod(CTypedName("bool", "set_circuit_from"), Array[CTypedName](CTypedName("mod_t*", "src")))
-      val llm = new LineLimitedMethod(method, codePrefix, codeSuffix, Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
-      for (m <- Driver.orderedNodes) {
-        if(m.name != "reset" && m.name != Driver.implicitReset.name && m.isInObject) {
-	  // Skip the circuit assign if this is a literal and we're
-	  // including literals in the objet.
-	  // The literals are declared as "static const" and will be
-          // initialized elsewhere.
-	  if (!(multiwordLiteralInObject && m.isInstanceOf[Literal])) {
-            llm.addString(emitCircuitAssign("mod_typed->", m))
-          }
-        }
-      }
-      for (clock <- Driver.clocks) {
-        llm.addString(emitCircuitAssign("mod_typed->", clock))
-      }
-      llm.done()
-      val nMethods = llm.bodies.length
-      writeCppFile(llm.getBodies)
-      nMethods
-    }
-
-    // For backwards compatibility, output both stream and FILE-based code.
     def genPrintMethod() {
       writeCppFile("void " + c.name + "_t::print ( FILE* f ) {\n")
       for (cc <- Driver.components; p <- cc.printfs) {
@@ -1459,8 +1263,9 @@ class CppBackend extends Backend {
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
-        val codePrefix = "  if (t == 0) return dump_init(f);\n" +
-                "  fprintf(f, \"#%d\\n\", t);\n"
+        val codePrefix = List(
+          "  if (t == 0) return dump_init(f);\n",
+          "  fprintf(f, \"#%d\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
@@ -1483,27 +1288,47 @@ class CppBackend extends Backend {
       }
     }
 
-    def genInitMappingTableMethod(mappings: ArrayBuffer[Tuple2[String, Node]]): Int = {
-      val method = CMethod(CTypedName("void", "init_mapping_table"), Array[CTypedName](), s"${c.name}_api_t")
-      val codePrefix = s"  dat_table.clear();\n" +
-                 s"  mem_table.clear();\n" +
-                 s"  ${c.name}_t* mod_typed = dynamic_cast<${c.name}_t*>(module);\n" +
-                 s"  assert(mod_typed);\n"
-      val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod_typed")))
-      for (m <- mappings) {
-        if (m._2.name != "reset" && m._2.name != Driver.implicitReset.name && (m._2.isInObject || m._2.isInVCD)) {
-          llm.addString(emitMapping(m))
-        }
+    def genInitSimDataMethod(c: Module) = {
+      val method = CMethod(CTypedName("void", "init_sim_data"), Array[CTypedName](), c.name + "_api_t")
+      val codePrefix = s"  sim_data.inputs.clear();\n" +
+                 s"  sim_data.outputs.clear();\n" +
+                 s"  sim_data.signals.clear();\n" +
+                 s"  ${c.name}_t* mod = dynamic_cast<${c.name}_t*>(module);\n" +
+                 s"  assert(mod);\n"
+      val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName(s"${c.name}_t*", "mod")))
+      val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
+      var id = 0
+      Driver.orderedNodes.map {
+        case m: Mem[_] => 
+          Driver.signalMap(m) = id
+          id += m.n
+        case node if node.prune || node.driveRand =>
+        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => 
+          Driver.signalMap(node) = id
+          id += 1
+        case _ =>
       }
+      llm addString (inputs map (in =>
+        "  sim_data.inputs.push_back(new dat_api<%d>(&mod->%s));\n".format(in.needWidth, emitRef(in))) mkString "")
+      llm addString (outputs map (out =>
+        "  sim_data.outputs.push_back(new dat_api<%d>(&mod->%s));\n".format(out.needWidth, emitRef(out))) mkString "")
+      llm addString (Driver.signalMap flatMap {
+        case (mem: Mem[_], id) => List(
+            "  std::string %s_path = \"%s\";\n".format(emitRef(mem), mem.chiselName),
+            "  for (size_t i = 0 ; i < %d ; i++) {\n".format(mem.n),
+            "    sim_data.signals.push_back(new dat_api<%d>(&mod->%s.contents[i]));\n".format(mem.needWidth, emitRef(mem)),
+            "    sim_data.signal_map[%s_path+\"[\"+itos(i,false)+\"]\"] = %d+i;\n".format(emitRef(mem), id), "  }\n")
+        case (node, id) => List(
+          "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) 
+      } mkString "")
+      llm addString (Driver.clocks map { clk =>
+        "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
+      } mkString "")
+
       llm.done()
       val nMethods = llm.bodies.length
       writeCppFile(llm.getBodies)
-
-      // Add the init_mapping_table file to the list of unoptimized files.
-      if (compileInitializationUnoptimized) {
-        val trimLength = ".cpp".length()
-        unoptimizedFiles += out_cpps.last.name.dropRight(trimLength)
-      }
       nMethods
     }
 
@@ -1517,7 +1342,6 @@ class CppBackend extends Backend {
     flattenAll // created Driver.orderedNodes
     ChiselError.checkpoint()
 
-    val mappings = generateNodeMapping
     renameNodes(Driver.orderedNodes)
     if (Driver.isReportDims) {
       val (numNodes, maxWidth, maxDepth) = findGraphDims
@@ -1535,19 +1359,6 @@ class CppBackend extends Backend {
     }
     val maxIslandId = islands.map(_.islandId).max
     val nodeToIslandArray = generateNodeToIslandArray(islands)
-
-    /** Walk the node structure, eliminating unnecessary data structures.
-      *  
-      */
-    def eliminateAuxilliaryData() {
-      for (n <- Driver.orderedNodes) {
-        if (n.consumers.size > 1) {
-          val consumerHead = n.consumers.head
-          n.consumers.clear
-          n.consumers += consumerHead
-        }
-      }
-    }
 
     class ClockDomains {
       type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
@@ -1594,12 +1405,12 @@ class CppBackend extends Backend {
         }
       }
 
-      def clock(n: Node) = if (n.clock == null) Driver.implicitClock else n.clock
+      def clock(n: Node) = n.clock getOrElse Driver.implicitClock
 
       def populate() {
         var nodeCount = 0
         def isNodeInIsland(node: Node, island: Island): Boolean = {
-          return island == null || nodeToIslandArray(node._id).contains(island)
+          island == null || nodeToIslandArray(node._id).contains(island)
         }
 
         // Return tuple of booleans if we actually added any clock code.
@@ -1754,12 +1565,15 @@ class CppBackend extends Backend {
     }
 
     if (Driver.isGenHarness) {
-      genHarness(c, c.name);
+      genHarness(c, c.name)
+      /* Copy the emulator headers into the targetDirectory. */
+      copyToTarget("sim_api.h")
+      copyToTarget("emul_api.h")
     }
     if (!Params.space.isEmpty) {
-      val out_p = createOutputFile(c.name + ".p");
-      out_p.write(Params.toDotpStringParams);
-      out_p.close();
+      val out_p = createOutputFile(c.name + ".p")
+      out_p.write(Params.toDotpStringParams)
+      out_p.close()
     }
 
     ChiselError.info("populating clock domains")
@@ -1784,16 +1598,7 @@ class CppBackend extends Backend {
     createCppFile()
     genClockMethod()
 
-    // generate clone() method
-    createCppFile()
-    genCloneMethod()
-
-    // generate set_circuit_from method
-    createCppFile()
-    val nSetCircuitFromMethods = genSetCircuitFromMethod()
-
     // generate print(...) method.
-    // This will probably end up in the same file as the above clone code.
     createCppFile()
     genPrintMethod()
 
@@ -1803,7 +1608,7 @@ class CppBackend extends Backend {
     createCppFile()
     val nDumpMethods = genDumpMethod(vcd)
 
-    // If we're compiling initialization methods -O0, add the current files
+    // If we're compiling initialization methods -O0 or -O1, add the current files
     //  to the unoptimized file list.
     //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
     if (compileInitializationUnoptimized) {
@@ -1816,12 +1621,20 @@ class CppBackend extends Backend {
     clkDomains.outputAllClkDomains()
 
     // Generate API methods
-    advanceCppFile()
-    createCppFile()
-    val nInitMappingTableMethods = genInitMappingTableMethod(mappings)
+    val nSimMethods = if (Driver.isGenHarness) {
+      advanceCppFile()
+      createCppFile()
+      // If we're compiling initialization methods -O0, add the current file to the unoptimized file list.
+      //  We strip off the trailing ".cpp" to facilitate creating both ".cpp" and ".o" files.
+      if (compileInitializationUnoptimized) {
+        val trimLength = ".cpp".length()
+        onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
+      }
+      genInitSimDataMethod(c) 
+    } else 0
 
     // Finally, generate the header - once we know how many methods we'll have.
-    genHeader(vcd, islands, nInitMethods, nSetCircuitFromMethods, nDumpInitMethods, nDumpMethods, nInitMappingTableMethods)
+    genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)
 
     maxFiles = out_cpps.length
 
@@ -1829,40 +1642,22 @@ class CppBackend extends Backend {
 
     out_cpps.clear()
 
-    def copyToTarget(filename: String) = {
-      val resourceStream = getClass().getResourceAsStream("/" + filename)
-      if( resourceStream != null ) {
-        val classFile = createOutputFile(filename)
-        while(resourceStream.available > 0) {
-          classFile.write(resourceStream.read())
-        }
-        classFile.close()
-        resourceStream.close()
-      } else {
-        println(s"WARNING: Unable to copy '$filename'" )
-      }
-    }
-    /* Copy the emulator headers into the targetDirectory. */
-    copyToTarget("emulator_mod.h")
-    copyToTarget("emulator_api.h")
     copyToTarget("emulator.h")
   }
 
   // Return true if we want this node to be included in the main object.
   // The Driver (and node itself) may also help determine this.
-  override def isInObject(n: Node): Boolean = {
-    n match {
-      // Should we put multiword literals in the object?
-      case l: Literal if multiwordLiteralInObject && words(n) > 1 => {
-        multiwordLiterals += l
-        true
-      }
-      // Should we put disconnected inputs in the object (we will generated random values for them)
-      case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
-        unconnectedInputs += b
-        true
-      }
-      case _ => false
+  override def isInObject(n: Node): Boolean = n match {
+    // Should we put multiword literals in the object?
+    case l: Literal if multiwordLiteralInObject && words(n) > 1 => {
+      multiwordLiterals += l
+      true
     }
+    // Should we put disconnected inputs in the object (we will generated random values for them)
+    case b: Bits if unconnectedInputsInObject && b.inputs.length == 0 => {
+      unconnectedInputs += b
+      true
+    }
+    case _ => false
   }
 }

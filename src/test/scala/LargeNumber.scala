@@ -30,6 +30,7 @@
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ListBuffer
+import scala.util.Random
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -40,14 +41,13 @@ import Chisel._
   */
 class LargeNumberSuite extends TestSuite {
 
-  val r = scala.util.Random
   val bitWidth = 130
 
-  def getBigRandom(bitWidth : Int) : BigInt = {
+  def getBigRandom(rnd: Random, bitWidth : Int) : BigInt = {
     val noWords = (bitWidth / 64).toInt + 1
-    var myRand = BigInt( r.nextLong )
+    var myRand = BigInt( rnd.nextLong )
     for ( i <- 0 until noWords )
-      myRand = ( myRand << 64 ) | BigInt( r.nextLong )
+      myRand = ( myRand << 64 ) | BigInt( rnd.nextLong )
     val res = myRand & ( ( BigInt(1) << bitWidth ) - 1 )
     res
   }
@@ -76,7 +76,7 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class NotTests(c : Not) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
       val z = ~ x
       poke(c.io.x_s, x)
       poke(c.io.x_u, x)
@@ -94,8 +94,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class AddTests(c : Add) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x + y
       val z_s = toSigned(x, bitWidth) + toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -116,8 +116,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class SubTests(c : Sub) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       println("x = " + x)
       println("y = " + y)
       val z_u = x - y
@@ -142,8 +142,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class MultTests(c : Mult) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x * y
       val z_s = toSigned(x, bitWidth) * toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -164,8 +164,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class DivTests(c : Div) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth/4)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth/4)
       val z_u = x / y
       val z_s = toSigned(x, bitWidth) / toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -186,8 +186,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class LshTests(c : Lsh) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = r.nextInt(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = rnd.nextInt(bitWidth)
       val z_u = x << y
       val z_s = toSigned(x, bitWidth) << y
       poke(c.io.x_s, x)
@@ -208,16 +208,18 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class RshTests(c : Rsh) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = r.nextInt(bitWidth)
-      val z_u = x >> y
-      val z_s = toSigned(x, bitWidth) >> y
-      poke(c.io.x_s, x)
-      poke(c.io.x_u, x)
-      poke(c.io.y_s, BigInt(y))
-      poke(c.io.y_u, BigInt(y))
-      expect(c.io.z_s, z_s)
-      expect(c.io.z_u, z_u)
+      for (i <- 0 to 50) {
+        val x = if (i == 0) BigInt(0) else getBigRandom(rnd, bitWidth)
+        val y = rnd.nextInt(bitWidth)
+        val z_u = x >> y
+        val z_s = toSigned(x, bitWidth) >> y
+        poke(c.io.x_s, x)
+        poke(c.io.x_u, x)
+        poke(c.io.y_s, BigInt(y))
+        poke(c.io.y_u, BigInt(y))
+        expect(c.io.z_s, z_s)
+        expect(c.io.z_u, z_u)
+      }
     }
     launchCppTester((c: Rsh) => new RshTests(c))
   }
@@ -237,8 +239,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class CatTests(c : Cat) extends Tester(c) {
-      val x = getBigRandom(bitWidth/2)
-      val y = getBigRandom(bitWidth/2)
+      val x = getBigRandom(rnd, bitWidth/2)
+      val y = getBigRandom(rnd, bitWidth/2)
       val z = (x << (bitWidth/2)) | y
       poke(c.io.x_s, x)
       poke(c.io.x_u, x)
@@ -258,8 +260,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class XorTests(c : Xor) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z = x ^ y
       poke(c.io.x_s, x)
       poke(c.io.x_u, x)
@@ -279,8 +281,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class AndTests(c : And) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z = x & y
       poke(c.io.x_s, x)
       poke(c.io.x_u, x)
@@ -300,8 +302,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class OrTests(c : Or) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z = x | y
       poke(c.io.x_s, x)
       poke(c.io.x_u, x)
@@ -328,8 +330,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class LtTests(c : Lt) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x < y
       val z_s = toSigned(x, bitWidth) < toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -357,8 +359,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class LtEqTests(c : LtEq) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x <= y
       val z_s = toSigned(x, bitWidth) <= toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -386,8 +388,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class EqTests(c : Eq) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x == x
       val z_s = toSigned(x, bitWidth) == toSigned(y, bitWidth)
       poke(c.io.x_s, x)
@@ -415,8 +417,8 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class NeqTests(c : Neq) extends Tester(c) {
-      val x = getBigRandom(bitWidth)
-      val y = getBigRandom(bitWidth)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = getBigRandom(rnd, bitWidth)
       val z_u = x != x
       val z_s = toSigned(x, bitWidth) != toSigned(y, bitWidth)
       poke(c.io.x_s, x)

@@ -11,6 +11,8 @@ inline ostream& operator << (ostream& os, const dat_t<w>& arg){
   return os;
 }
 
+{!ostream_lsh!}
+
 SC_MODULE({!name!}){
   {!component_type!}* c;
   

@@ -31,7 +31,6 @@
 package Chisel
 
 import scala.util.matching.Regex
-import Version._
 
 object Version {
   val versionRE = """(^\d+){0,1}((\.(\d+)){0,2})$""".r
@@ -59,7 +58,7 @@ object Version {
   */
 class Version(val dottedString: String) extends scala.math.Ordered[Version] {
   // Ensure we have a valid version string.
-  require(versionRE.pattern.matcher(dottedString).matches)
+  require(Version.versionRE.pattern.matcher(dottedString).matches)
   val maxVersion: Boolean = dottedString == ""
 
     def compare(that: Version):Int = {

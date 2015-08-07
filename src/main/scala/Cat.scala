@@ -29,7 +29,6 @@
 */
 
 package Chisel
-import Node._
 
 object Cat {
   def apply[T <: Data](mod: T, mods: T*): UInt = apply(mod :: mods.toList)
@@ -39,7 +38,7 @@ object Cat {
 
 object Concatenate {
   def apply(mod: Node, mods: Node*): Node = apply(mod :: mods.toList)
-  def apply(mods: Seq[Node]): Node = doCat(mods.filter(_ != null))
+  def apply(mods: Seq[Node]): Node = doCat(mods)
   private def doCat(mods: Seq[Node]): Node =
     if (mods.tail.isEmpty) mods.head
     else BinaryOp(doCat(mods.slice(0, mods.length/2)), doCat(mods.slice(mods.length/2, mods.length)), "##")
