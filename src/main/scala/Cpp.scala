@@ -346,11 +346,11 @@ class CppBackend extends Backend {
           if (o.needWidth() <= bpw) {
             "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n" + trunc(o)
           } else {
-            var shb = emitLoWordRef(o.inputs(1))
+            val shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
             res += s"val_t __c = 0"
-            res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
-            res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
+            res += s"val_t __w = ${shb} / ${bpw}"
+            res += s"val_t __s = ${shb} % ${bpw}"
             res += s"val_t __r = ${bpw} - __s"
             for (i <- 0 until words(o)) {
               val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}-__w, 0, ${words(o.inputs(0)) - 1})")
@@ -362,26 +362,37 @@ class CppBackend extends Backend {
           }
         } else if (o.op == ">>" || o.op == "s>>") {
           val arith = o.op == "s>>"
-          val res = ArrayBuffer[String]()
-          /* Use int and assume rsh < 2^32, define amount_shift as the amount to right shift */
-          res += s"unsigned int __amount = ${emitLoWordRef(o.inputs(1))}"
-          /* Define in_words as number of 64 bit words for the input */
-          res += s"unsigned int __in_words = ${((o.inputs(0).needWidth - 1) / bpw) + 1}"
-          /* Define in_width as the bit width of the input */
-          res += s"unsigned int __in_width = ${o.inputs(0).needWidth}"
-          res += s"val_t __d0[${((o.inputs(0).needWidth - 1) / bpw) + 1}]"
-          val srcRef  = s"&${emitLoWordRef(o.inputs(0))}"
-          // Call Rshift
-          if (arith) {
-            res += s"rsha_n(__d0, ${srcRef}, __amount, __in_words, __in_width)"
+          val gotWidth = o.inputs(0).needWidth()
+          // Is this a single word shift?
+          if (gotWidth <= bpw) {
+            if (arith) {
+              s"  ${emitLoWordRef(o)} = sval_t(${emitLoWordRef(o.inputs(0))} << ${bpw - gotWidth}) >> (${bpw - gotWidth} + ${emitLoWordRef(o.inputs(1))});\n" + trunc(o)
+            } else {
+              s"  ${emitLoWordRef(o)} = ${emitLoWordRef(o.inputs(0))} >> ${emitLoWordRef(o.inputs(1))};\n"
+            }
           } else {
-            res += s"rsh_n(__d0, ${srcRef}, __amount, __in_words)"
+            val res = ArrayBuffer[String]()
+            val nWords = ((gotWidth - 1) / bpw) + 1
+            /* Use int and assume rsh < 2^32, define amount_shift as the amount to right shift */
+            res += s"unsigned int __amount = ${emitLoWordRef(o.inputs(1))}"
+            /* Define in_words as number of 64 bit words for the input */
+            res += s"const unsigned int __in_words = ${nWords}"
+            /* Define in_width as the bit width of the input */
+            res += s"int __in_width = ${gotWidth}"
+            res += s"val_t __d0[${nWords}]"
+            val srcRef  = s"&${emitLoWordRef(o.inputs(0))}"
+            // Call Rshift
+            if (arith) {
+              res += s"rsha_n(__d0, ${srcRef}, __amount, __in_words, __in_width)"
+            } else {
+              res += s"rsh_n(__d0, ${srcRef}, __amount, __in_words)"
+            }
+            /* Attach the result from __d0 to o */
+            for ( i <- 0 until words(o) ) {
+              res += s"${emitWordRef(o, i)} = __d0[${i}]"
+            }
+            block(res) + (if (arith) trunc(o) else "")
           }
-          /* Attach the result from __d0 to o */
-          for ( i <- 0 until ((o.needWidth - 1)/bpw) + 1 ) {
-            res += s"${emitWordRef(o, i)} = __d0[${i}]"
-          }
-          block(res) + (if (arith) trunc(o) else "")
         } else if (o.op == "##") {
           val lsh = o.inputs(1).needWidth()
           block((0 until fullWords(o.inputs(1))).map(i => emitWordRef(o, i) + " = " + emitWordRef(o.inputs(1), i)) ++
