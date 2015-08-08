@@ -50,6 +50,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Extract from a constant a fixed range of bits */
@@ -59,6 +60,7 @@ class BitsSuite extends TestSuite {
       val res = UInt(5)((1, 0))
       assertTrue( res.getWidth == 2 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Equality */
@@ -69,6 +71,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testEqlBundle() {
@@ -77,6 +80,7 @@ class BitsSuite extends TestSuite {
       val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
       assertTrue( res.getWidth == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testEqlVec() {
@@ -85,6 +89,7 @@ class BitsSuite extends TestSuite {
       val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
       assertTrue( res.getWidth == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testNeg() {
@@ -94,6 +99,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 2 )
       assertTrue( res.litValue() == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* AND Reduction */
@@ -103,6 +109,7 @@ class BitsSuite extends TestSuite {
       val res = Bits(5).andR
       assertTrue( res.getWidth == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* OR Reduction */
@@ -112,6 +119,7 @@ class BitsSuite extends TestSuite {
       val res = Bits(5).orR
       assertTrue( res.getWidth == 1)
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XOR Reduction */
@@ -121,6 +129,7 @@ class BitsSuite extends TestSuite {
       val res = Bits(5).xorR
       assertTrue( res.getWidth == 1)
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* inequality */
@@ -131,6 +140,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise and */
@@ -141,6 +151,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 3 )
       assertTrue( res.litValue() == 4 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise or */
@@ -151,6 +162,7 @@ class BitsSuite extends TestSuite {
       assertTrue( res.getWidth == 3 )
       assertTrue( res.litValue() == 5 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise xor */
@@ -175,5 +187,6 @@ class BitsSuite extends TestSuite {
 	case e : Throwable => e.printStackTrace()
       }
     }
+    val dummyInst = Module(new Dummy)
   }
 }
