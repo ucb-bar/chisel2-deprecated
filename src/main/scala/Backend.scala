@@ -103,6 +103,19 @@ abstract class Backend extends FileSystemUtilities{
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
 
+  private val uniqueSet = HashSet[String]()
+
+  /** Assert that 'uniqueStr' is unique for this backend */
+  private[Chisel] def assertUnique(uniqueStr : String, msg : String) {
+    // Multiple empty strings are allowed
+    if (uniqueStr != "") {
+      if ( uniqueSet.contains(uniqueStr))
+        ChiselError.warning("[BUG] Internal error: " + msg)
+      else
+        uniqueSet += uniqueStr
+    }
+  }
+
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
     val dotPos = cname.lastIndexOf('.');

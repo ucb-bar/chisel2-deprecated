@@ -1058,12 +1058,19 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
+      // Header declarations should be unique, add a simple check
+      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc)) {
+        assertUnique(emitDec(m), "redeclaration in header for nodes")
         out_h.write(emitDec(m))
-      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+      }
+      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc)){
+        assertUnique(vcd.emitDec(m), "redeclaration in header for vcd")
         out_h.write(vcd.emitDec(m))
-      for (clock <- Driver.clocks)
+      }
+      for (clock <- Driver.clocks) {
+        assertUnique(emitDec(clock), "redeclaration in header for clock")
         out_h.write(emitDec(clock))
+      }
 
       out_h.write("\n");
 
