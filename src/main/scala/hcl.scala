@@ -145,10 +145,6 @@ abstract class BlackBox extends Module {
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;
   }
-
-  def setName(name: String) {
-    moduleName = name;
-  }
 }
 
 
