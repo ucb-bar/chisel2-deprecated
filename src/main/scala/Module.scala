@@ -137,6 +137,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   var parent: Module = null
   val children = ArrayBuffer[Module]()
 
+  /** Set the name of this module to the string 'n' */
+  def setName(n: String) { name = n ; named = true }
+
   private[Chisel] val bindings = ArrayBuffer[Binding]()
   private[Chisel] val printfs = ArrayBuffer[Printf]()
   private[Chisel] val asserts = ArrayBuffer[Assert]()
