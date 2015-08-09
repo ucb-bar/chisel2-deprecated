@@ -5,11 +5,11 @@ module ConnectWireSuite_CrossingBlock_1(
     output[7:0] io_o2
 );
 
-  wire[7:0] T0;
+  wire[7:0] T1;
 
 
-  assign io_o2 = T0;
-  assign T0 = io_o1 + io_i2;
+  assign io_o2 = T1;
+  assign T1 = io_o1 + io_i2;
   assign io_o1 = io_i1;
 endmodule
 
@@ -29,9 +29,9 @@ module ConnectWireSuite_BindingTestInternal_1(
     output[7:0] io_out9
 );
 
-  wire[7:0] T0;
-  wire[7:0] T1;
-  wire[7:0] T2;
+  wire[7:0] T3;
+  wire[7:0] T4;
+  wire[7:0] T5;
   wire[7:0] cb5_io_o1;
   wire[7:0] cb5_io_o2;
   wire[7:0] cb4_io_o1;
@@ -44,14 +44,14 @@ module ConnectWireSuite_BindingTestInternal_1(
   wire[7:0] cb1_io_o2;
 
 
-  assign T0 = io_in1 + 8'h1;
+  assign T3 = io_in1 + 8'h1;
   assign io_out9 = io_out7;
   assign io_out8 = cb5_io_o2;
   assign io_out7 = cb4_io_o2;
   assign io_out6 = cb4_io_o1;
-  assign io_out5 = T1;
-  assign T1 = T2 + io_out4;
-  assign T2 = cb3_io_o1 + cb3_io_o2;
+  assign io_out5 = T4;
+  assign T4 = T5 + io_out4;
+  assign T5 = cb3_io_o1 + cb3_io_o2;
   assign io_out4 = cb2_io_o2;
   assign io_out3 = cb2_io_o1;
   assign io_out2 = io_in2;
@@ -69,7 +69,7 @@ module ConnectWireSuite_BindingTestInternal_1(
        .io_o2( cb4_io_o2 )
   );
   ConnectWireSuite_CrossingBlock_1 cb3(
-       .io_i1( T0 ),
+       .io_i1( T3 ),
        .io_i2( cb1_io_o2 ),
        .io_o1( cb3_io_o1 ),
        .io_o2( cb3_io_o2 )
