@@ -63,7 +63,8 @@ class CppBackend extends Backend {
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   protected[this] val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  protected[this] val multiwordLiteralInObject = shadowRegisterInObject
+  // Actually, in order for emitLoWordRef() to work for multi-word literals, we need to have them in the object and initialized once.
+  protected[this] val multiwordLiteralInObject = shadowRegisterInObject || true
   protected[this] val multiwordLiterals = HashSet[Literal]()
   // Should we put unconnected inputs in the object?
   protected[this] val unconnectedInputsInObject = Driver.partitionIslands
@@ -99,9 +100,18 @@ class CppBackend extends Backend {
   protected[this] val coalesceConstants = multiwordLiteralInObject
   protected[this] val constantPool = HashMap[String, Literal]()
 
-  protected[this] def emitLit(value: BigInt, w: Int = 0): String = {
+  protected[this] def emitValue(value: BigInt, w: Int = 0): String = {
     val hex = value.toString(16)
     "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
+  }
+
+  // Emit the value of a literal, instead of a reference to it.
+  protected[this] def emitLitVal(n: Node, w: Int): String = {
+    assert(isLit(n))
+    val l = n.asInstanceOf[Literal]
+    val lit = l.value
+    val value = if (lit < 0) (BigInt(1) << l.needWidth()) + lit else lit
+    emitValue(value, w)
   }
 
   protected[this] def wordMangle(x: Node, w: String): String = x match {
@@ -123,16 +133,26 @@ class CppBackend extends Backend {
       else s"${emitRef(x)}[${w}]"
   }
 
-  protected[this] def wordMangle(x: Node, w: Int): String =
-    if (w >= words(x)) {
+  protected[this] def wordMangle(x: Node, w: Int): String = {
+    val nWords = words(x)
+    // If we're asking for a word that doesn't exist, return 0.
+    // FIXME: Shouldn't this generate an error?
+    if (w >= nWords) {
       "0L"
     }  else x match {
+      // If this is a single word literal, we just output its value.
       case l: Literal =>
-        val lit = l.value
-        val value = if (lit < 0) (BigInt(1) << x.needWidth()) + lit else lit
-        emitLit(value, w)
-      case _ => wordMangle(x, w.toString)
+        if (nWords == 1) {
+          emitLitVal(l, w)
+        } else {
+          // Otherwise, we'd better have multiwordLiteralInObject so we can return a reference to the specific word.
+          assert(multiwordLiteralInObject)
+          wordMangle(x, w.toString)
+        }
+      case _ => 
+        wordMangle(x, w.toString)
     }
+  }
 
   protected[this] def isLit(node: Node): Boolean = 
     node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
@@ -229,7 +249,7 @@ class CppBackend extends Backend {
   def trunc(x: Node): String = {
     val gotWidth = x.needWidth()
     if (gotWidth % bpw == 0) ""
-    else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitLit((BigInt(1) << (gotWidth%bpw))-1)};\n"
+    else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitValue((BigInt(1) << (gotWidth%bpw))-1)};\n"
   }
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
@@ -1149,7 +1169,7 @@ class CppBackend extends Backend {
       if (multiwordLiteralInObject) {
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
-          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_+", "+_) + "};\n"
         }
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
