@@ -208,18 +208,34 @@ class LargeNumberSuite extends TestSuite {
     }
 
     class RshTests(c : Rsh) extends Tester(c) {
-      for (i <- 0 to 50) {
-        val x = if (i == 0) BigInt(0) else getBigRandom(rnd, bitWidth)
-        val y = rnd.nextInt(bitWidth)
-        val z_u = x >> y
-        val z_s = toSigned(x, bitWidth) >> y
-        poke(c.io.x_s, x)
-        poke(c.io.x_u, x)
-        poke(c.io.y_s, BigInt(y))
-        poke(c.io.y_u, BigInt(y))
-        expect(c.io.z_s, z_s)
-        expect(c.io.z_u, z_u)
+      val x = getBigRandom(rnd, bitWidth)
+      val y = rnd.nextInt(bitWidth)
+      val z_u = x >> y
+      val z_s = toSigned(x, bitWidth) >> y
+      poke(c.io.x_s, x)
+      poke(c.io.x_u, x)
+      poke(c.io.y_s, BigInt(y))
+      poke(c.io.y_u, BigInt(y))
+      expect(c.io.z_s, z_s)
+      expect(c.io.z_u, z_u)
+    }
+    launchCppTester((c: Rsh) => new RshTests(c))
+  }
+
+  @Test def testRshExt() {
+    class Rsh extends Module {
+      val io = new Bundle {
+        val x = SInt(INPUT, width=66)
+        val z = SInt(OUTPUT, width=33)
       }
+      io.z := io.x >> UInt(24, width=33)
+    }
+
+    class RshTests(c : Rsh) extends Tester(c) {
+      val x = BigInt(4003500)*BigInt(825802)
+      val z = x >> 24
+      poke(c.io.x, x)
+      expect(c.io.z, z)
     }
     launchCppTester((c: Rsh) => new RshTests(c))
   }
