@@ -29,8 +29,6 @@
 */
 
 package Chisel
-import Node._
-import scala.math._
 
 object MuxLookup {
   def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
@@ -52,24 +50,21 @@ object MuxCase {
   }
 }
 
-object Multiplex{
+object Multiplex {
   def apply (t: Node, c: Node, a: Node): Node = {
-    if (t.litOf != null) {
-      return if (t.litOf.value == 0) a else c
-    }
-    if (a != null && a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0))) {
-      return Multiplex(t, c, a.inputs(1))
-    }
-    if (c.litOf != null && a != null && a.litOf != null) {
-      if (c.litOf.value == a.litOf.value) {
-        return c
+    t.litOpt match { 
+      case Some(tl) => if (tl.value == 0) a else c 
+      case None if a != null => (c.litOpt, a.litOpt) match {
+        case (_, Some(al)) if a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0)) =>
+          Multiplex(t, c, a.inputs(1))
+        case (Some(cl), Some(al)) if cl.value == al.value => c
+        case (Some(cl), Some(al)) if cl.isKnownWidth && al.isKnownWidth &&
+             cl.widthW.needWidth() == 1 && al.widthW.needWidth() == 1 =>
+          if (cl.value == 0) LogicalOp(t, Literal(0,1), "===") else t
+        case _ => new Mux().init("", Node.maxWidth _, t, c, a)
       }
-      if (c.litOf.isKnownWidth && a.litOf.isKnownWidth
-          && c.litOf.widthW.needWidth() == 1 && a.litOf.widthW.needWidth() == 1) {
-        return if (c.litOf.value == 0) LogicalOp(t, Literal(0,1), "===") else t
-      }
+      case _ => new Mux().init("", Node.maxWidth _, t, c, a)
     }
-    new Mux().init("", maxWidth _, t, c, a);
   }
 }
 

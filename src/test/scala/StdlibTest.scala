@@ -396,13 +396,10 @@ try {
         for (s <- 0 until m.nSections) {
           accumulatedDelay += s
           // The expected value is either the delayed poked value,
-          // or 0 if we haven't done enough poking.
-          val expected = if (d >= accumulatedDelay) {
-            pokeVal + accumulatedDelay
-          } else {
-            0
-          }
-          expect(m.io.stages(s), expected)
+          // initial values are not necessarily 0 
+          if (d >= accumulatedDelay) {
+            expect(m.io.stages(s), pokeVal + accumulatedDelay)
+          } 
         }
         step(1)
       }
@@ -902,7 +899,7 @@ try {
           val in = UInt(INPUT,  8)
           val out  = UInt(OUTPUT, 8)
         }
-        io.out := Mux(io.in === (BitPat("b?110") | BitPat("b1???")), io.in, UInt(0))
+        io.out := Mux(io.in === (Bits("b?110") | Bits("b1???")), io.in, UInt(0))
       }
   
       chiselMain(testArgs,

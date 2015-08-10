@@ -44,94 +44,149 @@ class BitsSuite extends TestSuite {
 
   /** Extract a bit from a constant at a fixed position */
   @Test def testExtractConstantFixed() {
-    val res = UInt(5)(0)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(5)(0)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Extract from a constant a fixed range of bits */
   @Test def testExtractConstantRangeFixed() {
-    val res = UInt(5)((1, 0))
-    assertTrue( res.getWidth == 2 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = UInt(5)((1, 0))
+      assertTrue( res.getWidth == 2 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Equality */
   @Test def testEql() {
-    val res = Bits(2) === Bits(2)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === Bits(2)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testEqlBundle() {
-    val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
+      assertTrue( res.getWidth == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testEqlVec() {
-    val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
+      assertTrue( res.getWidth == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testNeg() {
-    val res = ~Bits(2)
-    assertTrue( res.getWidth == 2 )
-    assertTrue( res.litOf.value == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = ~Bits(2)
+      assertTrue( res.getWidth == 2 )
+      assertTrue( res.litValue() == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* AND Reduction */
   @Test def testAndR() {
-    val res = Bits(5).andR
-    assertTrue( res.getWidth == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).andR
+      assertTrue( res.getWidth == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* OR Reduction */
   @Test def testOrR() {
-    val res = Bits(5).orR
-    assertTrue( res.getWidth == 1)
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).orR
+      assertTrue( res.getWidth == 1)
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XOR Reduction */
   @Test def testXorR() {
-    val res = Bits(5).xorR
-    assertTrue( res.getWidth == 1)
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5).xorR
+      assertTrue( res.getWidth == 1)
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* inequality */
   @Test def testNeq() {
-    val res = Bits(5) != Bits(4)
-    assertTrue( res.getWidth == 1 )
-    assertTrue( res.litOf.value == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) != Bits(4)
+      assertTrue( res.getWidth == 1 )
+      assertTrue( res.litValue() == 1 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise and */
   @Test def testAnd() {
-    val res = Bits(5) & Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 4 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) & Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 4 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise or */
   @Test def testOr() {
-    val res = Bits(5) | Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 5 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) | Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 5 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* bitwise xor */
   @Test def testXor() {
-    val res = Bits(5) ^ Bits(4)
-    assertTrue( res.getWidth == 3 )
-    assertTrue( res.litOf.value == 1 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Bits(5) ^ Bits(4)
+      assertTrue( res.getWidth == 3 )
+      assertTrue( res.litValue() == 1 )
+    }
   }
 
   /* Concatenation */
   @Test def testCat() {
-    try {
-    val res = Bits(5) ## Bits(4)
-    assertTrue( res.getWidth == 6 )
-    assertTrue( res.litOf.value == 44 )
-    } catch {
-      case e : Throwable => e.printStackTrace()
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      try {
+        val res = Bits(5) ## Bits(4)
+        assertTrue( res.getWidth == 6 )
+        assertTrue( res.litValue() == 44 )
+      } catch {
+	case e : Throwable => e.printStackTrace()
+      }
     }
+    val dummyInst = Module(new Dummy)
   }
 }

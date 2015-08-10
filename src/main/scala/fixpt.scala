@@ -75,12 +75,12 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   def do_mult(b: T): T = {
     val result = Factory(exp+b.exp,raw.needWidth()+b.raw.needWidth())
     result.raw := raw * b.raw
-    return result
+    result
   }
   def do_divide(b: T): T = {
     val result = Factory(exp-b.exp,raw.needWidth())
     result.raw := raw / b.raw
-    return result
+    result
   }
   def do_truncate(source: T): Unit = {
     if(exp > source.exp) {

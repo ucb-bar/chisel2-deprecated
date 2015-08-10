@@ -128,7 +128,7 @@ object ChiselError {
     }
     val idx = stack.indexWhere(isUserCode)
     if(idx < 0) {
-      println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
+      // println("COULDN'T FIND LINE NUMBER (" + stack(1) + ")")
       None
     } else {
       // There may be an anonymous method in this class which we skipped

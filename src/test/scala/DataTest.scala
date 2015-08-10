@@ -55,125 +55,183 @@ import Chisel._
 class DataSuite extends TestSuite {
 
   @Test def testBoolFromValue() {
-    val tested = Bool(true);
-//    assertTrue( tested.isInstanceOf[Literal] );
-    assertFalse( tested.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val tested = Bool(true);
+  //    assertTrue( tested.isInstanceOf[Literal] );
+      assertFalse( tested.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testBoolFromDir() {
-    val tested = Bool(dir = INPUT);
-    assertTrue( tested.dir == INPUT );
-    assertFalse( tested.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val tested = Bool(dir = INPUT);
+      assertTrue( tested.dir == INPUT );
+      assertFalse( tested.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testBoolFromDefault() {
-    val tested = Bool();
-    assertTrue( tested.dir == null )
-    assertFalse( tested.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val tested = Bool();
+      assertTrue( tested.dir == NODIR );
+      assertFalse( tested.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromLit() {
-    val fixFromLit = SInt(42);
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val fixFromLit = SInt(42);
 
- //   assertTrue( fixFromLit.isInstanceOf[Literal] );
-    assertFalse( fixFromLit.named );
+   //   assertTrue( fixFromLit.isInstanceOf[Literal] );
+      assertFalse( fixFromLit.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromLitWithWidth() {
-    val fixFromLitWithWidth = SInt(42, width = 16);
-    // assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
-    assertFalse( fixFromLitWithWidth.named );
-    /* XXX width was -1 here for some reason */
-    assertTrue( fixFromLitWithWidth.getWidth() == 16 );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val fixFromLitWithWidth = SInt(42, width = 16);
+      // assertTrue( fixFromLitWithWidth.isInstanceOf[Literal] );
+      assertFalse( fixFromLitWithWidth.named );
+      /* XXX width was -1 here for some reason */
+      assertTrue( fixFromLitWithWidth.getWidth() == 16 );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testSIntFromWidthDir() {
-    val fixFromWidthDir = SInt(width = 8, dir = INPUT);
-    assertTrue( fixFromWidthDir.getWidth() == 8 );
-    assertTrue( fixFromWidthDir.dir == INPUT );
-    assertFalse( fixFromWidthDir.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val fixFromWidthDir = SInt(width = 8, dir = INPUT);
+      assertTrue( fixFromWidthDir.getWidth() == 8 );
+      assertTrue( fixFromWidthDir.dir == INPUT );
+      assertFalse( fixFromWidthDir.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   // Testing the UInt factory methods
 
   @Test def testUIntVal() {
-    // apply(x: Int): UInt
-    val dat = UInt(5)
-    assertTrue( dat.getWidth() == 3 );
-    // assertTrue( dat.isInstanceOf[Literal] );
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // apply(x: Int): UInt
+      val dat = UInt(5)
+      assertTrue( dat.getWidth() == 3 );
+      // assertTrue( dat.isInstanceOf[Literal] );
+      assertFalse( dat.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntValWidth() {
-    // def apply(x: Int, width: Int): UInt
-    val dat = UInt(5, 4)
-    assertTrue( dat.getWidth() == 4 )
-    // assertTrue( dat.isInstanceOf[Literal] )
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: Int, width: Int): UInt
+      val dat = UInt(5, 4)
+      assertTrue( dat.getWidth() == 4 )
+      // assertTrue( dat.isInstanceOf[Literal] )
+      assertFalse( dat.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
   @Test def testUIntString() {
-    // def apply(x: String): UInt
-    val dat = UInt("1010")
-    assertTrue( dat.width == -1 ); // XXX
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String): UInt
+      val dat = UInt("1010")
+      assertTrue( dat.width == -1 ); // XXX
+      assertTrue( dat.dir == OUTPUT );
+      assertFalse( dat.isSigned );
+      assertTrue( dat.assigned );
+      assertFalse( dat.named );
+    }
   }
    */
 
   @Test def testUIntStringWidth() {
-    // def apply(x: String, width: Int): UInt
-    val dat = UInt("101", 4)
-    assertTrue( dat.getWidth() == 4 )
-    // assertTrue( dat.isInstanceOf[Literal] )
-    assertFalse( dat.named )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String, width: Int): UInt
+      val dat = UInt("101", 4)
+      assertTrue( dat.getWidth() == 4 )
+      // assertTrue( dat.isInstanceOf[Literal] )
+      assertFalse( dat.named )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntStringBaseBinary() {
-    // def apply(x: String, base: Char): UInt
-    val dat = UInt("1010", 'b')
-    assertTrue( dat.getWidth() == 4 )
-    // assertTrue( dat.isInstanceOf[Literal] )
-    assertFalse( dat.named )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String, base: Char): UInt
+      val dat = UInt("1010", 'b')
+      assertTrue( dat.getWidth() == 4 )
+      // assertTrue( dat.isInstanceOf[Literal] )
+      assertFalse( dat.named )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntStringBaseOctal() {
-    // def apply(x: String, base: Char): UInt
-    val dat = UInt("644", 'o')
-    assertTrue( dat.getWidth() == 9 );
-    // assertTrue( dat.isInstanceOf[Literal] )
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String, base: Char): UInt
+      val dat = UInt("644", 'o')
+      assertTrue( dat.getWidth() == 9 );
+      // assertTrue( dat.isInstanceOf[Literal] )
+      assertFalse( dat.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /* XXX This test interfers with others declared in NameTest.scala
   @Test def testUIntStringBaseDec() {
-    // def apply(x: String, base: Char): UInt
-    val dat = UInt("199", 'd')
-    assertFalse( dat.width.isSet );
-    assertTrue( dat.dir == OUTPUT );
-    assertFalse( dat.isSigned );
-    assertTrue( dat.assigned );
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String, base: Char): UInt
+      val dat = UInt("199", 'd')
+      assertFalse( dat.width.isSet );
+      assertTrue( dat.dir == OUTPUT );
+      assertFalse( dat.isSigned );
+      assertTrue( dat.assigned );
+      assertFalse( dat.named );
+    }
   }
    */
 
   @Test def testUIntStringBaseHex() {
-    // def apply(x: String, base: Char): UInt
-    val dat = UInt("abc", 'h')
-    assertTrue( dat.getWidth() == 12 )
-    // assertTrue( dat.isInstanceOf[Literal] )
-    assertFalse( dat.named )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(x: String, base: Char): UInt
+      val dat = UInt("abc", 'h')
+      assertTrue( dat.getWidth() == 12 )
+      // assertTrue( dat.isInstanceOf[Literal] )
+      assertFalse( dat.named )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testUIntDirWidth() {
-    // def apply(dir: IODirection = null, width: Int = -1): UInt
-    val dat = UInt(INPUT, 4)
-    assertTrue( dat.getWidth() == 4 );
-    assertTrue( dat.dir == INPUT );
-    assertFalse( dat.named );
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      // def apply(dir: IODirection = None, width: Int = -1): UInt
+      val dat = UInt(INPUT, 4)
+      assertTrue( dat.getWidth() == 4 );
+      assertTrue( dat.dir == INPUT );
+      assertFalse( dat.named );
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /** The code used to bypass the width initialization resulting

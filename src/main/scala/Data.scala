@@ -30,25 +30,26 @@
 
 package Chisel
 
-import Node._
-import ChiselError._
-
 abstract trait Num[T <: Data] {
-  // def << (b: T): T;
-  // def >> (b: T): T;
-  def unary_-(): T;
-  def +  (b: T): T;
-  def *  (b: T): T;
-  def /  (b: T): T;
-  def %  (b: T): T;
-  def -  (b: T): T;
-  def <  (b: T): Bool;
-  def <= (b: T): Bool;
-  def >  (b: T): Bool;
-  def >= (b: T): Bool;
+  // def << (b: T): T
+  // def >> (b: T): T
+  def unary_-(): T
+  def +  (b: T): T
+  def *  (b: T): T
+  def /  (b: T): T
+  def %  (b: T): T
+  def -  (b: T): T
+  def <  (b: T): Bool
+  def <= (b: T): Bool
+  def >  (b: T): Bool
+  def >= (b: T): Bool
 
   def min(b: T): T = Mux(this < b, this.asInstanceOf[T], b)
   def max(b: T): T = Mux(this < b, b, this.asInstanceOf[T])
+}
+
+object Data {
+  implicit def toOption[T <: Data](data: T): Option[T] = Option(data)
 }
 
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
@@ -60,7 +61,7 @@ abstract trait Num[T <: Data] {
   generates target code.
   */
 abstract class Data extends Node {
-  var comp: proc = null;
+  var comp: Option[proc] = None // TODO: better name?
 
   // Interface required by Vec:
   def ===[T <: Data](right: T): Bool = {
@@ -73,9 +74,9 @@ abstract class Data extends Node {
     if( gotWidth < 1) {
       throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
     } else if(gotWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool");
+      throw new Exception("multi bit signal " + this + " converted to Bool")
     }
-    chiselCast(this){Bool()};
+    chiselCast(this){Bool()}
   }
 
   // Interface required by Cat:
@@ -87,13 +88,13 @@ abstract class Data extends Node {
   def setIsTypeNode {
     assert(inputs.length > 0, ChiselError.error("Type Node must have an input"))
     isTypeNode = true
-    inferWidth = widthOf(0)
+    inferWidth = Node.widthOf(0)
   }
 
-  def apply(name: String): Data = null
+  def apply(name: String): Data = null // TODO: neccessary?
   def flatten: Array[(String, Bits)]
-  def flip(): this.type = this;
-  def asInput(): this.type = this;
+  def flip(): this.type = this
+  def asInput(): this.type = this
 
   /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
     or recursively sets members of Bundle/Vec to OUTPUT.
@@ -101,7 +102,7 @@ abstract class Data extends Node {
     */
   def asOutput(): this.type
   def asDirectionless(): this.type
-  def isDirectionless: Boolean = true;
+  def isDirectionless: Boolean = true
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
     of *Node* instance which we have lost the concrete type. */
@@ -149,42 +150,42 @@ abstract class Data extends Node {
   override def clone(): this.type = this.cloneType()
 
   def cloneType(): this.type = {
-    def getCloneMethod(c: Class[_]): java.lang.reflect.Method = {
+    def getCloneMethod(c: Class[_]): Option[java.lang.reflect.Method] = {
       val methodNames = c.getDeclaredMethods.map(_.getName())
       if (methodNames.contains("cloneType")) {
-        c.getDeclaredMethod("cloneType")
+        Some(c.getDeclaredMethod("cloneType"))
       } else if (methodNames.contains("clone")) {
-        c.getDeclaredMethod("clone")
+        Some(c.getDeclaredMethod("clone"))
       } else {
-        null
+        None
       }
     }
 
     try {
       val clazz = this.getClass
-      val cloneMethod = getCloneMethod(clazz)
-      if (cloneMethod != null) {
-        cloneMethod.invoke(this).asInstanceOf[this.type]
-      } else {
-        val constructor = clazz.getConstructors.head
-        if(constructor.getParameterTypes.size == 0) {
-          val obj = constructor.newInstance()
-          obj.asInstanceOf[this.type]
-        } else {
-          val params = constructor.getParameterTypes.toList
-          if(constructor.getParameterTypes.size == 1) {
-            val paramtype = constructor.getParameterTypes.head
-            // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
-            //    added by scalac for nested classes and closures. Thus, try faking the constructor
-            //    by not supplying said class or closure (pass null).
-            // CONSIDER: Don't try to create this
-            if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-              constructor.newInstance(null).asInstanceOf[this.type]
-            } else {
-              throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
-            }
+      getCloneMethod(clazz) match {
+        case Some(p) => p.invoke(this).asInstanceOf[this.type]
+        case _ => {
+          val constructor = clazz.getConstructors.head
+          if(constructor.getParameterTypes.size == 0) {
+            val obj = constructor.newInstance()
+            obj.asInstanceOf[this.type]
           } else {
-           throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+            val params = constructor.getParameterTypes.toList
+            if(constructor.getParameterTypes.size == 1) {
+              val paramtype = constructor.getParameterTypes.head
+              // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+              //    added by scalac for nested classes and closures. Thus, try faking the constructor
+              //    by not supplying said class or closure (pass null).
+              // CONSIDER: Don't try to create this
+              if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+                constructor.newInstance(null).asInstanceOf[this.type]
+              } else {
+                throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+              }
+            } else {
+             throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+            }
           }
         }
       }
@@ -198,10 +199,9 @@ abstract class Data extends Node {
   }
 
   override def nameIt(path: String, isNamingIo: Boolean) {
-    if (isTypeNode && comp != null) {
-      comp.nameIt(path, isNamingIo)
-    } else {
-      super.nameIt(path, isNamingIo)
+    comp match {
+      case Some(p) if isTypeNode => p nameIt (path, isNamingIo)
+      case _ => super.nameIt(path, isNamingIo)
     }
   }
 
@@ -210,16 +210,13 @@ abstract class Data extends Node {
   // Chisel3 - This node has been wrapped in Wire() and may participate in assignment (:=, <>) statements.
   private var _isWired = false
   def isWired = _isWired
-  def setIsWired(value: Boolean) {
-    _isWired = value
-  }
+  def setIsWired(value: Boolean) { _isWired = value }
 
   // Chisel3 - type-only nodes (no data - initialization or assignment) - used for verifying Wire() wrapping
   override def isTypeOnly = {
-    if (isTypeNode && comp != null) {
-      comp.isTypeOnly
-    } else {
-      super.isTypeOnly
+    comp match {
+      case Some(p) if isTypeNode => p.isTypeOnly
+      case _ => super.isTypeOnly
     }
   }
 }

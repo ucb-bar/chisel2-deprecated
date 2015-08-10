@@ -50,6 +50,7 @@ abstract class TestSuite extends JUnitSuite {
   val blankLines_re = """(?m)^\s*$[\r\n]+""".r
   @Before def initialize() {
     dir.mkdir
+    Driver.initChisel(Array[String]())
   }
 
   def assertFile( filename: String ) {
