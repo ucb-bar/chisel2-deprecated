@@ -383,7 +383,6 @@ object Driver extends FileSystemUtilities{
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
-          testerSeedValid = true
           testerSeed = args(i+1).toLong
           i += 1
         }
@@ -513,9 +512,7 @@ object Driver extends FileSystemUtilities{
   // standard input stream to a file.
   var dumpTestInput = false
 
-  // Setting this to TRUE will initialize the tester's RNG with the
-  // seed below.
-  var testerSeedValid = false
+  // This value may be overridden with a command line option --testerSeed
   var testerSeed = System.currentTimeMillis()
 
   // Setting this to TRUE will result in temporary values (ie, nodes

@@ -197,7 +197,7 @@ static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
   }
 }
 
-static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
+static void rsha_n (val_t d[], const val_t s0[], const int amount, const int nw, const int w) {
 
   int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
@@ -235,7 +235,7 @@ static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
   }
 }
 
-static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
+static void rsh_n (val_t d[], const val_t s0[], const int amount, const int nw) {
   val_t carry = 0;
   int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
@@ -250,7 +250,7 @@ static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
   }
 }
 
-static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
+static void lsh_n (val_t d[], const val_t s0[], const int amount, const int nwd, const int nws) {
   val_t carry          = 0;
   int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
@@ -494,16 +494,16 @@ struct bit_word_funs {
   static bool neq (val_t s0[], val_t s1[]) {
     return !eq(s0, s1);
   }
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     rsha_n(d, s0, amount, nw, w);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     rsh_n(d, s0, amount, nw);
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     lsh_n(d, s0, amount, nw, nw);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     // TODO: FINISH THIS
     const int bw = e-s+1;
     val_t msk[nw];
@@ -609,13 +609,13 @@ struct bit_word_funs<1> {
   static bool neq (val_t s0[], val_t s1[]) {
     return s0[0] != s1[0];
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     d[0] = (s0[0] << amount);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     d[0] = (s0[0] >> amount);
   }
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     d[0] = s0[0] << (val_n_bits() - w);
     d[0] = (sval_t(d[0]) >> (val_n_bits() - w + amount)) & mask_val(w);
   }
@@ -729,7 +729,7 @@ struct bit_word_funs<2> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     val_t msk[2];
     const int bw = e-s+1;
     mask_n(msk, 2, bw);
@@ -743,7 +743,7 @@ struct bit_word_funs<2> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s) {
+  static void inject (val_t d[], const val_t s0[], const int e, const int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
     const int bw = e-s+1;
     val_t msk[2];
@@ -756,7 +756,7 @@ struct bit_word_funs<2> {
     d[1] = (d[1] & ~msk_lsh[1]) | (s0_lsh[1] & msk_lsh[1]);
   }
 
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     sval_t hi = s0[1] << (2*val_n_bits() - w);
     if (amount >= val_n_bits()) {
       d[0] = hi >> (amount - w + val_n_bits());
@@ -773,7 +773,7 @@ struct bit_word_funs<2> {
       d[1] = d[1] & mask_val(w - val_n_bits());
     }
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     if (amount >= val_n_bits()) {
       d[1] = 0;
       d[0] = s0[1] >> (amount - val_n_bits());
@@ -785,7 +785,7 @@ struct bit_word_funs<2> {
       d[0] = (s0[1] << (val_n_bits() - amount)) | (s0[0] >> amount);
     }
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     if (amount == 0)
     {
       d[1] = s0[1];
@@ -891,7 +891,7 @@ struct bit_word_funs<3> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]) | (s0[2] != s1[2]);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     val_t msk[3];
     const int bw = e-s+1;
     mask_n(msk, 3, bw);
@@ -907,7 +907,7 @@ struct bit_word_funs<3> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s) {
+  static void inject (val_t d[], const val_t s0[], const int e, const int s) {
     const int bw = e-s+1;
     val_t msk[3];
     val_t msk_lsh[3];
@@ -920,13 +920,13 @@ struct bit_word_funs<3> {
     d[2] = (d[2] & ~msk_lsh[2]) | (s0_lsh[2] & msk_lsh[2]);
   }
 
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     rsha_n(d, s0, amount, 3, w);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     rsh_n(d, s0, amount, 3);
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     lsh_n(d, s0, amount, 3, 3);
   }
   static void log2 (val_t d[], val_t s0[]) {
@@ -1174,7 +1174,7 @@ class dat_t {
   inline dat_t<w> operator >> ( dat_t<w> o ) {
     return *this >> o.lo_word();
   }
-  dat_t<w> rsha ( dat_t<w> o) {
+  dat_t<w> rsha ( const dat_t<w> o) {
     dat_t<w> res;
     int amount = o.lo_word();
     bit_word_funs<n_words>::rsha(res.values, values, amount, w);
