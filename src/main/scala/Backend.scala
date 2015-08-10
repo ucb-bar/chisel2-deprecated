@@ -205,6 +205,8 @@ abstract class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
+        case clk: Clock if clk.name == "" =>
+          clk setName "C" + clk.component.nextIndex
         case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
@@ -220,6 +222,8 @@ abstract class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg =>
           reg setName namespace.getUniqueName(reg.name)
+        case clk: Clock =>
+          clk setName namespace.getUniqueName(clk.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary
           // the isIo check is also strange and happens because parents see child io in the DFS
@@ -263,6 +267,8 @@ abstract class Backend extends FileSystemUtilities{
         node.name
       case _: Reg =>
         if (node.named) node.name else "R" + node.emitIndex
+      case _: Clock =>
+        if (node.named) node.name else "C" + node.emitIndex
       case _ =>
         if (node.named) node.name else "T" + node.emitIndex
     }
@@ -827,8 +833,6 @@ abstract class Backend extends FileSystemUtilities{
 
     verifyComponents
 
-    ChiselError.info("giving names")
-    nameAll
     ChiselError.checkpoint()
 
     ChiselError.info("executing custom transforms")
