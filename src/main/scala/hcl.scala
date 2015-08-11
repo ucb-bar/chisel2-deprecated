@@ -214,10 +214,6 @@ abstract class BlackBox extends Module {
     this.asInstanceOf[Module].verilog_parameters = params.toString
   }
 
-  def setName(name: String) {
-    moduleName = name;
-  }
-
   /** Rename any clock with the output name of "clkName" to "outName"
     * @note Only defined for this black box module, to generally rename the clock see [[Chisel.Clock Clock]] */
   def renameClock(clkName: String, outName: String) {
