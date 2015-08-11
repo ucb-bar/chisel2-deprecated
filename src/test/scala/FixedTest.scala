@@ -46,6 +46,14 @@ class FixedSuite extends TestSuite {
   def toFixed(x : Double, fracWidth : Int) : BigInt = BigInt(scala.math.round(x*scala.math.pow(2, fracWidth)))
   def toDouble(x : BigInt, fracWidth : Int) : Double = x.toDouble/scala.math.pow(2, fracWidth)
 
+  // Newton-Raphson to find 1/x - x_(t+1) = x_t(2 - a*x_t)
+  def performNR(in : Double, xt : Double) : Double = xt*(2.0 - in*xt)
+
+  def tailNR(in : Double, xt : Double, it : Int) : Double = {
+    val nxt = performNR(in, xt)
+    if (it == 0) nxt else tailNR(in, nxt, it - 1)
+  }
+
   @Test def testConversion() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
@@ -468,5 +476,83 @@ class FixedSuite extends TestSuite {
     }
 
     launchCppTester((c: FixedMod) => new FixedModTests(c))
+  }
+
+  @Test def testFixedNDiv() {
+    class FixedNDiv extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 24, 16)
+        val b = Fixed(INPUT, 24, 16)
+        val c = Fixed(OUTPUT, 24, 16)
+      }
+      io.c := io.a /& io.b
+    }
+
+    class FixedNDivTests(c : FixedNDiv) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+        var inA = BigInt(r.nextInt(1 << 22)) //BigInt(670823)
+        var inB = BigInt(r.nextInt(1 << 22)) //BigInt(2613)
+        var doubleA = toDouble(inA, 16)
+        var doubleB = toDouble(inB, 16)
+        while(doubleA/doubleB > scala.math.pow(2, 8)) {
+          inA = BigInt(r.nextInt(1 << 22))
+          inB = BigInt(r.nextInt(1 << 22))
+          doubleA = toDouble(inA, 16)
+          doubleB = toDouble(inB, 16)
+        }
+        poke(c.io.a, inA)
+        poke(c.io.b, inB)
+        val div = toDouble(inA, 16) / toDouble(inB, 16)
+        val nrDiv = peek(c.io.c)
+        val err = scala.math.abs(toDouble(nrDiv, 16) - div)
+        val res = if (err < toDouble(BigInt(scala.math.pow(2, 8).toInt), 16)) true else false
+        expect(res, "Error: " + err.toString)
+      }
+    }
+
+    launchCppTester((c: FixedNDiv) => new FixedNDivTests(c))
+  }
+  
+  // This is the same as the NDiv test, however the optional pipelining is enabled.
+  @Test def testFixedNDivPipe() {
+    class FixedNDivPipe extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 24, 16)
+        val b = Fixed(INPUT, 24, 16)
+        val c = Fixed(OUTPUT, 24, 16)
+      }
+      io.c := io.a /& (io.b, true)
+    }
+
+    class FixedNDivPipeTests(c : FixedNDivPipe) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+        var inA = BigInt(r.nextInt(1 << 22))
+        var inB = BigInt(r.nextInt(1 << 22))
+        var doubleA = toDouble(inA, 16)
+        var doubleB = toDouble(inB, 16)
+        while(doubleA/doubleB > scala.math.pow(2, 8)) {
+          inA = BigInt(r.nextInt(1 << 22))
+          inB = BigInt(r.nextInt(1 << 22))
+          doubleA = toDouble(inA, 16)
+          doubleB = toDouble(inB, 16)
+        }
+        poke(c.io.a, inA)
+        poke(c.io.b, inB)
+        step(5)
+        val div = toDouble(inA, 16) / toDouble(inB, 16)
+        val nrDiv = peek(c.io.c)
+        val err = scala.math.abs(toDouble(nrDiv, 16) - div)
+        val res = if (err < toDouble(BigInt(scala.math.pow(2, 8).toInt), 16)) true else false
+        expect(res, "Error: " + err.toString)
+      }
+    }
+
+    launchCppTester((c: FixedNDivPipe) => new FixedNDivPipeTests(c))
   }
 }
