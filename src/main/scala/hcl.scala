@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.util.Properties
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 class TestIO(val format: String, val args: Seq[Data] = Seq())
 object Scanner {
@@ -139,11 +140,60 @@ trait nameable {
   var named = false
 }
 
+class VerilogParameters {
+  override def toString() : String = {
+    val myFields = this.getClass().getDeclaredFields()
+    val paramStr = new ArrayBuffer[String]
+    paramStr += "# ("
+    for ( field <- myFields ) {
+      field.setAccessible(true)
+      val fieldName = field.toString().split(" ").last.split('.').last
+      val fieldVal = field.get(this)
+      val fieldStr = {
+        if (fieldVal.isInstanceOf[Boolean]) {
+          if ( fieldVal.asInstanceOf[Boolean] ) "TRUE" else "FALSE"
+        } else if (fieldVal.isInstanceOf[String])
+          "\"" + fieldVal + "\""
+        else
+          fieldVal
+      }
+      val verilogStr = "    ." + fieldName + "(" + fieldStr + ")"
+      if ( myFields.last == field )
+        paramStr += verilogStr
+      else
+        paramStr += verilogStr + ","
+    }
+    paramStr += "  )"
+    paramStr.mkString("\n")
+  }
+}
+
 abstract class BlackBox extends Module {
   Driver.blackboxes += this
+  val clockMapping = new HashMap[String, String]
 
   def setVerilogParameters(string: String) {
     this.asInstanceOf[Module].verilog_parameters = string;
+  }
+
+  def setVerilogParameters(params: VerilogParameters) {
+    this.asInstanceOf[Module].verilog_parameters = params.toString
+  }
+
+  def renameClock(clkName: String, outName: String) {
+    clockMapping.put(clkName, outName)
+  }
+
+  def renameClock(clk: Clock, outName: String) {
+    clockMapping.put(clk.name, outName)
+  }
+
+  def mapClock(clkName: String) : String = {
+    clockMapping.getOrElse(clkName, clkName)
+  }
+
+  def renameReset(name: String) {
+    this.reset.setName(name)
   }
 }
 
