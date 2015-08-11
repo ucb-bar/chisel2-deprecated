@@ -820,6 +820,8 @@ abstract class Backend extends FileSystemUtilities{
 
     verifyComponents
 
+    ChiselError.info("giving names")
+    nameAll
     ChiselError.checkpoint()
 
     ChiselError.info("executing custom transforms")
