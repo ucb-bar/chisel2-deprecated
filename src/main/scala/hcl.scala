@@ -187,6 +187,17 @@ class VerilogParameters {
   }
 }
 
+/** This class allows the connection to Verilog modules outside of chisel after generation
+  * @example
+  * {{{ class DSP48E1 extends BlackBox {
+  * val io = new [[Chisel.Bundle Bundle]] // Create I/O with same as DSP
+  * val dspParams = new [[Chisel.VerilogParameters VerilogParameters]] // Create Parameters to be specified
+  * setVerilogParams(dspParams)
+  * renameClock("clk", "clock")
+  * renameReset("rst")
+  * // Implement functionality of DSP to allow simulation verification
+  * } }}}
+  */
 abstract class BlackBox extends Module {
   Driver.blackboxes += this
   private val clockMapping = new HashMap[String, String]
