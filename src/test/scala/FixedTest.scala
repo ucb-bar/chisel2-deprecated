@@ -47,16 +47,24 @@ class FixedSuite extends TestSuite {
   def toDouble(x : BigInt, fracWidth : Int) : Double = x.toDouble/scala.math.pow(2, fracWidth)
 
   @Test def testConversion() {
-    val r = scala.util.Random
-    val in = BigInt(r.nextInt(1 << 30))
-    assertTrue(toFixed(toDouble(in, 16), 16) == in)
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val r = scala.util.Random
+      val in = BigInt(r.nextInt(1 << 30))
+      assertTrue(toFixed(toDouble(in, 16), 16) == in)
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Extract a bit from a constant at a fixed position */
   @Test def testFixedConstructor() {
-    val res = Fixed(0, 16, 8)
-    assertTrue( res.getWidth == 16 )
-    assertTrue( res.getFractionalWidth == 8 )
+    class Dummy extends Module {
+      val io = UInt(INPUT, 0)
+      val res = Fixed(0, 16, 8)
+      assertTrue( res.getWidth == 16 )
+      assertTrue( res.getFractionalWidth == 8 )
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testFixedEqual() {
