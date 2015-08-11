@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.math.{ceil, floor, log}
+import scala.collection.mutable.ArrayBuffer
 
 object log2Up
 {
@@ -592,5 +593,41 @@ object Wire
                    UInt().asInstanceOf[T] } }
     res.setIsWired(true)
     res.asDirectionless
+  }
+}
+
+/** DelayBetween works out the number of registers or delays for all possible directional paths between two nodes
+  */
+object DelayBetween {
+
+  /** This method recursively searchs backwards along the directional graph from visited to end */
+  private def nodePathSearch(visited : List[Node], end : Node, paths : ArrayBuffer[Int]) : ArrayBuffer[Int] = {
+    val startList : List[Node] = visited.last.inputs.toList
+    for (node <- startList) {
+      if (!visited.contains(node)) {
+        if (node._id == end._id) {
+          val completePath : List[Node] = visited :+ node
+          paths += completePath.filter(_.isReg).length
+        }
+      }
+    }
+
+    for (node <- startList) {
+      if (!visited.contains(node) && !(node._id == end._id)) {
+        val nextPath = visited :+ node
+        paths ++= nodePathSearch(nextPath, end, new ArrayBuffer[Int])
+      }
+    }
+    paths
+  }
+
+  /** Find all delays for paths from a to b
+    * @param a starting node
+    * @param b finishing node
+    * @return the all delays between a and b from smallest to largest
+    */
+  def apply(a : Node, b : Node) : ArrayBuffer[Int] = {
+    // Do a bfs looking at all inputs of b until a is reached
+    nodePathSearch(List(b), a, new ArrayBuffer[Int]).sorted.distinct
   }
 }
