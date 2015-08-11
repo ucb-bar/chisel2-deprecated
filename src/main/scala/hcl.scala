@@ -180,10 +180,6 @@ abstract class BlackBox extends Module {
     this.asInstanceOf[Module].verilog_parameters = params.toString
   }
 
-  def setName(name: String) {
-    moduleName = name;
-  }
-
   def renameClock(clkName: String, outName: String) {
     clockMapping.put(clkName, outName)
   }
