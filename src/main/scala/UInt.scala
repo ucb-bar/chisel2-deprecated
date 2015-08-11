@@ -36,16 +36,27 @@ object UInt {
    methods to create UInt from litterals (with implicit and explicit
    widths) and reserve the default parameters for the "direction" method.
    */
+  /** Create a UInt from an Int */
   def apply(x: Int): UInt = apply(BigInt(x))
+  /** Create a UInt from an Int with specified width */
   def apply(x: Int, width: Int): UInt = apply(BigInt(x), width)
+  /** Create a UInt from a BigInt */
   def apply(x: BigInt): UInt = Lit(checkSign(x)){UInt()}
+  /** Create a UInt from a BigInt with specified width */
   def apply(x: BigInt, width: Int): UInt = Lit(checkSign(x), width){UInt()}
+  /** Create a UInt from a String of a base 10 Int*/
   def apply(x: String): UInt = Lit(x, -1){UInt()}
+  /** Create a UInt from a String of a base 10 Int with specified width */
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()}
+  /** Create a UInt from a String of an arbitrary base */
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()}
+  /** Create a UInt from a String of an arbitrary base with specified width */
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()}
+  /** Create a UInt from a Node */
   def apply(x: Node): UInt = UInt(x, -1)
+  /** Create a UInt from a Node with specified width */
   def apply(x: Node, width: Int): UInt = UInt(width = width).asTypeFor(x)
+  /** Create a UInt for I/O with optional width */
   def apply(dir: IODirection = NODIR, width: Int = -1): UInt = {
     val res = new UInt()
     res.create(dir, width)
@@ -85,6 +96,7 @@ class UInt extends Bits with Num[UInt] {
     res
   }
 
+  /** Set the value of this UInt */
   override def fromInt(x: Int): this.type = {
     UInt(x).asInstanceOf[this.type]
   }
@@ -95,6 +107,7 @@ class UInt extends Bits with Num[UInt] {
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 
   // arithmetic operators
+  /** Convert a UInt to an SInt by added a MSB zero */
   def zext(): SInt = {
     // Don't sign-extend a zero-width node.
     val result = if (isZeroWidth) {
@@ -116,10 +129,14 @@ class UInt extends Bits with Num[UInt] {
   def -  (b: UInt): UInt = newBinaryOp(b, "-")
   def >> (i: Int): UInt = newBinaryOp(UInt(i), ">>") // chisel3
   def << (i: Int): UInt = newBinaryOp(UInt(i), "<<") // chisel3
-  def +%  (b: UInt): UInt = newBinaryOp(b, "+") // chisel3 add-wrap
-  def +&  (b: UInt): UInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
-  def -%  (b: UInt): UInt = newBinaryOp(b, "-") // chisel3 sub-wrap
-  def -&  (b: UInt): UInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
+  /** chisel3 add-wrap operator */
+  def +%  (b: UInt): UInt = newBinaryOp(b, "+")
+  /** chisel3 add (width +1) operator */
+  def +&  (b: UInt): UInt = newBinaryOp(b, "+&")
+  /** chisel3 sub-wrap operator */
+  def -%  (b: UInt): UInt = newBinaryOp(b, "-")
+  /** chisel3 sub (width +1) operator */
+  def -&  (b: UInt): UInt = newBinaryOp(b, "-&")
 
   // order operators
   def <  (b: UInt): Bool = newLogicalOp(b, "<")

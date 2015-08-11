@@ -31,35 +31,41 @@
 package Chisel
 import scala.math.{ceil, floor, log}
 
+/** Compute the log2 rounded up with min value of 1 */
 object log2Up
 {
   def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
 }
 
+/** Compute the log2 rounded up */
 object log2Ceil
 {
   def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
 }
 
-
+/** Compute the log2 rounded down with min value of 1 */
 object log2Down
 {
   def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
 }
 
+/** Compute the log2 rounded down */
 object log2Floor
 {
   def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
 }
 
-
+/** Check if an Integer is a power of 2 */
 object isPow2
 {
   def apply(in: Int): Boolean = in > 0 && ((in & (in-1)) == 0)
 }
 
+/** Fold Right with a function */
 object foldR
 {
+  /** @param x a sequence of values
+    * @param f a function to perform the fold right with */
   def apply[T <: Bits](x: Seq[T])(f: (T, T) => T): T =
     if (x.length == 1) x(0) else f(x(0), foldR(x.slice(1, x.length))(f))
 }
@@ -93,7 +99,7 @@ object PopCount
   def apply(in: Bits): UInt = apply((0 until in.getWidth).map(in(_)))
 }
 
-/** Litte/big bit endian convertion: reverse the order of the bits in a UInt.
+/** Litte/big bit endian conversion: reverse the order of the bits in a UInt.
 */
 object Reverse
 {
@@ -119,7 +125,7 @@ object Reverse
   def apply(in: UInt): UInt = doit(in, in.getWidth)
 }
 
-
+/** A register with an Enable signal */
 object RegEnable
 {
   def apply[T <: Data](updateData: T, enable: Bool) = {
@@ -138,7 +144,12 @@ object RegEnable
   */
 object ShiftRegister
 {
+  /** @param in input to delay
+    * @param n number of cycles to delay */
   def apply[T <: Data](in: T, n: Int) : T = apply(in, n, Bool(true))
+  /** @param in input to delay
+    * @param n number of cycles to delay
+    * @param en enable the shift */
   def apply[T <: Data](in: T, n: Int, en: Bool) : T =
   {
     // The order of tests reflects the expected use cases.
@@ -151,7 +162,14 @@ object ShiftRegister
     }
   }
   
+  /** @param in input to delay
+    * @param init reset value to use
+    * @param n number of cycles to delay */
   def apply[T <: Data](in: T, init: T, n: Int) : T = apply(in, init, n, Bool(true))
+  /** @param in input to delay
+    * @param init reset value to use
+    * @param n number of cycles to delay
+    * @param en enable the shift */
   def apply[T <: Data](in: T, init: T, n: Int, en: Bool) : T =
   {
     // The order of tests reflects the expected use cases.
@@ -195,6 +213,7 @@ object Mux1H
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
 
+/** An I/O Bundle containing data and a signal determining if its valid */
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
   val valid = Bool(OUTPUT)
@@ -203,13 +222,14 @@ class ValidIO[+T <: Data](gen: T) extends Bundle
   override def cloneType: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
-/** Adds a valid protocol to any interface. The standard used is
-  that the consumer uses the flipped interface.
+/** Adds a valid protocol to any interface
+  * The standard used is that the consumer uses the flipped interface.
 */
 object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
+/** An I/O Bundle with simple handshaking using valid and ready signals for data 'bits'*/
 class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
@@ -219,14 +239,14 @@ class DecoupledIO[+T <: Data](gen: T) extends Bundle
   override def cloneType: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
-/** Adds a ready-valid handshaking protocol to any interface.
-  The standard used is that the consumer uses the flipped
-  interface.
+/** Adds a ready-valid handshaking protocol to any interface
+  * The standard used is that the consumer uses the flipped interface
   */
 object Decoupled {
   def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 
+/** An I/O bundle for enqueuing data with valid/ready handshaking */
 class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
@@ -236,6 +256,7 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
+/** An I/O bundle for dequeuing data with valid/ready handshaking */
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
@@ -244,7 +265,7 @@ class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   override def cloneType: this.type = new DeqIO(gen).asInstanceOf[this.type]
 }
 
-
+/** An I/O bundle for dequeuing data with valid/ready handshaking */
 class DecoupledIOC[+T <: Data](gen: T) extends Bundle
 {
   val ready = Bool(INPUT)
@@ -252,13 +273,14 @@ class DecoupledIOC[+T <: Data](gen: T) extends Bundle
   val bits  = gen.cloneType.asOutput
 }
 
-
+/** An I/O bundle for the Arbiter */
 class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
   val in  = Vec(n,  Decoupled(gen) ).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
 }
 
+/** Arbiter Control determining which producer has access */
 object ArbiterCtrl
 {
   def apply(request: Seq[Bool]): Seq[Bool] = {
@@ -329,10 +351,10 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
   Producers are chosen in round robin order.
 
   Example usage:
-    val arb = new RRArbiter(2, UInt())
+    {{{ val arb = new RRArbiter(2, UInt())
     arb.io.in(0) <> producer0.io.out
     arb.io.in(1) <> producer1.io.out
-    consumer.io.in <> arb.io.out
+    consumer.io.in <> arb.io.out }}}
   */
 class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
@@ -340,10 +362,10 @@ class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
  Priority is given to lower producer
 
  Example usage:
-   val arb = Module(new Arbiter(2, UInt()))
+   {{{ val arb = Module(new Arbiter(2, UInt()))
    arb.io.in(0) <> producer0.io.out
    arb.io.in(1) <> producer1.io.out
-   consumer.io.in <> arb.io.out
+   consumer.io.in <> arb.io.out }}}
  */
 class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 
@@ -354,8 +376,13 @@ object FillInterleaved
   def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
 }
 
+/** A counter module
+  * @param n The maximum value of the counter, does not have to be power of 2
+  */
 class Counter(val n: Int) {
+  /** Value of the counter */
   val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
+  /** increment the counter */
   def inc(): Bool = {
     if (n == 1) Bool(true)
     else {
@@ -366,6 +393,11 @@ class Counter(val n: Int) {
   }
 }
 
+/** Counter Object
+  * Example Usage:
+  * {{{ val countOn = Bool(true) // increment counter every clock cycle
+  * val myCounter = Counter(countOn, n)
+  * when ( myCounter.value === UInt(3) ) { ... } }}}*/
 object Counter
 {
   def apply(n: Int): Counter = new Counter(n)
@@ -377,13 +409,26 @@ object Counter
   }
 }
 
+/** An I/O Bundle for Queues
+  * @param gen The type of data to queue
+  * @param entries The max number of entries in the queue */
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
+  /** I/O to enqueue data, is [[Chisel.DecoupledIO]] flipped */
   val enq   = Decoupled(gen.cloneType).flip
+  /** I/O to enqueue data, is [[Chisel.DecoupledIO]]*/
   val deq   = Decoupled(gen.cloneType)
+  /** The current amount of data in the queue */
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
+/** A hardware module implmenting a Queue
+  * @param gen The type of data to queue
+  * @param entries The max number of entries in the queue
+  * @param pipe
+  * @param flow
+  * @param _reset
+  */
 class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
@@ -429,9 +474,9 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   from the inputs.
 
   Example usage:
-    val q = new Queue(UInt(), 16)
+    {{{ val q = new Queue(UInt(), 16)
     q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq
+    consumer.io.in <> q.io.deq }}}
   */
 object Queue
 {
@@ -444,6 +489,12 @@ object Queue
   }
 }
 
+/** An async fifo
+  * @param gen The type of data in the fifo
+  * @param entries The max number of entries in the fifo
+  * @param enq_clk clk used for queuing data
+  * @param deq_clk clk used for dequeuing data from the fifo
+  */
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
@@ -497,6 +548,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
+/** Similar to a shift register but with handshaking at start */
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {

@@ -105,6 +105,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
 
   lazy val elements = calcElements(view)
 
+  /** Connect all data nodes in the map as inputs for this bundle using the names in the map */
   def fromMap(elemmap: Map[String, Data]): this.type = {
     // only well defined for 'flat' bundles, for now
     val result = this.cloneType
@@ -128,6 +129,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
     res
   }
 
+  /** Name the bundle, do not use directly, use [[Chisel.Node.setName setName]] instead */
   override def nameIt (path: String, isNamingIo: Boolean) {
     if( !named && (name.isEmpty || (!path.isEmpty && name != path)) ) {
       name = path
@@ -140,6 +142,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
     }
   }
 
+  /** Create a new Bundle with all the elements of both */
   def +(other: Bundle): Bundle = {
     val res = new Bundle
     res.elements ++= elements
@@ -147,6 +150,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
     res
   }
 
+  /** Change all INPUT to OUTPUT and visa versa for all elements in this Bundle */
   override def flip(): this.type = {
     elements foreach (_._2.flip)
     this
@@ -156,10 +160,19 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
     elements foreach (_._2.removeTypeNodes)
   }
 
+  /** Check if an element exists with that name */
   def contains(name: String): Boolean = elements contains name 
 
   override def apply(name: String): Data = elements(name)
 
+  /** Connect all elements contained in this to node 'src'
+    * @note The elements are checked for compatibility based on their name
+    * If elements are in src that are not in this Bundle no warning will be produced
+    * @example
+    * {{{ // pass through all wires in this modules io to the sub module which have the same name
+    * // Note: ignores any extra defined in io
+    * mySubModule.io <> io }}}
+    */
   override def <>(src: Node): Unit = {
     (comp, src) match {
       case (None, other: Bundle) => for ((n, i) <- elements) {

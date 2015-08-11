@@ -31,27 +31,35 @@
 package Chisel
 import Literal._
 
-/* Chisel3 compatibility */
+/** A bit pattern object to enable representation of dont cares */
 object BitPat {
+  /** Get a bit pattern from a string
+    * @param n a string with format b---- eg) b1?01
+    * @note legal characters are 0, 1, ? and must be base 2*/
   def apply(n: String): BitPat = {
     require(n(0) == 'b', "BINARY BitPats ONLY")
     val (bits, mask, swidth) = parseLit(n.substring(1))
     new BitPat(toLitVal(bits, 2), toLitVal(mask, 2), swidth)
   }
 
+  /** Get a bit pattern of don't cares with a specified width */
   def DC(width: Int): BitPat = BitPat("b" + ("?" * width))
 
   // BitPat <-> UInt
+  /** enable conversion of a bit pattern to a UInt */
   implicit def BitPatToUInt(x: BitPat): UInt = {
     require(x.mask == (BigInt(1) << x.getWidth)-1)
     UInt(x.value, x.getWidth)
   }
+  /** create a bit pattern from a UInt */
   implicit def apply(x: UInt): BitPat = {
     require(x.isLit)
     BitPat("b" + x.litValue().toString(2))
   }
 }
 
+/** A class to create bit patterns
+  * Use the [[Chisel.BitPat$ BitPat]] object instead of this class directly */
 class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
   def getWidth: Int = width
   def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))

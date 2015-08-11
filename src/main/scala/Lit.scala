@@ -32,31 +32,94 @@ package Chisel
 import scala.math.{log, abs, ceil, max, min}
 
 /* Factory for literal values to be used by Bits and SInt factories. */
+/** A factory for literal values */
 object Lit {
+  /** Create a Lit value
+    * @tparam T type to create Lit of
+    * @param n a string representing the value of the literal
+    * format is Bxxxx where B is a single char base and xxx is the number in that base
+    * base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt]("21010")(UInt(width=4)) }}} */
   def apply[T <: Bits](n: String)(gen: => T): T = {
     makeLit(Literal(n, -1))(gen)
   }
 
+  /** Create a Lit Value
+    * @tparam T type to create Lit of
+    * @param n string representing value of the Lit
+    * format is Bxxxx where B is a single char base and xxx is the number in that base
+    * base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt]("21010", 4)(UInt()) }}} */
   def apply[T <: Bits](n: String, width: Int)(gen: => T): T = {
     makeLit(Literal(n, width))(gen)
   }
 
+  /** Create a Lit Value
+    * @tparam T type to create Lit of
+    * @param n string representing value of the Lit in the base specified
+    * @param base a character representing the base
+    * base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt]("987", 'a')(UInt()) }}} */
   def apply[T <: Bits](n: String, base: Char)(gen: => T): T = {
     makeLit(Literal(-1, base, n))(gen)
   }
 
+  /** Create a Lit Value
+    * @tparam T type to create Lit of
+    * @param n string representing value of the Lit in the base specified
+    * @param base a character representing the base
+    * base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param width force the width of the Lit created
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt]("987", 'a')(UInt()) }}} */
   def apply[T <: Bits](n: String, base: Char, width: Int)(gen: => T): T = {
     makeLit(Literal(width, base, n))(gen)
   }
 
+  /** Create a Lit Value
+    * @tparam T type to create Lit of
+    * @param n a BigInt for the bits of the Lit
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt](BigInt(987))(UInt()) }}} */
   def apply[T <: Bits](n: BigInt)(gen: => T): T = {
     makeLit(Literal(n, signed = gen.isInstanceOf[SInt]))(gen)
   }
 
+  /** Create a Lit Value
+    * @tparam T type to create Lit of
+    * @param n a BigInt for the bits of the Lit
+    * @param width force the width of the Lit created
+    * @param gen a function generating the type to use
+    * @example {{{ Lit[UInt](BigInt(987), 12)(UInt()) }}} */
   def apply[T <: Bits](n: BigInt, width: Int)(gen: => T): T = {
     makeLit(Literal(n, width, signed = gen.isInstanceOf[SInt]))(gen)
   }
 
+  /** A function to make a Lit from a Literal
+    * @tparam T type to create Lit of
+    * @param x a Literal to transform into a Lit
+    * @param gen a function generating the type to use
+    * @return a Lit of type T with the value of x
+    */
   def makeLit[T <: Bits](x: Literal)(gen: => T): T = {
     gen.fromNode(x)
   }
@@ -65,6 +128,7 @@ object Lit {
 object Literal {
 
   private def bigMax(x: BigInt, y: BigInt): BigInt = if (x > y) x else y
+  /** Get the number of bits in x */
   def sizeof(x: BigInt): Int = {
     val y = bigMax(BigInt(1), x.abs).toDouble
     val res = max(1, (ceil(log(y + 1)/log(2.0))).toInt)
@@ -114,6 +178,7 @@ object Literal {
     res
   }
   val hexNibbles = "0123456789abcdef"
+  /** Convert 4 chars in a binary string to a hex char starting at 'off' */
   def toHexNibble(x: String, off: Int): Char = {
     var res = 0
     for (i <- 0 until 4) {
@@ -123,7 +188,9 @@ object Literal {
     }
     hexNibbles(res)
   }
+  // TODO should be private?
   val pads = Vector(0, 3, 2, 1)
+  /** Convert a binary string to hex */
   def toHex(x: String): String = {
     var res = new StringBuilder
     val numNibbles = (x.length-1) / 4 + 1
@@ -133,9 +200,11 @@ object Literal {
     }
     res.result
   }
+  /** Convert a hex string to a BigInt */
   def toLitVal(x: String): BigInt = {
     BigInt(x.substring(2, x.length), 16)
   }
+  /** convert a string to a BigInt with base shamt */
   def toLitVal(x: String, shamt: Int): BigInt = {
     var res = BigInt(0)
     for(c <- x if c != '_') {
@@ -145,8 +214,15 @@ object Literal {
     res
   }
 
+  /** remove all underscores from a string */
   def removeUnderscore(x: String): String = x filterNot (_ == '_')
 
+  /** Parse a binary string with don't cares as '?'
+    * @param x input binary string
+    * @return a tuple of (bits, mask, width)
+    * bits is the string with '?' replaced with '0'
+    * mask is '0' for all '?' in the string but '1' otherwise
+    * width is the number of bits */
   def parseLit(x: String): (String, String, Int) = {
     val bits = new StringBuilder
     val mask = new StringBuilder
@@ -159,6 +235,13 @@ object Literal {
     }
     (bits.result, mask.result, width)
   }
+  /** Convert a string to a BigInt
+    * @param base is:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    */
   def stringToVal(base: Char, x: String): BigInt = base match {
     case 'x' => toLitVal(x)
     case 'd' => BigInt(x.toInt)
@@ -168,9 +251,7 @@ object Literal {
     case  _  => BigInt(-1)
   }
 
-  /** Derive the bit length for a Literal
-   *  
-   */
+  /** Derive the bit length for a Literal */
   def bitLength(b: BigInt): Int = {
     // Check for signedness
     // We have seen unexpected values (one too small) when using .bitLength on negative BigInts,
@@ -201,12 +282,25 @@ object Literal {
     res
   }
 
-  /** Creates a *Literal* instance from a scala string. The first character
+  /** Creates a [[Chisel.Literal Literal]] instance from a scala string. The first character
     of the string indicates the base for the suffix characters.
+    * base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
     */
   def apply(n: String, width: Int): Literal =
     apply(width, n(0), n.substring(1, n.length))
 
+  /** Create a Literal value
+    * @param width force the width of the Literal
+    * @param base can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param literal is a string representing the number */
   def apply(width: Int, base: Char, literal: String): Literal = {
     if (!"dhbo".contains(base)) {
       ChiselError.error("no base specified")

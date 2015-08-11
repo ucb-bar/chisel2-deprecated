@@ -61,7 +61,7 @@ class Version(val dottedString: String) extends scala.math.Ordered[Version] {
   require(Version.versionRE.pattern.matcher(dottedString).matches)
   val maxVersion: Boolean = dottedString == ""
 
-    def compare(that: Version):Int = {
+  def compare(that: Version):Int = {
     // If both versions are maximum, they're equal.
     if (this.maxVersion && that.maxVersion) {
       0

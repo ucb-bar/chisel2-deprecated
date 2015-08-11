@@ -70,7 +70,10 @@ object BuildSettings extends Build {
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
-    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials")
+    scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials"),
+    scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("chisel"), version) map { (bd, v) =>
+      Seq("-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
+    }
   ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
 
   lazy val root = Project("chisel", file("."), settings=buildSettings)
