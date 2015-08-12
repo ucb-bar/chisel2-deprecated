@@ -287,14 +287,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   def <>(src: Module) { io <> src.io }
 
   def apply(name: String): Data = io(name)
-  // COMPILATION OF REFERENCE
-  private[Chisel] def emitDec(b: Backend): String = {
-    var res = ""
-    // val wires = io.flatten;
-    for ((n, w) <- wires)
-      res += b.emitDec(w)
-    res
-  }
 
   /** Add a pin with a name to the module
     * @param pin the I/O to add
@@ -317,7 +309,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   }
 
   /** Add a submodule to this module */
-  private[Chisel] def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
+  def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
     Driver.modStackPushed = true
     Driver.modAdded = true
     val q = params.alterPartial(f)
@@ -330,7 +322,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   }
 
   /** Add a submodule to this module */
-  private[Chisel] def addModule[T <: Module](c: => T)(implicit p:Parameters = params) = {
+  def addModule[T <: Module](c: => T)(implicit p:Parameters = params) = {
     Driver.modStackPushed = true
     Driver.modAdded = true
     Driver.compStack.push(this)
@@ -343,7 +335,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   }
 
   /** A breadth first search of the graph of nodes */
-  private[Chisel] def bfs (visit: Node => Unit) = {
+  def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
 
@@ -374,7 +366,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   }
 
   /** A depth first search of the graph of nodes */
-  private[Chisel] def dfs(visit: Node => Unit): Unit = {
+  def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
     // initialize DFS
     for ((n, io) <- wires ; if io.isIo && io.dir == OUTPUT)
