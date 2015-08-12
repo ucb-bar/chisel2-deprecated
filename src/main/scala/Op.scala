@@ -32,7 +32,15 @@ package Chisel
 import Op._
 import Node._
 
+/** Cast a node to be Bits */
 object chiselCast {
+  /** @tparam S type of the node to cast
+    * @tparam T type of the Bits to cast to
+    * @param x the node to case
+    * @param gen the instantiation to cast to
+    * @example
+    * {{{ val myUInt = chiselCast[Data, UInt](myData, UInt(width=8)) }}}
+    */
   def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
     val res = gen
     res assign x.toNode
@@ -40,6 +48,7 @@ object chiselCast {
   }
 }
 
+// TODO: make private[Chisel]?
 object UnaryOp {
   val Op = OpGen1({ new UnaryOp(_: String) }) _
   def apply(op: String, widthInfer: (=> Node) => Width, x: Node): Node = {
@@ -71,6 +80,7 @@ object UnaryOp {
   }
 }
 
+// TODO: make private[Chisel]?
 object BinaryOp {
   val Op = OpGen2({ new BinaryOp(_)}) _
   def apply(op: String, widthInfer: (=> Node) => Width, x: Node, y: Node): Node = {
@@ -119,7 +129,7 @@ object BinaryOp {
   private def modSUWidth(x: => Node) = x.inputs(0).needWidth().min(x.inputs(1).needWidth() - 1)
 }
 
-
+// TODO: make private[Chisel]?
 object LogicalOp {
   val Op = OpGen2({ new LogicalOp(_)}) _
   def apply(x: Node, y: Node, op: String): Bool = {

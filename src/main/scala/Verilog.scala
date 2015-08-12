@@ -156,7 +156,8 @@ class VerilogBackend extends Backend {
     val spacing = (if(c.verilog_parameters != "") " " else "")
     var res = new StringBuilder 
     List("  ", c.moduleName, " ", c.verilog_parameters, spacing, c.name, "(") addString res
-    c.clocks map (x => "." + emitRef(x) + "(" + emitRef(x) + ")") addString (res, ", ")
+    def getMapClk(x : Clock) : String = if ( c.isInstanceOf[BlackBox] ) c.asInstanceOf[BlackBox].mapClock(emitRef(x)) else emitRef(x)
+    c.clocks map (x => "." + getMapClk(x) + "(" + emitRef(x) + ")") addString (res, ", ")
     if (!c.clocks.isEmpty && !c.resets.isEmpty) res append ", "
     c.resets.values map (x => "." + emitRef(x) + "(" + emitRef(x.inputs(0)) + ")") addString (res, ", ")
     var isFirst = true

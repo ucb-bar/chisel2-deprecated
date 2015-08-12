@@ -37,6 +37,12 @@ import java.lang.Double.{longBitsToDouble, doubleToLongBits}
 import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessIO}
 
+/** This class is the super class for test cases
+  * @param c The module under test
+  * @param isTrace print the all I/O operations and tests to stdout, default true
+  * @example
+  * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
+  */
 class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
   private var _testIn: Option[InputStream] = None
   private var _testErr: Option[InputStream] = None
@@ -59,6 +65,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     if(_logs.isEmpty) "" else _logs.dequeue
   }
 
+  /** Valid commands to send to the Simulator
+    * @todo make private? */
   object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, GETID, SETCLK, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
@@ -135,22 +143,34 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
+  /** @param id the unique id of a node
+    * @return the current value of the node with the id */
   def peek(id: Int) = {
     sendCmd(SIM_CMD.PEEK)
     writeln(id.toString)
     try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
   }
+  /** Peek at the value of a node based on the path
+    */
   def peekPath(path: String) = { 
     peek(_signalMap getOrElseUpdate (path, getId(path)))
   }
+  /** Peek at the value of a node
+    * @param node Node to peek at
+    * @param off The index or offset to inspect */
   def peekNode(node: Node, off: Option[Int] = None) = {
     peekPath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""))
   }
+  /** Peek at the value of some memory at an index
+    * @param data Memory to inspect
+    * @param off Offset in memory to look at */
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
     val value = peekNode(data, Some(off))
     if (isTrace) println("  PEEK %s[%d] -> %s".format(dumpName(data), off, value.toString(16)))
     value
   }
+  /** Peek at the value of some bits
+    * @return a BigInt representation of the bits */
   def peek(data: Bits): BigInt = {
     if (isStale) update
     val value = if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
@@ -158,35 +178,64 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     if (isTrace) println("  PEEK " + dumpName(data) + " -> " + value.toString(16))
     value
   }
+  /** Peek at Aggregate data
+    * @return an Array of BigInts representing the data */
   def peek(data: Aggregate): Array[BigInt] = {
     data.flatten.map(x => x._2) map (peek(_))
   }
+  /** Interpret data as a single precision float */
   def peek(data: Flo): Float = {
     intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
   }
+  /** Interpret the data as a double precision float */
   def peek(data: Dbl): Double = {
     longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
   }
 
-
+  /** set the value of a node with unique 'id'
+    * @param id The unique id of the node to set
+    * @param v The BigInt representing the bits to set
+    * @param w The number of 64 bit chunks to write, default is 1
+    * @example {{{ poke(id, BigInt(63) << 60, 2) }}}
+    */
   def poke(id: Int, v: BigInt, w: Int = 1) {
     sendCmd(SIM_CMD.POKE)
     writeln(id.toString)
     writeValue(v, w)
   }
+  /** set the value of a node with its path
+    * @param path The unique path of the node to set
+    * @param v The BigInt representing the bits to set
+    * @param w The number of 64 bit chunks to write, default is 1
+    * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
+    */
   def pokePath(path: String, v: BigInt, w: Int = 1) {
     poke(_signalMap getOrElseUpdate (path, getId(path)), v, w)
   }
+  /** set the value of a node
+    * @param node The node to set
+    * @param v The BigInt representing the bits to set
+    * @param off The offset or index
+    */
   def pokeNode(node: Node, v: BigInt, off: Option[Int] = None) {
     pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v, node.needWidth)
   }
+  /** set the value of some memory
+    * @param data The memory to write to
+    * @param value The BigInt representing the bits to set
+    * @param off The offset representing the index to write to memory
+    */
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
     if (isTrace) println("  POKE %s[%d] <- %s".format(dumpName(data), off, value.toString(16)))
     pokeNode(data, value, Some(off))
   }
+  /** Set the value of some 'data' Node */
   def poke(data: Bits, x: Boolean) { this.poke(data, int(x)) }
+  /** Set the value of some 'data' Node */
   def poke(data: Bits, x: Int)     { this.poke(data, int(x)) }
+  /** Set the value of some 'data' Node */
   def poke(data: Bits, x: Long)    { this.poke(data, int(x)) }
+  /** Set the value of some 'data' Node */
   def poke(data: Bits, x: BigInt)  {
     val value = if (x >= 0) x else {
       val cnt = (data.needWidth() - 1) >> 6
@@ -201,13 +250,16 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       pokeNode(data.getNode, value)
     isStale = true
   }
+  /** Set the value of Aggregate data */
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
     val kv = (data.flatten.map(x => x._2), x.reverse).zipped
     for ((x, y) <- kv) poke(x, y)
   }
+  /** Set the value of a hardware single precision floating point representation */
   def poke(data: Flo, x: Float): Unit = {
     poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
   }
+  /** Set the value of a hardware double precision floating point representation */
   def poke(data: Dbl, x: Double): Unit = {
     poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
   }
@@ -221,6 +273,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     _inputs foreach (x => writeValue(_pokeMap getOrElse (x, BigInt(0)), x.needWidth()))
   }
 
+  /** Send reset to the hardware
+    * @param n number of cycles to hold reset for, default 1 */
   def reset(n: Int = 1) {
     if (isTrace) println("RESET " + n)
     for (i <- 0 until n) {
@@ -258,20 +312,32 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     readln.toInt
   }
 
+  /** Step time by the smallest amount to the next rising clock edge
+    * @note this is defined based on the period of the clock
+    * See [[Chisel.Clock$ Clock]]
+    */
   def step(n: Int) {
     if (isTrace) println("STEP " + n + " -> " + (t + n))
     (0 until n) foreach (_ => takeStep)
     t += n
   }
 
+  /** Convert a Boolean to BigInt */
   def int(x: Boolean): BigInt = if (x) 1 else 0
+  /** Convert an Int to BigInt */
   def int(x: Int):     BigInt = (BigInt(x >>> 1) << 1) | x & 1
+  /** Convert a Long to BigInt */
   def int(x: Long):    BigInt = (BigInt(x >>> 1) << 1) | x & 1
+  /** Convert Bits to BigInt */
   def int(x: Bits):    BigInt = x.litValue()
 
   var ok = true
   var failureTime = -1
 
+  /** Expect a value to be true printing a message if it passes or fails
+    * @param good If the test passed or not
+    * @param msg The message to print out
+    */
   def expect (good: Boolean, msg: String): Boolean = {
     if (isTrace)
       println(msg + " " + (if (good) "PASS" else "FAIL"))
@@ -279,6 +345,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     good
   }
 
+  /** Expect the value of data to have the same bits as a BigInt */
   def expect (data: Bits, expected: BigInt): Boolean = {
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
@@ -286,6 +353,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     expect(got == exp, "EXPECT " + dumpName(data) + " <- " + got.toString(16) + " == " + exp.toString(16))
   }
 
+  /** Expect the value of Aggregate data to be have the values as passed in with the array */
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
     val kv = (data.flatten.map(x => x._2), expected.reverse).zipped;
     var allGood = true
@@ -294,18 +362,26 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     allGood
   }
 
-  /* We need the following so scala doesn't use our "tolerant" Float version of expect.
-   */
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
   def expect (data: Bits, expected: Int): Boolean = {
     expect(data, int(expected))
   }
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
   def expect (data: Bits, expected: Long): Boolean = {
     expect(data, int(expected))
   }
+  /* We need the following so scala doesn't use our "tolerant" Float version of expect.
+   */
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
   def expect (data: Flo, expected: Float): Boolean = {
     val got = peek(data)
     expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
   }
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
   def expect (data: Dbl, expected: Double): Boolean = {
     val got = peek(data)
     expect(got == expected, "EXPECT " + dumpName(data) + " <- " + got + " == " + expected)
@@ -314,6 +390,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /* Compare the floating point value of a node with an expected floating point value.
    * We will tolerate differences in the bottom bit.
    */
+  /** A tolerant expect for Float
+    * Allows for a single least significant bit error in the floating point representation */
   def expect (data: Bits, expected: Float): Boolean = {
     val gotBits = peek(data).toInt
     val expectedBits = java.lang.Float.floatToIntBits(expected)
@@ -363,6 +441,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     process
   }
 
+  /** Complete the simulation and inspect all tests */
   def finish {
     sendCmd(SIM_CMD.FIN)
     _testIn match { case Some(in) => in.close case None => }
@@ -380,6 +459,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 }
 
+/** A tester to check a node graph from INPUTs to OUTPUTs directly */
 class MapTester[+T <: Module](c: T, val testNodes: Seq[Node]) extends Tester(c, false) {
   val (ins, outs) = testNodes partition { case b: Bits => b.dir == INPUT case _ => false }
   def step(svars: HashMap[Node, Node],

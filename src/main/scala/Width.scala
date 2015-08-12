@@ -30,11 +30,14 @@
 
 package Chisel
 
+/** Get the number of bits required */
 object Width {
   type WidthType = Option[Int]  // The internal representation of width
   // Class variables.
-  val unSet: WidthType = None   // The internal "unset" value
-  val unSetVal: Int = -1        // The external "unset" value
+  /** The internal "unset" value */
+  val unSet: WidthType = None
+  /** The external "unset" value */
+  val unSetVal: Int = -1
   val throwIfUnsetRef: Boolean = false
   val debug: Boolean = false
 
@@ -50,6 +53,7 @@ object Width {
   }
 }
 
+/** Create a new width */
 class Width(_width: Int) extends Ordered[Width] {
   import Width._
 
@@ -64,7 +68,7 @@ class Width(_width: Int) extends Ordered[Width] {
   @deprecated("Clients should not expect a Width is directly convertable to an Int", "2.3")
   def width: Int = if (isKnown) widthVal.get else unSetVal
 
-  //  Set the width of a Node.
+  /** Set the width of a Node, w must be >= 0*/
   def setWidth(w: Int): Unit = {
     assert(w >= 0, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0) {
@@ -87,11 +91,11 @@ class Width(_width: Int) extends Ordered[Width] {
     setWidth(w)
   }
 
-  // Indicate whether width is actually known(set) or not.
+  /** Indicate whether width is actually known(set) or not */
   def isKnown: Boolean = widthVal != unSet
 
-  // Return an "known" integer value or raise an exception
-  //  if called when the width is unknown.
+  /** @return an "known" integer value
+    * @throws exception if called when the width is unknown */
   def needWidth(): Int = {
     if (! isKnown ) {
       ChiselError.warning("needWidth but width not set")
@@ -103,12 +107,12 @@ class Width(_width: Int) extends Ordered[Width] {
     widthVal.get
   }
 
-  // Return either the width or the specificed value if the width isn't set.
+  /** @return the width or the specificed value if the width isn't set */
   def widthOrValue(v: Int): Int = {
     if (widthVal != unSet) widthVal.get else v
   }
 
-  // Compare two widths. We assume an unknown width is less than any known width
+  /** Compare two widths where an unknown width is less than any known width */
   def compare(that: Width): Int = {
     if (this.isKnown && that.isKnown) {
       this.widthVal.get - that.widthVal.get
@@ -119,17 +123,20 @@ class Width(_width: Int) extends Ordered[Width] {
     }
   }
 
-  // Print a string representation of width
+  /** Print a string representation of width */
   override def toString: String = (widthVal match {
     case Some(w) => w
     case x => x
   }).toString
 
+  /** create a copy of this width
+    * @param w optionally set the width for the new copy */
   def copy(w: Int = this.widthVal.get): Width = {
     val neww = new Width(w)
     neww
   }
 
+  /** clone this width */
   override def clone(): Width = {
     if (this.isKnown) {
       Width(this.widthVal.get)
@@ -139,6 +146,7 @@ class Width(_width: Int) extends Ordered[Width] {
   }
 
   // Define the arithmetic operations so we can deal with unspecified widths
+  // TODO: make private?
   def binaryOp(op: String, operand: Width): Width = {
     if (!this.isKnown) {
       this
@@ -186,17 +194,23 @@ class Width(_width: Int) extends Ordered[Width] {
   //   (undefined widths should NOT compare equal)
   //   Since hashCode (and equals) depends on a var, it can change if the value changes.
   //   This will be problematic for collections of widths.
+  /** Define the hashcode based on the width
+    * the same widths should have the same hash code
+    * unknown widths should be unique
+    */
   override def hashCode: Int = widthVal match {
     case Some(w) => w * 41
     case _ => super.hashCode
   }
+  /** Define equality for width */
   override def equals(other: Any): Boolean = other match {
     case that: Width =>
       (that canEqual this) && (this.widthVal != unSet)
       (this.widthVal == that.widthVal)
     case _ =>
       false
-}
-    def canEqual(other: Any): Boolean = other.isInstanceOf[Width]
+  }
+  /** check if 'other' is a Width to check if its possible to equal a Width */
+  def canEqual(other: Any): Boolean = other.isInstanceOf[Width]
 
 }

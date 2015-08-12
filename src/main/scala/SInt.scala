@@ -32,10 +32,15 @@ package Chisel
 
 object SInt {
 
+  /** Create a SInt from an Int */
   def apply(x: Int): SInt = Lit(x){SInt()}
+  /** Create a SInt from an Int specifying the width */
   def apply(x: Int, width: Int): SInt = Lit(x, width){SInt()}
+  /** Create a SInt from an BigInt */
   def apply(x: BigInt): SInt = Lit(x){SInt()}
+  /** Create a SInt from an BigInt specifying the width */
   def apply(x: BigInt, width: Int): SInt = Lit(x, width){SInt()}
+  /** Create a SInt for I/O specifying the width */
   def apply(dir: IODirection = NODIR, width: Int = -1): SInt = {
     val res = new SInt()
     res.create(dir, width)
@@ -56,6 +61,7 @@ class SInt extends Bits with Num[SInt] {
     res
   }
 
+  /** Set the value of this SInt to a value */
   override def fromInt(x: Int): this.type = {
     SInt(x).asInstanceOf[this.type]
   }
@@ -128,10 +134,14 @@ class SInt extends Bits with Num[SInt] {
   def /  (b: SInt): SInt = newBinaryOp(b, "s/s")
   def %  (b: SInt): SInt = newBinaryOp(b, "s%s")
   def -  (b: SInt): SInt = newBinaryOp(b, "-")
-  def +%  (b: SInt): SInt = newBinaryOp(b, "+") // chisel3 add-wrap
-  def +&  (b: SInt): SInt = newBinaryOp(b, "+&") // chisel3 add (width +1)
-  def -%  (b: SInt): SInt = newBinaryOp(b, "-") // chisel3 sub-wrap
-  def -&  (b: SInt): SInt = newBinaryOp(b, "-&") // chisel3 sub (width +1)
+  /** chisel3 add-wrap operator */
+  def +%  (b: SInt): SInt = newBinaryOp(b, "+")
+  /** chisel3 add (width + 1) operator */
+  def +&  (b: SInt): SInt = newBinaryOp(b, "+&")
+  /** chisel3 sub-wrap operator */
+  def -%  (b: SInt): SInt = newBinaryOp(b, "-")
+  /** chisel3 sub (width + 1) operator */
+  def -&  (b: SInt): SInt = newBinaryOp(b, "-&")
 
   //SInt to UInt arithmetic
   def * (b: UInt): SInt = {
