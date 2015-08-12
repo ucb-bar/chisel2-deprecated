@@ -30,7 +30,6 @@
 
 package Chisel
 
-// TODO: Should be UInt rather than Bits as input must be positive
 /** Compute Log2 with truncation of a UInt in hardware using a Mux Tree
   * An alternative interpretation is it computes the minimum number of bits needed to represent x
   * @example
