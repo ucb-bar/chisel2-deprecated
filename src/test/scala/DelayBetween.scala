@@ -50,9 +50,13 @@ class DelayBetweenSuite extends TestSuite {
       io.out := io.in
     }
     val myInst = Module(new ZeroDelay)
-    val delayList = DelayBetween(myInst.io.in, myInst.io.out)
-    assertTrue("Should only find exactly one path", delayList.length == 1)
-    assertTrue("Delay should be 0", delayList(0) == 0)
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find exactly one path", delayDepth.length == 1)
+    assertTrue("Delay should be 0", delayDepth(0) == 0)
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("Shortest Delay should be 0", delayShort == 0)
   }
 
   @Test def testOne() {
@@ -64,9 +68,17 @@ class DelayBetweenSuite extends TestSuite {
       io.out := RegNext(io.in)
     }
     val myInst = Module(new OneDelay)
-    val delayList = DelayBetween(myInst.io.in, myInst.io.out)
-    assertTrue("Should only find exactly one path", delayList.length == 1)
-    assertTrue("Delay should be 1", delayList(0) == 1)
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find exactly one path", delayDepth.length == 1)
+    assertTrue("Delay should be 1", delayDepth(0) == 1)
+
+    val delayBreadth = DelayBetween(myInst.io.in, myInst.io.out, true)
+    assertTrue("Should only find exactly one path", delayBreadth.length == 1)
+    assertTrue("Delay should be 1", delayBreadth(0) == 1)
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("Shortest Delay should be 1", delayShort == 1)
   }
 
   @Test def testInf() {
@@ -78,8 +90,15 @@ class DelayBetweenSuite extends TestSuite {
       io.out := UInt(0, 4)
     }
     val myInst = Module(new InfDelay)
-    val delayList = DelayBetween(myInst.io.in, myInst.io.out)
-    assertTrue("Should only find no paths", delayList.length == 0)
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find no paths", delayDepth.length == 0)
+
+    val delayBreadth = DelayBetween(myInst.io.in, myInst.io.out, true)
+    assertTrue("Should only find no paths", delayBreadth.length == 0)
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("No Path: Shortest Delay should be -1", delayShort == -1)
   }
 
   @Test def testMultiple() {
@@ -93,9 +112,51 @@ class DelayBetweenSuite extends TestSuite {
       io.out := Mux(io.en, reg1, io.in)
     }
     val myInst = Module(new MultDelay)
-    val delayList = DelayBetween(myInst.io.in, myInst.io.out)
-    assertTrue("Should only find exactly two paths", delayList.length == 2)
-    assertTrue("Delay should contain 0 and 1", delayList.contains(0) && delayList.contains(1) )
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find exactly two paths", delayDepth.length == 2)
+    assertTrue("Delay should contain 0 and 1", delayDepth.contains(0) && delayDepth.contains(1) )
+    
+    val delayBreadth = DelayBetween(myInst.io.in, myInst.io.out, true)
+    assertTrue("Should only find exactly two paths", delayBreadth.length == 2)
+    assertTrue("Delay should contain 0 and 1", delayBreadth.contains(0) && delayBreadth.contains(1))
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("Shortest Delay should be 0", delayShort == 0)
+  }
+
+  @Test def testBundle() {
+    class BundleDelay extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT, 4)
+        val en = Bool(INPUT)
+        val out = UInt(OUTPUT, 4)
+      }
+      val RegMod = Module(new RegModule()).io
+      RegMod.in := Reg(next=io.in)
+      io.out := RegMod.out
+    }
+
+    class RegModule extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT, 4)
+        val out = UInt(OUTPUT, 4)
+      }
+      io.out := Reg(next=io.in)
+    }
+
+    val myInst = Module(new BundleDelay)
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find exactly one path", delayDepth.length == 1)
+    assertTrue("Delay should contain 2 ", delayDepth.contains(2))
+    
+    val delayBreadth = DelayBetween(myInst.io.in, myInst.io.out, true)
+    assertTrue("Should only find exactly one paths", delayBreadth.length == 1)
+    assertTrue("Delay should contain 2", delayBreadth.contains(2))
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("Shortest Delay should be 2", delayShort == 2)
   }
 
   @Test def testRegLoop() {
@@ -115,9 +176,17 @@ class DelayBetweenSuite extends TestSuite {
       io.out := reg3
     }
     val myInst = Module(new RegLoopDelay)
-    val delayList = DelayBetween(myInst.io.in, myInst.io.out)
-    assertTrue("Should only find exactly one path", delayList.length == 1)
-    assertTrue("Delay should contain 2", delayList.contains(2) )
+    
+    val delayDepth = DelayBetween(myInst.io.in, myInst.io.out)
+    assertTrue("Should only find exactly one path", delayDepth.length == 1)
+    assertTrue("Delay should contain 2", delayDepth.contains(2) )
+
+    val delayBreadth = DelayBetween(myInst.io.in, myInst.io.out, true)
+    assertTrue("Should only find exactly one path", delayBreadth.length == 1)
+    assertTrue("Delay should contain 2", delayBreadth.contains(2))
+
+    val delayShort = DelayBetween.findShortest(myInst.io.in, myInst.io.out)
+    assertTrue("Shortest Delay should be 2", delayShort == 2)
   }
 
 }
