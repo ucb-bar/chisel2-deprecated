@@ -39,10 +39,8 @@ object Bool {
     res.init("", 1)
     res
   }
-  /** Factory method to create a don't-care.
-    *  FIXME: This should remain a BitPat(), not a Bool().
-    *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
-    */
+
+  @deprecated("Use [[Chisel.BitPat BitPat]] to define Don't Cares instead", "3")
   def DC = Bool().fromNode(Bits.DC(1))
 }
 

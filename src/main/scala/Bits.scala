@@ -74,7 +74,6 @@ abstract class Bits extends Data with proc {
 
   def fromInt(x: Int): this.type
   def toSInt(): SInt = chiselCast(this){SInt()}
-  def toUInt(): UInt = chiselCast(this){UInt()}
   override def getNode: Node = if (procAssigned) this else super.getNode
 
   // internal, non user exposed connectors

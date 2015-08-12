@@ -101,7 +101,10 @@ class UInt extends Bits with Num[UInt] {
     UInt(x).asInstanceOf[this.type]
   }
 
-  override def toBits: UInt = this
+  /** @return This UInt as Bits */
+  override def toBits: Bits = this
+  /** @return This UInt as UInt */
+  override def toUInt: UInt = this
 
   // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")

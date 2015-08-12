@@ -325,7 +325,7 @@ class NameSuite extends TestSuite {
 
       io.status := reg_status
 
-      val elts = Vec(List[UInt](reg_status.toBits))
+      val elts = Vec(List[UInt](reg_status.toUInt))
       rdata := elts(UInt(0))
 
       reg_status := new Status().fromBits(wdata)

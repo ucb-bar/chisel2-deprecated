@@ -38,7 +38,7 @@ object Node {
     * @param args Nodes whos values to fetch to print
     */
   def sprintf(message: String, args: Node*): Bits = {
-    val s = Bits().fromNode(new Sprintf(message, args))
+    val s = UInt().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
     s
   }
@@ -429,9 +429,10 @@ abstract class Node extends nameable {
     if (!isTypeNode || inputs.isEmpty) this
     else inputs(0).getNode
 
-  // TODO: change function name to toUInt?
+  /** @return This node as Bits */
+  def toBits(): Bits = chiselCast(this){UInt()}
   /** @return This node as a UInt */
-  def toBits(): UInt = chiselCast(this){UInt()}
+  def toUInt(): UInt = chiselCast(this){UInt()}
 
   /** @return This node */
   def toNode: Node = this
