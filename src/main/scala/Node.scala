@@ -207,12 +207,6 @@ abstract class Node extends Nameable {
     // See the comments in infer
   }
 
-  /** Set the name of a node when elaborated
-    * {{{ my.io.node.setName("MY_IO_NODE") }}}
-    * @param n The name to set the node to
-    */
-  def setName(n: String) { name = n ; named = true }
-
   /** An internal method to name nodes, use setName instead */
   private[Chisel] def nameIt (path: String, isNamingIo: Boolean) {
     try {
