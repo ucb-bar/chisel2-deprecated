@@ -201,17 +201,22 @@ abstract class Backend extends FileSystemUtilities{
       assert(children.filter(_.name.isEmpty).isEmpty, "Chisel Internal Error: Unnamed Children")
         // since sortedComps, all children should have names due to check above
       
-      // ensure all nodes in the design has SOME name
+      // ensure all nodes in the design have SOME name
       comp dfs { 
         case reg: Reg if reg.name == "" =>
-          reg setName "R" + reg.component.nextIndex
+          reg setName "R" + reg.componentOf.nextIndex
         case clk: Clock if clk.name == "" =>
-          clk setName "C" + clk.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
-          node.name = "T" + node.component.nextIndex
+          clk setName "C" + clk.componentOf.nextIndex
+        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None => {
+          // NOTE: This explicitly does NOT use setName.
+          //  setName sets node.named which has side-effects, notable in renameNodes() below.
+          node.name = "T" + node.componentOf.nextIndex
+        }
         case _ =>
       }
-
+      comp.clocks map { clk => if (clk.name == "") {
+        clk setName "C" + clk.componentOf.nextIndex
+      }}
       // Now, ensure everything has a UNIQUE name
       // First, reserve all the IO names
       comp.io.flatten map(_._2) foreach(n => namespace.reserveName(n.name))
@@ -231,6 +236,9 @@ abstract class Backend extends FileSystemUtilities{
         }
         case _ =>
       }
+      comp.clocks map { clk => {
+        clk setName namespace.getUniqueName(clk.name) 
+      }}
     }
   }
 
@@ -245,7 +253,7 @@ abstract class Backend extends FileSystemUtilities{
       case _ =>
     }
     case _ =>
-  }
+   }
 
   def fullyQualifiedName( m: Node ): String = m match {
     case l: Literal => l.toString;
@@ -261,17 +269,15 @@ abstract class Backend extends FileSystemUtilities{
   def emitTmp(node: Node): String =
     emitRef(node)
 
+  /** Emit a reference for this node.
+    * By the time we get here, all nodes should have been named and any naming conflicts dealt with.
+    */
   def emitRef(node: Node): String = {
-    node match {
-      case _: Literal =>
-        node.name
-      case _: Reg =>
-        if (node.named) node.name else "R" + node.emitIndex
-      case _: Clock =>
-        if (node.named) node.name else "C" + node.emitIndex
-      case _ =>
-        if (node.named) node.name else "T" + node.emitIndex
+    if (node.name == "") {
+      ChiselError.error("Unnamed node" + node)
+      node setName "N" + node.componentOf.nextIndex
     }
+    node.name
   }
 
   def emitRef(c: Module): String = c.name
