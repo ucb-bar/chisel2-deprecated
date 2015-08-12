@@ -149,7 +149,7 @@ object Module {
   * val myInst = Module(new MyModule) // create a MyModule
   * }}}
   */
-abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) extends nameable {
+abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) extends Nameable {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance

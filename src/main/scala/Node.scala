@@ -148,7 +148,7 @@ object Node {
   are used to traverse the directed graph respectively backward (from
   output to input) and forward (from input to output).
   */
-abstract class Node extends nameable {
+abstract class Node extends Nameable {
   private[Chisel] var sccIndex = -1
   private[Chisel] var sccLowlink = -1
   private[Chisel] var depth = 0

@@ -133,7 +133,7 @@ trait proc extends Node {
   protected def setDefault(src: Node): Unit = muxes.last.inputs(2) = src
 }
 
-trait nameable {
+trait Nameable {
   /** Name of the instance. */
   var name: String = ""
   /** _named_ is used to indicates name was set explicitely

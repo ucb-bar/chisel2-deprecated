@@ -32,7 +32,7 @@
 /*
 Data Hierarchy:
 
-nameable                (src/main/hcl.scala)
+Nameable                (src/main/hcl.scala)
     Data                (src/main/Data.scala)
       Bits              (src/main/Bits.scala)
         SInt            (src/main/SInt.scala)
