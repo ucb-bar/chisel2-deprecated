@@ -158,7 +158,7 @@ abstract class Node extends nameable {
   /* Assigned in Binding and Mod.reset */
   private[Chisel] var compOpt: Option[Module] = Module.getComponent
   /** Use the function componentOf instead*/
-  def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") } 
+  private[Chisel] def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") }
   /** Get the module that this node is a part of or the top module if not assigned yet
     * @return The module that this node is a part of
     */
