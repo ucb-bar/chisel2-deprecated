@@ -67,18 +67,18 @@ abstract class Data extends Node {
 
   // Interface required by Vec:
   def ===[T <: Data](right: T): Bool = {
-    throw new Exception("=== not defined on " + this.getClass
+    throwException("=== not defined on " + this.getClass
       + " and " + right.getClass)
   }
 
   /** Try to convert this data to a Bool
-    * @throws Exception if the width is not 1*/
+    * @throws ChiselException if the width is not 1*/
   def toBool(): Bool = {
     val gotWidth = this.getWidth()
     if( gotWidth < 1) {
-      throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+      throwException("unable to automatically convert " + this + " to Bool, convert manually instead")
     } else if(gotWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool")
+      throwException("multi bit signal " + this + " converted to Bool")
     }
     chiselCast(this){Bool()}
   }
@@ -86,7 +86,7 @@ abstract class Data extends Node {
   /** Interface required by [[Chisel.Cat Cat]]
     is an operator to combine data nodes together */
   def ##[T <: Data](right: T): this.type = {
-    throw new Exception("## not defined on " + this.getClass + " and " + right.getClass)
+    throwException("## not defined on " + this.getClass + " and " + right.getClass)
   }
 
   /** make this node a type node */

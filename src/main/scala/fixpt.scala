@@ -142,7 +142,7 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
   def >  (b: UFix): Bool = b.do_lessthan(this)
   def >= (b: UFix): Bool = b.do_lesseq(this)
 
-  def %  (b: UFix): UFix = throw new Exception("% unavailable for UFix")
+  def %  (b: UFix): UFix = throwException("% unavailable for UFix")
 }
 
 @deprecated("Use [[Chisel.Fixed Fixed]] instead", "3")
@@ -175,7 +175,7 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
   def >  (b: SFix): Bool = b.do_lessthan(this)
   def >= (b: SFix): Bool = b.do_lesseq(this)
 
-  def %  (b: SFix): SFix = throw new Exception("% unavailable for UFix")
+  def %  (b: SFix): SFix = throwException("% unavailable for UFix")
 }
 
 object QR {
