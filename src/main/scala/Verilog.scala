@@ -722,7 +722,7 @@ class VerilogBackend extends Backend {
     val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)
     link(dir, "vpi.so", List("vpi.o"), isLib=true)
-    if (!run(cmd)) throw new Exception("vcs command failed")
+    if (!run(cmd)) throw new RuntimeException("vcs command failed")
   }
 
   private def if_not_synthesis = "`ifndef SYNTHESIS\n// synthesis translate_off\n"

@@ -258,7 +258,7 @@ abstract class Node extends nameable {
   final def isLit: Boolean = litOpt ne None
   private[Chisel] def litOpt: Option[Literal] = if (getNode != this) getNode.litOpt else None
   /** @return the literal value of a node
-    * @throws Exception if there is no literal value available
+    * @throws ChiselException if there is no literal value available
     */
   def litOf: Literal = litOpt match { case Some(l) => l case None => throwException("no lit value for this node") }
   /** @return the literal value of the node as a BigInt
@@ -271,8 +271,8 @@ abstract class Node extends nameable {
   /** Convert the node literal to a Double */
   def dblLitValue: Double = java.lang.Double.longBitsToDouble(litValue().toLong)
   // TODO: MOVE TO WIRE
-  def assign(src: Node): Unit = throw new Exception("unimplemented assign")
-  def <>(src: Node): Unit = throw new Exception("unimplemented <>")
+  def assign(src: Node): Unit = throwException("unimplemented assign")
+  def <>(src: Node): Unit = throwException("unimplemented <>")
   def ^^(src: Node): Unit = src <> this
 
   private var _isIo = false
@@ -410,7 +410,7 @@ abstract class Node extends nameable {
   }
 
   /** @return the width or number of bits used by this node
-    * @throws Exception if the width of the node is unknown */
+    * @throws ChiselException if the width of the node is unknown */
   def getWidth(): Int = {
     val w = getWidthW()
     if (w.isKnown)
@@ -484,7 +484,7 @@ abstract class Node extends nameable {
     inferWidth = Node.fixWidth(w)
   }
   /** @return the bitWidth of the node
-    * @throws Exception if the width is not yet defined
+    * @throws ChiselException if the width is not yet defined
     */
   def needWidth(): Int = widthW.needWidth 
   /** Return true if the width of this node is known (set). */

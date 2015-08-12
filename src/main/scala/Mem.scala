@@ -216,7 +216,7 @@ class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc 
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
 {
-  override def cond = throw new Exception("")
+  override def cond = throwException("")
   override def getPortType = if (write.isMasked) "mrw" else "rw"
 }
 
