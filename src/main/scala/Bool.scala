@@ -40,8 +40,8 @@ object Bool {
     res
   }
 
-  @deprecated("Use [[Chisel.BitPat BitPat]] to define Don't Cares instead", "3")
-  def DC = Bool().fromNode(Bits.DC(1))
+  /** Get a length 1 Don't Care [[Chisel.BitPat BitPat]] */
+  def DC = BitPat.DC(1)
 }
 
 class Bool extends UInt {

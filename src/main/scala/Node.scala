@@ -38,7 +38,7 @@ object Node {
     * @param args Nodes whos values to fetch to print
     */
   def sprintf(message: String, args: Node*): Bits = {
-    val s = UInt().fromNode(new Sprintf(message, args))
+    val s = Bits().fromNode(new Sprintf(message, args))
     s.setIsTypeNode
     s
   }

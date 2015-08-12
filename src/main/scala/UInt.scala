@@ -44,13 +44,41 @@ object UInt {
   def apply(x: BigInt): UInt = Lit(checkSign(x)){UInt()}
   /** Create a UInt from a BigInt with specified width */
   def apply(x: BigInt, width: Int): UInt = Lit(checkSign(x), width){UInt()}
-  /** Create a UInt from a String of a base 10 Int*/
+  /** Create a UInt from a string of the format Bxxxx
+    * where B is the base and can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    */
   def apply(x: String): UInt = Lit(x, -1){UInt()}
-  /** Create a UInt from a String of a base 10 Int with specified width */
+  /** Create a UInt from a string of the format Bxxxx
+    * where B is the base and can be:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * with an enforced 'width'
+    */
   def apply(x: String, width: Int): UInt = Lit(x, width){UInt()}
-  /** Create a UInt from a String of an arbitrary base */
+  /** Create a UInt from a string
+    * @param x is a String in the specified base
+    * @param base is:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    */
   def apply(x: String, base: Char): UInt = Lit(x, base, -1){UInt()}
-  /** Create a UInt from a String of an arbitrary base with specified width */
+  /** Create a UInt from a string
+    * @param x is a String in the specified base
+    * @param base is:
+    *  - h for hex
+    *  - d for decimal
+    *  - o for octal
+    *  - b for binary
+    * @param width enforced bitwidth
+    */
   def apply(x: String, base: Char, width: Int): UInt = Lit(x, base, width){UInt()}
   /** Create a UInt from a Node */
   def apply(x: Node): UInt = UInt(x, -1)

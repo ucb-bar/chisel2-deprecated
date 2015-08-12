@@ -190,7 +190,7 @@ class Toy extends Module {
     val in1 = SFix(2, 4).asInput
 
     val out = SFix(4,16).asOutput
-    val oraw = UInt(OUTPUT, width=128)
+    val oraw = Bits(OUTPUT, width=128)
   }
 
   val int_result = -io.in0 * (io.in0 + io.in1)

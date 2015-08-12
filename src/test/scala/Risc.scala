@@ -52,7 +52,7 @@ class RiscSuite extends TestSuite {
       val code = Mem(Bits(width = 32), 256)
       val pc   = Reg(init=UInt(0, 8))
       
-      val add_op :: imm_op :: Nil = Enum(Bits(width = 8), 2)
+      val add_op :: imm_op :: Nil = Enum(UInt(width = 8), 2)
     
       val inst = code(pc)
       val op   = inst(31,24)
@@ -60,13 +60,13 @@ class RiscSuite extends TestSuite {
       val rai  = inst(15, 8)
       val rbi  = inst( 7, 0)
     
-      val ra = Mux(rai === Bits(0), Bits(0), file(rai))
-      val rb = Mux(rbi === Bits(0), Bits(0), file(rbi))
+      val ra = Mux(rai === UInt(0), UInt(0), file(rai))
+      val rb = Mux(rbi === UInt(0), UInt(0), file(rbi))
       val rc = Bits(width = 32)
     
       io.valid := Bool(false)
-      io.out   := Bits(0)
-      rc       := Bits(0)
+      io.out   := UInt(0)
+      rc       := UInt(0)
     
       when (io.isWr) {
         code(io.wrAddr) := io.wrData
