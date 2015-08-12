@@ -213,9 +213,8 @@ abstract class Node extends nameable {
     */
   def setName(n: String) { name = n ; named = true }
 
-  // TODO: set to private[Chisel] in favour of setName?
   /** An internal method to name nodes, use setName instead */
-  def nameIt (path: String, isNamingIo: Boolean) {
+  private[Chisel] def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitly through *setName*,
