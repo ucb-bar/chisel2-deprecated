@@ -84,6 +84,7 @@ object LFSR16
 }
 
 /** Returns the number of bits set (i.e value is 1) in the input signal.
+  * @example {{{ PopCount(UInt(29)) === UInt(4) }}}
   */
 object PopCount
 {
@@ -128,11 +129,16 @@ object Reverse
 /** A register with an Enable signal */
 object RegEnable
 {
+  /** @param updateData input data into the register
+    * @param enable when high or true put updateData in a register */
   def apply[T <: Data](updateData: T, enable: Bool) = {
     val r = Reg(updateData)
     when (enable) { r := updateData }
     r
   }
+  /** @param updateData input data into the register
+    * @param resetData the initial or reset value for the register
+    * @param enable when high or true put updateData in a register */
   def apply[T <: Data](updateData: T, resetData: T, enable: Bool) = {
     val r = RegInit(resetData)
     when (enable) { r := updateData }
@@ -147,7 +153,7 @@ object ShiftRegister
   /** @param in input to delay
     * @param n number of cycles to delay */
   def apply[T <: Data](in: T, n: Int) : T = apply(in, n, Bool(true))
-  /** @param in input to delay
+  /** @param in input data to delay
     * @param n number of cycles to delay
     * @param en enable the shift */
   def apply[T <: Data](in: T, n: Int, en: Bool) : T =
@@ -183,7 +189,10 @@ object ShiftRegister
   }
 }
 
-/** Returns the one hot encoding of the input UInt.
+/** @return the one hot encoding of the input UInt
+  * @example
+  * {{{ val myOH = UIntToOH(UInt(5), 8) -> 0x20
+  * val myOH2 = UIntToOH(UInt(0), 8) -> 0x01 }}}
   */
 object UIntToOH
 {
@@ -213,42 +222,72 @@ object Mux1H
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
 
-/** An I/O Bundle containing data and a signal determining if its valid */
+/** An I/O Bundle containing data and a signal determining if its valid
+  * @constructor A bundle containing the Bool(OUTPUT) 'valid' and 'bits' OUTPUT of type T
+  * @note can be constucted using the object [[Chisel.Valid$ Valid]]
+  * @example
+  * {{{ myIO = Valid[UInt](UInt(width=4))
+  * myIO.valid := Bool(true)
+  * myIO.bits := UInt(5) }}}*/
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
+  /** A valid OUTPUT signal */
   val valid = Bool(OUTPUT)
+  /** A OUTPUT signal created using gen */
   val bits = gen.cloneType.asOutput
+  /** @return when the data is consumed
+    * @note defined as the valid signal */
   def fire(dummy: Int = 0): Bool = valid
+  /** clone this I/O */
   override def cloneType: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface
-  * The standard used is that the consumer uses the flipped interface.
-*/
+  * By default this creates a [[Chisel.ValidIO ValidIO]] class with valid and bits set to OUTPUT
+  * @note can be set to INPUT using the function [[Chisel.Bundle.flip flip]]
+  * @example
+  * {{{ myIO = Valid(UInt(width=4))
+  * myIO.valid := Bool(true)
+  * myIO.bits := UInt(5) }}}*/
 object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
-/** An I/O Bundle with simple handshaking using valid and ready signals for data 'bits'*/
+/** An I/O Bundle with simple handshaking using valid and ready signals for data 'bits'
+  * @note can be created using [[Chisel.Decoupled$ Decoupled]]
+  * @example
+  * {{{ val io = Decoupled(UInt(width=4))
+  * io.valid := io.ready
+  * io.bits := UInt(5) }}} */
 class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
+  /** [[Chisel.INPUT INPUT]] signal to indicate data is ready */
   val ready = Bool(INPUT)
+  /** [[Chisel.OUTPUT OUTPUT]] signal to indicate data is valid */
   val valid = Bool(OUTPUT)
+  /** [[Chisel.OUTPUT OUTPUT]] data of type T */
   val bits  = gen.cloneType.asOutput
+  /** Indicate when data has been consumed
+    * @note defined as ready && valid */
   def fire(dummy: Int = 0): Bool = ready && valid
   override def cloneType: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface
-  * The standard used is that the consumer uses the flipped interface
+  * @note the I/O can be 'flipped' so the data is INPUT instead using the function [[Chisel.Bundle.flip flip]]
   */
 object Decoupled {
   def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 
-/** An I/O bundle for enqueuing data with valid/ready handshaking */
+/** An I/O bundle for enqueuing data with valid/ready handshaking
+  * @example
+  * {{{ val io = new EnqIO(UInt(width=5))
+  * when (myCond) { io.enq(UInt(3)) } }}}*/
 class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
+  // Perhaps should return ready rather than dat?
+  /** enqueue data 'dat' by setting valid and bits */
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
   for (io <- bits.flatten.map(x => x._2))
@@ -256,21 +295,16 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
-/** An I/O bundle for dequeuing data with valid/ready handshaking */
+/** An I/O bundle for dequeuing data with valid/ready handshaking*/
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
   ready := Bool(false);
+  /* Strange that this requires a Boolean argument
+   * Change to deq() : (T, Bool) = { ready := Bool(true); (bits, valid) }
+   */
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
   override def cloneType: this.type = new DeqIO(gen).asInstanceOf[this.type]
-}
-
-/** An I/O bundle for dequeuing data with valid/ready handshaking */
-class DecoupledIOC[+T <: Data](gen: T) extends Bundle
-{
-  val ready = Bool(INPUT)
-  val valid = Bool(OUTPUT)
-  val bits  = gen.cloneType.asOutput
 }
 
 /** An I/O bundle for the Arbiter */
@@ -349,8 +383,7 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
   Producers are chosen in round robin order.
-
-  Example usage:
+  @example
     {{{ val arb = new RRArbiter(2, UInt())
     arb.io.in(0) <> producer0.io.out
     arb.io.in(1) <> producer1.io.out
@@ -360,8 +393,7 @@ class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
  Priority is given to lower producer
-
- Example usage:
+ @example
    {{{ val arb = Module(new Arbiter(2, UInt()))
    arb.io.in(0) <> producer0.io.out
    arb.io.in(1) <> producer1.io.out
@@ -376,13 +408,14 @@ object FillInterleaved
   def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
 }
 
-/** A counter module
+/** A counter module, can also be created using [[Chisel.Counter$ Counter]]
   * @param n The maximum value of the counter, does not have to be power of 2
   */
 class Counter(val n: Int) {
-  /** Value of the counter */
+  /** current value of the counter */
   val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
-  /** increment the counter */
+  /** increment the counter
+    * @return if the counter is at the max value */
   def inc(): Bool = {
     if (n == 1) Bool(true)
     else {
@@ -393,14 +426,19 @@ class Counter(val n: Int) {
   }
 }
 
-/** Counter Object
-  * Example Usage:
+/** Counter Object for [[Chisel.Counter Counter]]
+  * @example
   * {{{ val countOn = Bool(true) // increment counter every clock cycle
-  * val myCounter = Counter(countOn, n)
-  * when ( myCounter.value === UInt(3) ) { ... } }}}*/
+  * val myCounter = Counter(8)
+  * when ( myCounter.inc() ) {
+  * ... // When counter value is max at 7 do something
+  * } }}}*/
 object Counter
 {
   def apply(n: Int): Counter = new Counter(n)
+  /** Get a counter which takes an input Bool of when to increment
+    * @return a UInt which is the value of the counter and a Bool indicating when the counter resets
+    */
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
     val c = new Counter(n)
     var wrap: Bool = null
@@ -410,6 +448,7 @@ object Counter
 }
 
 /** An I/O Bundle for Queues
+  * @tparam T the type of data to queue (such as UInt)
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue */
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
@@ -423,14 +462,16 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 }
 
 /** A hardware module implmenting a Queue
-  * @param gen The type of data to queue
+  * @tparam T the type of data to queue
+  * @param gen The parameterized type of data to queue eg) UInt(width=5)
   * @param entries The max number of entries in the queue
-  * @param pipe
-  * @param flow
-  * @param _reset
+  * @param pipe An option to force the addition of items to a full queue if deq is ready
+  * @param flow An option to force the dequeuing of items from the queue if enq is valid
+  * @param _reset The reset to pass to this queue
   */
 class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
+  /** The I/O for this queue */
   val io = new QueueIO(gen, entries)
 
   val ram = Mem(gen, entries)
@@ -473,7 +514,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   the depth of the queues. The width of the queue is determined
   from the inputs.
 
-  Example usage:
+  @example
     {{{ val q = new Queue(UInt(), 16)
     q.io.enq <> producer.io.out
     consumer.io.in <> q.io.deq }}}
@@ -563,10 +604,10 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
   by the number of cycles set by the latency parameter. Functionality
   is similar to ShiftRegister but this exposes a Pipe interface.
 
-  Example usage:
+  @example {{{
     val pipe = new Pipe(UInt())
     pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq
+    consumer.io.in <> pipe.io.deq }}}
   */
 object Pipe
 {
@@ -590,7 +631,7 @@ object Pipe
 /** Builds a Mux tree under the assumption that multiple select signals
   can be enabled. Priority is given to the first select signal.
 
-  Returns the output of the Mux tree.
+  @return the output of the Mux tree
   */
 object PriorityMux
 {
