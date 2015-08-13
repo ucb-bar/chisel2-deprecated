@@ -34,7 +34,7 @@ import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, S
 /** Methods to insert [[Chisel.Module Modules]] into components correctly */
 object Module {
   /** @return the top level module
-    * @throws Exception no top component is set
+    * @throws ChiselException if no top component is set
     */
   def topMod = Driver.topComponent getOrElse (throwException("no top component"))
 
@@ -396,7 +396,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   /** Add a default reset to the module*/
   def addDefaultReset {
     _reset match {
-      case None => throw new RuntimeException
+      case None => throwException("no default reset")
       case Some(r) => resetPin match {
         case None => 
         case Some(p) =>

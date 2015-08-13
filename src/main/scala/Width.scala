@@ -30,6 +30,8 @@
 
 package Chisel
 
+import java.util.NoSuchElementException
+
 /** Get the number of bits required */
 object Width {
   type WidthType = Option[Int]  // The internal representation of width
@@ -45,7 +47,7 @@ object Width {
     if (w < -1) {
       ChiselError.warning("Width:apply < -1")
       if (throwIfUnsetRef) {
-        throw new Exception("Width:apply < -1");
+        throwException("Width:apply < -1");
       }
     }
     val neww = new Width(w)
@@ -73,7 +75,7 @@ class Width(_width: Int) extends Ordered[Width] {
     assert(w >= 0, ChiselError.error("Width.setWidth: setting width to " + w))
     if (w < 0) {
       if (throwIfUnsetRef) {
-        throw new Exception("Width:setWidth < -1");
+        throwException("Width:setWidth < -1");
       }
       widthVal = unSet
     } else {
@@ -95,14 +97,10 @@ class Width(_width: Int) extends Ordered[Width] {
   def isKnown: Boolean = widthVal != unSet
 
   /** @return an "known" integer value
-    * @throws exception if called when the width is unknown */
+    * @throws NoSuchElementException if called when the width is unknown */
   def needWidth(): Int = {
     if (! isKnown ) {
       ChiselError.warning("needWidth but width not set")
-      if (throwIfUnsetRef) {
-        ChiselError.report()
-        throw new Exception("uninitialized width");
-      }
     }
     widthVal.get
   }

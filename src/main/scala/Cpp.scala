@@ -740,7 +740,7 @@ class CppBackend extends Backend {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
       val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
-      if (!run(cmd)) throw new Exception("make failed...")
+      if (!run(cmd)) throwException("make failed...")
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {
