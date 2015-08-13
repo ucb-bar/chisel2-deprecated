@@ -205,8 +205,6 @@ abstract class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg if reg.name == "" =>
           reg setName "R" + reg.component.nextIndex
-        case bus: Bus if bus.name == "" =>
-          bus setName "B" + bus.component.nextIndex
         case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
@@ -265,8 +263,6 @@ abstract class Backend extends FileSystemUtilities{
         node.name
       case _: Reg =>
         if (node.named) node.name else "R" + node.emitIndex
-      case _: Bus =>
-        if (node.named) node.name else "B" + node.emitIndex
       case _ =>
         if (node.named) node.name else "T" + node.emitIndex
     }
