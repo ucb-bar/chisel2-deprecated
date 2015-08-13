@@ -50,7 +50,6 @@ object TextComparator {
   val tokenRegEx = """(?!^)\b""".r                      // Break on (but capture) non-word characters.
   val EOLRegex = """.*\n""".r                         // recognize EOL
   val allowedDifferencePrefixRegex = """\b[RT]""".r   // The only words we allow for substitution are Registers and Temporaries
-  val tcequivalents = "TC"                            // We allow 'T' and 'C' equivalence (while the great naming reorg is in progress).
   def tokenize(s: String): Array[String] = {
       tokenRegEx.split(s)
   }
@@ -109,11 +108,8 @@ class TextComparator {
     val testTokens = tokenize(testLine)
     for ((original, test) <- originalTokens zip testTokens) {
       if (original != test) {
-        val firstO = original(0)
-        val firstT = test(0)
-        // Tokens don't match. Currently, we only allow mismatches for registers and temporaries, or clocks and temporaries.
-        if ((firstO == firstT && allowedDifferencePrefixRegex.findFirstIn(original) != None)
-            || (tcequivalents.contains(firstO) && tcequivalents.contains(firstT))) {
+        // Tokens don't match. Currently, we only allow mismatches for registers and temporaries.
+        if (original(0) == test(0) && allowedDifferencePrefixRegex.findFirstIn(original) != None) {
           // This looks like a possible substitution. Remember it.
           substitutions(test) = original
         } else {
