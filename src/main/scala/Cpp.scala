@@ -532,6 +532,30 @@ class CppBackend extends Backend {
 
       case x: Clock => ""
 
+      case x: Bus => {
+        val res = ArrayBuffer[String]()
+        val writers = x.getWriters
+        // Reset value for bus
+        for ( i <- 0 until words(x)) {
+          if ( x.pulledHigh )
+            res += s"${emitWordRef(x, i)} = -1"
+          else
+            res += s"${emitWordRef(x, i)} = 0"
+        }
+        // Implement writers as cascade AND for high and OR for low
+        for ( i <- 0 until writers.length) {
+          var ifStatement = s"if ( ${emitLoWordRef(writers(i).write)} ) {"
+          for ( w <- 0 until words(x)) {
+            if ( x.pulledHigh )
+              ifStatement = ifStatement + s"${emitWordRef(x, w)} &= ${emitWordRef(writers(i).data, w)};"
+            else
+              ifStatement = ifStatement + s"${emitWordRef(x, w)} |= ${emitWordRef(writers(i).data, w)};"
+          }
+          res += ifStatement + "}"
+        }
+        emitTmpDec(x) + block(res)
+      }
+
       case x: Bits if x.isInObject && x.inputs.length == 1 => 
         emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
           + " = " + emitWordRef(x.inputs(0), i)))

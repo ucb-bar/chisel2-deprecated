@@ -249,6 +249,11 @@ class VerilogBackend extends Backend {
           else "",
         ";\n").mkString
 
+      case x: Bus => {
+        val highZ = x.out.needWidth + "'b" + (0 until x.out.needWidth).map(w => "z").mkString
+        x.getWriters.map(w => {"  assign " + emitRef(x) + " = (" + emitRef(w.write) + ") ? " + emitRef(w.data) + " : " + highZ + ";\n"}).mkString
+      }
+
       case m: Mem[_] if !m.isInline => 
         def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
         def find_gran(x: Node) : Int = x match {
