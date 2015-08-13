@@ -438,8 +438,8 @@ abstract class Backend extends FileSystemUtilities{
       case x: Delay =>
         val clock = x.clock getOrElse x.component._clock.get
         val reset =
-          if (x.component.hasExplicitReset) x.component._reset.get
-          else if (x.clock != None) x.clock.get.getReset
+          if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.component.hasExplicitClock) x.component._clock.get.getReset
           else x.component._reset.get
         x.assignReset(x.component addResetPin reset)
