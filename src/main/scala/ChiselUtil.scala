@@ -374,7 +374,7 @@ class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
 object FillInterleaved
 {
   def apply(n: Int, in: Bits): UInt = apply(n, in.toBools)
-  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
+  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toUInt
 }
 
 /** A counter module

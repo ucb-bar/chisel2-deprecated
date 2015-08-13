@@ -133,11 +133,17 @@ trait proc extends Node {
   protected def setDefault(src: Node): Unit = muxes.last.inputs(2) = src
 }
 
-trait nameable {
+/** This trait allows an instantiation of something to be given a particular name */
+trait Nameable {
+  /** Name of the instance. */
   var name: String = ""
   /** _named_ is used to indicates name was set explicitely
    and should not be overriden by a _nameIt_ generator. */
   var named = false
+  /** Set the name of this module to the string 'n'
+    * @example {{{ my.io.node.setName("MY_IO_NODE") }}}
+    */
+  def setName(n: String) { name = n ; named = true }
 }
 
 /** This class enables the definition of verilog parameters without having to to string building

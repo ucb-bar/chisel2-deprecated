@@ -64,7 +64,7 @@ try {
       }
 
       // apply(bit: Int): Bool
-      val a = io.x(0).toBits
+      val a = io.x(0).toUInt
 
       // apply(hi: Int, lo: Int): UInt
       val b = io.x(4, 3)
@@ -73,7 +73,7 @@ try {
       val e = io.x(9, -1)
 
       // apply(bit: UInt): Bool
-      val a1 = io.x(UInt(0)).toBits
+      val a1 = io.x(UInt(0)).toUInt
 
       // apply(hi: UInt, lo: UInt): UInt
       val b1 = io.x(UInt(4), UInt(3))
@@ -91,13 +91,13 @@ try {
       val h = ~io.x
 
       // andR(): Bool
-      val i = io.x.andR.toBits
+      val i = io.x.andR.toUInt
 
       // orR():  Bool
-      val j = io.x.orR.toBits
+      val j = io.x.orR.toUInt
 
       // xorR():  Bool
-      val k = io.x.xorR.toBits
+      val k = io.x.xorR.toUInt
 
       // << (b: UInt): UInt
       val l = io.x << a
@@ -137,7 +137,7 @@ try {
         | r | u | ab | ac
         /* XXX Computing any of those signals throws an exception */
         /* c | c1 | e | t | e1 | s */
-      ).toBits
+      ).toUInt
 
       // -- result type is Bool --
 
