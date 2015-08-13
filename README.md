@@ -143,7 +143,7 @@ To generate all the documentation:
 The following
 apt-get installs should work for ubuntu 14.04 LTS
 
-    $ sudo apt-get install python-bs4 imagemagick source-highlight
+    $ sudo apt-get install python-bs4 python-jinja2 imagemagick source-highlight
     $ sudo apt-get install tex4ht texlive-latex-base
     $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
     $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
