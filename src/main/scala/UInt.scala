@@ -63,8 +63,7 @@ object UInt {
     res
   }
 
-// FIXME: This should return a BitPat, not a UInt
-//  def DC(width: Int): BitPat = BitPat.DC(width)
+  @deprecated("Use [[Chisel.BitPat BitPat]] to define don't cares", "3")
   def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 
   private def checkSign(x: BigInt) = {
