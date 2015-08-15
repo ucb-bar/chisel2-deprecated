@@ -201,7 +201,7 @@ object Mux1H
   def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
     if (in.tail.isEmpty) in.head
     else {
-      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
+      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, UInt(0)))
       in.head.fromBits(masked.reduceLeft(_|_))
     }
   }
