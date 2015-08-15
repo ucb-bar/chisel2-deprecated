@@ -249,7 +249,7 @@ class VerilogBackend extends Backend {
           else "",
         ";\n").mkString
 
-      case x: Bus => {
+      case x: TSB => {
         val highZ = x.out.needWidth + "'b" + (0 until x.out.needWidth).map(w => "z").mkString
         x.getWriters.map(w => {"  assign " + emitRef(x) + " = (" + emitRef(w.write) + ") ? " + emitRef(w.data) + " : " + highZ + ";\n"}).mkString
       }

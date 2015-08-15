@@ -31,7 +31,7 @@
 package Chisel
 import scala.collection.mutable.ArrayBuffer
 
-/** I/O for a writer to the bus */
+/** I/O for a writer to the [[Chisel.TSB Tri State Buffer]] */
 class WriterIO(gen : Bits) extends Bundle {
   /** Enable writing to the bus */
   val write = Bool()
@@ -39,12 +39,19 @@ class WriterIO(gen : Bits) extends Bundle {
   val data  = gen.cloneType
 }
 
-/** This class enables multiple writers to the same bus using high impedence */
-class Bus(gen : Bits) extends Node {
-  /** Choose whether should be pulled high or low when idle*/
+/** This class implements a Tri State Buffer (TSB)
+  * @note To read the value of the TSB use TSB.out
+  * @note The TSB has a flag pulledHigh for simulation and has no effect on generated verilog
+  */
+class TSB(gen : Bits) extends Node {
+  /** Choose whether should be pulled high or low when TSB is idle
+    * @note default is true*/
   var pulledHigh = true
+  /** Pass the inout bus up to the top level module
+    * @note default is false*/
+  var toTop = false
 
-  /** Read output of the bus */
+  /** Read only output of the TSB */
   val out = gen.cloneType.asOutput
 
   // Set up the output
@@ -54,9 +61,9 @@ class Bus(gen : Bits) extends Node {
   /** Multiple write and enable output */
   private val writers = new ArrayBuffer[WriterIO]()
 
-  /** Add writer to the bus */
+  /** Add writer to the TSB */
   def addWriter(newWriter : WriterIO) : Unit = {
-    if ( newWriter.data.getWidth != getWidth ) ChiselError.error("Writers must have same width as bus")
+    if ( newWriter.data.getWidth != getWidth ) ChiselError.error("Writers must have same width as TSB")
     inputs += newWriter.write
     inputs += newWriter.data
     newWriter.write.consumers += this
@@ -68,7 +75,7 @@ class Bus(gen : Bits) extends Node {
   def getWriters() = writers.toList
 
   // Override methods
-  override def ## ( b : Node ) : Node = { throwException("Cannot use cat on bus") }
-  override def <> ( b : Node ) : Unit = { throwException("Cannot use <> as the writer cannot be known") }
+  override def ## ( b : Node ) : Node = { ChiselError.error("Cannot use cat on TSB") }
+  override def <> ( b : Node ) : Unit = { ChiselError.error("Cannot use <> as the writer cannot be known") }
   override def getWidth() : Int = out.getWidth
 }

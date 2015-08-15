@@ -532,7 +532,7 @@ class CppBackend extends Backend {
 
       case x: Clock => ""
 
-      case x: Bus => {
+      case x: TSB => {
         val res = ArrayBuffer[String]()
         val writers = x.getWriters
         // Reset value for bus
