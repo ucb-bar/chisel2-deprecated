@@ -148,7 +148,7 @@ object Node {
   are used to traverse the directed graph respectively backward (from
   output to input) and forward (from input to output).
   */
-abstract class Node extends nameable {
+abstract class Node extends Nameable {
   private[Chisel] var sccIndex = -1
   private[Chisel] var sccLowlink = -1
   private[Chisel] var depth = 0
@@ -158,7 +158,7 @@ abstract class Node extends nameable {
   /* Assigned in Binding and Mod.reset */
   private[Chisel] var compOpt: Option[Module] = Module.getComponent
   /** Use the function componentOf instead*/
-  def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") } 
+  private[Chisel] def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") }
   /** Get the module that this node is a part of or the top module if not assigned yet
     * @return The module that this node is a part of
     */
@@ -207,15 +207,8 @@ abstract class Node extends nameable {
     // See the comments in infer
   }
 
-  /** Set the name of a node when elaborated
-    * {{{ my.io.node.setName("MY_IO_NODE") }}}
-    * @param n The name to set the node to
-    */
-  def setName(n: String) { name = n ; named = true }
-
-  // TODO: set to private[Chisel] in favour of setName?
   /** An internal method to name nodes, use setName instead */
-  def nameIt (path: String, isNamingIo: Boolean) {
+  private[Chisel] def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitly through *setName*,
