@@ -265,8 +265,8 @@ class ConnectSuite extends TestSuite {
 
       class ForeignRef extends Module {
         val io = new Bundle {
-          val input  = Bits(INPUT, width = 8)
-          val output = Bits(OUTPUT, width = 8)
+          val input  = UInt(INPUT, width = 8)
+          val output = UInt(OUTPUT, width = 8)
         }
         val foreign = Module(new ForeignMod)
         io.output := io.input + foreign.add

@@ -269,16 +269,16 @@ class DataSuite extends TestSuite {
     try {
     class Child extends Module {
       val io = new Bundle {
-        val input  = Bits(INPUT, width = 8)
-        val output = Bits(OUTPUT, width = 8)
+        val input  = UInt(INPUT, width = 8)
+        val output = UInt(OUTPUT, width = 8)
       }
       io.output := io.input
     }
 
     class Parent extends Module {
       val io = new Bundle {
-        val input  = Bits(INPUT, width = 8)
-        val output = Bits(OUTPUT, width = 8)
+        val input  = UInt(INPUT, width = 8)
+        val output = UInt(OUTPUT, width = 8)
       }
       val child = Module(new Child)
       // child.io.input := io.input

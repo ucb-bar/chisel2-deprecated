@@ -43,17 +43,17 @@ class ComplexSuite extends TestSuite {
     class ComplexAssign(W: Int) extends Module {
       val io = new Bundle {
         val e   = /* new */ Bool(INPUT)
-        val in  = new Complex(Bits(width = W), Bits(width = W)).asInput
-        val out = new Complex(Bits(width = W), Bits(width = W)).asOutput
+        val in  = new Complex(UInt(width = W), UInt(width = W)).asInput
+        val out = new Complex(UInt(width = W), UInt(width = W)).asOutput
       }
       when (io.e) {
-//        val w = Wire(new Complex(Bits(width = W), Bits(width = W)))
+//        val w = Wire(new Complex(UInt(width = W), UInt(width = W)))
 //        w := io.in
         io.out.real := io.in.real
         io.out.imag := io.in.imag
       } .otherwise {
-        io.out.real := Bits(0)
-        io.out.imag := Bits(0)
+        io.out.real := UInt(0)
+        io.out.imag := UInt(0)
       }
     }
     

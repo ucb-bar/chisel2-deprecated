@@ -3,14 +3,14 @@ package SysCTest
 import Chisel._
 
 class FullAdderInput extends Bundle {
-  val a   = Bits(width = 1)
-  val b   = Bits(width = 1)
-  val cin = Bits(width = 1)
+  val a   = UInt(width = 1)
+  val b   = UInt(width = 1)
+  val cin = UInt(width = 1)
 }
 
 class FullAdderOutput extends Bundle {
-  val sum  = Bits(width = 1)
-  val cout = Bits(width = 1)
+  val sum  = UInt(width = 1)
+  val cout = UInt(width = 1)
 }
 
 class FullAdder extends Module {

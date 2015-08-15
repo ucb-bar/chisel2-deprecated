@@ -481,8 +481,8 @@ class NameSuite extends TestSuite {
   @Test def testInputPortNameChange() {
     class InputPortNameComp extends Module {
       val io = new Bundle {
-        val in = Bits(INPUT, 20)
-        val out = Bits(OUTPUT, 20)
+        val in = UInt(INPUT, 20)
+        val out = UInt(OUTPUT, 20)
       }
 
       val newName = io.in

@@ -850,7 +850,7 @@ try {
     try {
       class LitAsPort extends Module {
         val io = new Bundle {
-          val s2 = Bits(12)
+          val s2 = UInt(12)
         }
       }
       chiselMain(Array("--backend", "c",
@@ -899,7 +899,7 @@ try {
           val in = UInt(INPUT,  8)
           val out  = UInt(OUTPUT, 8)
         }
-        io.out := Mux(io.in === (Bits("b?110") | Bits("b1???")), io.in, UInt(0))
+        io.out := Mux(io.in === (UInt("b?110") | UInt("b1???")), io.in, UInt(0))
       }
   
       chiselMain(testArgs,

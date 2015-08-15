@@ -4,13 +4,13 @@ import Chisel._
 class VecApp(n: Int, W: Int) extends Module {
   val io = new Bundle {
     val a = UInt(INPUT, n)
-    val i = Vec(Bits(INPUT, W), n)
-    // val o = Vec(n,  Bits(OUTPUT, W) )
-    val d = Bits(OUTPUT, W)
+    val i = Vec(UInt(INPUT, W), n)
+    // val o = Vec(n,  UInt(OUTPUT, W) )
+    val d = UInt(OUTPUT, W)
   }
   // for (j <- 0 until n)
   //   io.o(j) := io.i(j)
-  // val w = Wire(Vec(n,  Bits(width = W) ))
+  // val w = Wire(Vec(n,  UInt(width = W) ))
   // w := io.i
   // io.o := w
   // io.d := w(io.a)
