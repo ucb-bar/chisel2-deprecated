@@ -49,7 +49,7 @@ class TSB(gen : Bits) extends Node {
   var pulledHigh = true
   /** Pass the inout bus up to the top level module
     * @note default is false*/
-  var toTop = false
+  def toTop : Unit = { componentOf.addTSB(this) }
 
   /** Read only output of the TSB */
   val out = gen.cloneType.asOutput

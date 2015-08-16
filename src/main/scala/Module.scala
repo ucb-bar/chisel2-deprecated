@@ -163,6 +163,12 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   private[Chisel] val debugs = LinkedHashSet[Node]()
   private[Chisel] val nodes = LinkedHashSet[Node]()
   private[Chisel] val names = HashMap[String, Node]()
+  private[Chisel] val tsbs = LinkedHashSet[TSB]()
+
+  private[Chisel] def addTSB(tsb : TSB) : Unit = {
+    tsbs += tsb
+    if ( this != Module.topMod ) componentOf.addTSB(tsb)
+  }
 
   private lazy val trueCond = Bool(true)
   private[Chisel] val switchKeys = Stack[Bits]()
