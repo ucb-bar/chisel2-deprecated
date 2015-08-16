@@ -57,7 +57,7 @@ object PriorityEncoder
 object OHToUInt
 {
   def apply(in: Seq[Bool]): UInt = apply(Vec(in))
-  def apply(in: Vec[Bool]): UInt = apply(in.toBits)
+  def apply(in: Vec[Bool]): UInt = apply(in.asUInt)
   def apply(in: Bits): UInt = UInt().asTypeFor(new OHToUInt(in))
 }
 

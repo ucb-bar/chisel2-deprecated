@@ -40,7 +40,7 @@ object FameDecoupledIO
       connectTo.host_ready := flattened.host_ready
       flattened.target.valid := connectTo.target.valid
       connectTo.target.ready := flattened.target.ready
-      flattened.target.bits := connectTo.target.bits.toBits
+      flattened.target.bits := connectTo.target.bits.asUInt
     } else {
       connectTo.host_valid := flattened.host_valid
       flattened.host_ready := connectTo.host_ready
@@ -269,7 +269,7 @@ class Fame1Wrapper(f: => Module) extends Module {
           decoupled.bits := decoupledBitsClone.fromBits(fame1Decoupled.target.bits)
         } else {
           decoupled.ready := fame1Decoupled.target.ready
-          fame1Decoupled.target.bits := decoupled.bits.toBits
+          fame1Decoupled.target.bits := decoupled.bits.asUInt
           fame1Decoupled.target.valid := decoupled.valid
         }
         DecoupledIOs(name) = fame1Decoupled
@@ -283,7 +283,7 @@ class Fame1Wrapper(f: => Module) extends Module {
           val regBitsClone = reg.bits.cloneType()
           reg.bits := regBitsClone.fromBits(fame1RegIO.bits)
         } else {
-          fame1RegIO.bits := reg.bits.toBits
+          fame1RegIO.bits := reg.bits.asUInt
         }
         RegIOs(name) = fame1RegIO
         reg_counter += 1
@@ -296,13 +296,13 @@ class Fame1Wrapper(f: => Module) extends Module {
           elementClone.setName(name)
           DebugIOs(name) = elementClone
           elementClone <> ioNode
-          if(ioNode.toBits.dir == INPUT){
+          if(ioNode.asUInt.dir == INPUT){
             io.debug(debug_counter).asInput
             ioNode := io.debug(debug_counter)
             DebugIOs(name) = io.debug(debug_counter)
           } else {
             io.debug(debug_counter).asOutput
-            io.debug(debug_counter) assign ioNode.toBits
+            io.debug(debug_counter) assign ioNode.asUInt
             DebugIOs(name) = io.debug(debug_counter)
           }
           debug_counter += 1

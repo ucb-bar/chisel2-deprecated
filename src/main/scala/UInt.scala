@@ -100,7 +100,9 @@ class UInt extends Bits with Num[UInt] {
     UInt(x).asInstanceOf[this.type]
   }
 
+  @deprecated("Use asUInt instead of toBits", "3")
   override def toBits: UInt = this
+  override def asUInt: UInt = this
 
   // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")

@@ -96,14 +96,14 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
       for (w <- writes)
         w.cond = w.cond.asInstanceOf[Bool] && !(cond && addr === w.addr.asInstanceOf[UInt])
 
-    val wr = new MemWrite(this, cond, addr, wdata.toBits, wmask)
+    val wr = new MemWrite(this, cond, addr, wdata.asUInt, wmask)
     writes += wr
     inputs += wr
   }
 
   def write(addr: UInt, dataIn: T): Unit = {
     val cond = Module.current.whenCond
-    val data = dataIn.toBits
+    val data = dataIn.asUInt
     if (seqRead && Driver.isDebugMem) {
       // generate bogus data when reading & writing same address on same cycle
       val random16 = LFSR16()
@@ -117,7 +117,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   def write(addr: UInt, data: T, wmask: UInt): Unit =
     if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
-    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), None)
+    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.asUInt & wmask | read(addr).asUInt & ~wmask), None)
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)

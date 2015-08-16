@@ -77,7 +77,7 @@ class BitsSuite extends TestSuite {
   @Test def testEqlBundle() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = UInt(2) === new Bundle{ val abc = UInt(2) }.toBits
+      val res = UInt(2) === new Bundle{ val abc = UInt(2) }.asUInt
       assertTrue( res.getWidth == 1 )
     }
     val dummyInst = Module(new Dummy)
@@ -86,7 +86,7 @@ class BitsSuite extends TestSuite {
   @Test def testEqlVec() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = UInt(2) === Vec(UInt(2) :: Nil).toBits
+      val res = UInt(2) === Vec(UInt(2) :: Nil).asUInt
       assertTrue( res.getWidth == 1 )
     }
     val dummyInst = Module(new Dummy)
