@@ -430,9 +430,12 @@ abstract class Node extends nameable {
     if (!isTypeNode || inputs.isEmpty) this
     else inputs(0).getNode
 
-  // TODO: change function name to toUInt?
-  /** @return This node as a UInt */
+  @deprecated("Don't use toBits to return a UInt, use asBits or asUInt", "3")
   def toBits(): UInt = chiselCast(this){UInt()}
+  /** @return this node as Bits */
+  def asBits(): Bits = chiselCast(this){UInt()}
+  /** @return this node as a UInt */
+  def asUInt(): UInt = chiselCast(this){UInt()}
 
   /** @return This node */
   def toNode: Node = this
