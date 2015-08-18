@@ -39,7 +39,7 @@ import Chisel._
 
 /** This test suite tests the emulator with large integers ( > 64 bits )
   */
-class BusSuite extends TestSuite {
+class TSBSuite extends TestSuite {
   val testArgs = Array("--backend", "v",
     "--targetDir", dir.getPath.toString()
   )
@@ -51,12 +51,12 @@ class BusSuite extends TestSuite {
         val en  = Bool(INPUT)
         val out = UInt(OUTPUT, 4)
       }
-      val myBus = new Bus(UInt(width=4))
+      val myTSB = new TSB(UInt(width=4))
       val writer = new WriterIO(UInt(width=4))
       writer.write := io.en
       writer.data := io.in
-      myBus.addWriter(writer)
-      io.out := myBus.out
+      myTSB.addWriter(writer)
+      io.out := myTSB.out
     }
 
     class WriteTestTests(c : WriteTest) extends Tester(c) {
@@ -70,7 +70,7 @@ class BusSuite extends TestSuite {
     launchCppTester((c: WriteTest) => new WriteTestTests(c))
     chiselMain(testArgs,
       () => Module(new WriteTest()))
-    assertFile("BusSuite_WriteTest_1.v")
+    assertFile("TSBSuite_WriteTest_1.v")
   }
 
   @Test def testWriteLow {
@@ -80,13 +80,13 @@ class BusSuite extends TestSuite {
         val en  = Bool(INPUT)
         val out = UInt(OUTPUT, 4)
       }
-      val myBus = new Bus(UInt(width=4))
-      myBus.pulledHigh = false
+      val myTSB = new TSB(UInt(width=4))
+      myTSB.pulledHigh = false
       val writer = new WriterIO(UInt(width=4))
       writer.write := io.en
       writer.data := io.in
-      myBus.addWriter(writer)
-      io.out := myBus.out
+      myTSB.addWriter(writer)
+      io.out := myTSB.out
     }
 
     class WriteLowTestTests(c : WriteLowTest) extends Tester(c) {
@@ -100,7 +100,7 @@ class BusSuite extends TestSuite {
     launchCppTester((c: WriteLowTest) => new WriteLowTestTests(c))
     chiselMain(testArgs,
       () => Module(new WriteLowTest()))
-    assertFile("BusSuite_WriteLowTest_1.v")
+    assertFile("TSBSuite_WriteLowTest_1.v")
   }
 
   @Test def testMultiWord {
@@ -110,12 +110,12 @@ class BusSuite extends TestSuite {
         val en  = Bool(INPUT)
         val out = UInt(OUTPUT, 130)
       }
-      val myBus = new Bus(UInt(width=130))
+      val myTSB = new TSB(UInt(width=130))
       val writer = new WriterIO(UInt(width=130))
       writer.write := io.en
       writer.data := io.in
-      myBus.addWriter(writer)
-      io.out := myBus.out
+      myTSB.addWriter(writer)
+      io.out := myTSB.out
     }
 
     class WriteMultiTestTests(c : WriteMultiTest) extends Tester(c) {
@@ -129,6 +129,6 @@ class BusSuite extends TestSuite {
     launchCppTester((c: WriteMultiTest) => new WriteMultiTestTests(c))
     chiselMain(testArgs,
       () => Module(new WriteMultiTest()))
-    assertFile("BusSuite_WriteMultiTest_1.v")
+    assertFile("TSBSuite_WriteMultiTest_1.v")
   }
 }
