@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -570,5 +570,50 @@ class ConnectSuite extends TestSuite {
       () => Module(new BindingTest()))
     
     assertFile("ConnectSuite_BindingTest_1.v")
+  }
+
+  /* Unused top level IOs are preserved (#172)
+   *
+   * 
+   */
+  @Test def testUnconnectedIOs() {
+    class SubModule(reset: Bool) extends Module(null, reset) {
+      class IO extends Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+        val ncIn = Bool(INPUT)
+        val ncOut = Bool(OUTPUT)
+      }
+      val io = new IO
+    
+      val r = Reg(init = Bool(true))
+      r := io.in
+      io.out := r
+    }
+    
+    class UnconnectedIOs extends Module {
+      class IO extends Bundle {
+        val in  = Bool(INPUT)
+        val out = Bool(OUTPUT)
+        val ncIn = Bool(INPUT)
+        val ncOut = Bool(OUTPUT)
+      }
+      val io = new IO
+    
+      val regs = Reg(Vec(3, Bool()))
+      regs(0) := reset
+      for (i <- 1 until 3)
+        regs(i) := regs(i-1)
+    
+      val sub = Module(new SubModule(regs(2)))
+      sub.io.in := io.in
+      io.out := sub.io.out /* | regs(2) */
+    }
+
+    chiselMain(Array[String]("--backend", "c",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new UnconnectedIOs()))
+    
+    assertFile("ConnectSuite_UnconnectedIOs_1.h")
   }
 }
