@@ -577,6 +577,7 @@ class ConnectSuite extends TestSuite {
    * 
    */
   @Test def testUnconnectedIOs() {
+    println("\ntestUnconnectedIOs ...")
     class SubModule(reset: Bool) extends Module(null, reset) {
       class IO extends Bundle {
         val in = Bool(INPUT)
@@ -615,5 +616,30 @@ class ConnectSuite extends TestSuite {
       () => Module(new UnconnectedIOs()))
     
     assertFile("ConnectSuite_UnconnectedIOs_1.h")
+  }
+
+  /* Missing default produces reasonable error message
+   * (and not a bare "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements." 
+   * Issue #513
+   */
+  @Test def testNoDefaultIOs() {
+    println("\ntestNoDefaultIOs ...")
+    class NoDefaultIOs extends Module {
+      class IO extends Bundle {
+        val in  = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val io = new IO
+      when(io.in) {
+        io.out := Bool(true)
+      }
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString())
+    intercept[IllegalStateException] {
+      // This should fail since io.out does not have a default value.
+      chiselMain(testArgs, () => Module(new NoDefaultIOs))
+    }
+    assertTrue(ChiselError.hasErrors)
   }
 }
