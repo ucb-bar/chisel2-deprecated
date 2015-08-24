@@ -200,22 +200,22 @@ static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
 static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, const unsigned int nw, const unsigned int w) {
 
   unsigned int n_shift_bits     = amount % val_n_bits();
-  unsigned int n_shift_words    = amount / val_n_bits();
+  int n_shift_words    = amount / val_n_bits();
   unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
   int msb              = s0[nw-1] >> (w - nw*val_n_bits() - 1);
   val_t carry = 0;
 
+  n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
   n_shift_words = (n_shift_words > nw) ? nw : n_shift_words;
 
   for (int i = 0; i < nw; i++)
     d[i] = 0;
 
-  for (unsigned int i = nw-1; i >= n_shift_words; i--) {
+  for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i - n_shift_words] = ( val >> n_shift_bits ) | carry;
     carry  = is_zero_carry ? 0 : val << n_rev_shift_bits;
-    if ( i - n_shift_words == 0) break; // I don't know why this line is necessary ...
   }
 
   if (msb == 0) {
@@ -238,18 +238,18 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
 
 static void rsh_n (val_t d[], const val_t s0[], const unsigned int amount, const unsigned int nw) {
   val_t carry = 0;
-  unsigned int n_shift_bits     = amount % val_n_bits();
-  unsigned int n_shift_words    = amount / val_n_bits();
+  unsigned int n_shift_bits = amount % val_n_bits();
+  int n_shift_words = amount / val_n_bits();
   unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
-  int is_zero_carry    = n_shift_bits == 0;
+  int is_zero_carry = n_shift_bits == 0;
+  n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
   n_shift_words = (n_shift_words > nw) ? nw : n_shift_words;
-  for (unsigned int i = 0; i < n_shift_words; i++)
+  for (int i = 0; i < n_shift_words; i++)
     d[nw-i-1] = 0;
-  for (unsigned int i = nw-1; i >= n_shift_words; i--) {
+  for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
     d[i-n_shift_words] = val >> n_shift_bits | carry;
     carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
-    if ( i - n_shift_words == 0) break; // I don't know why this line is necessary ...
   }
 }
 
