@@ -79,14 +79,14 @@ trait FileSystemUtilities {
   def cc(dir: String, name: String, flags: String = "", isCC: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val cmd = List(compiler, "-c", "-o", dir + name + ".o", flags, dir + name + ".cpp").mkString(" ")
-    if (!run(cmd)) throw new Exception("failed to compile " + name + ".cpp")
+    if (!run(cmd)) throwException("failed to compile " + name + ".cpp")
   }
 
   def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val shared = if (isLib) "-shared" else ""
     val ac = (List(compiler, LDFLAGS, shared, "-o", dir + target) ++ (objects map (dir + _))).mkString(" ")
-    if (!run(ac)) throw new Exception("failed to link " + objects.mkString(", "))
+    if (!run(ac)) throwException("failed to link " + objects.mkString(", "))
   }
 }
 
@@ -102,6 +102,19 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
+
+  private val uniqueSet = HashSet[String]()
+
+  /** Assert that 'uniqueStr' is unique for this backend */
+  private[Chisel] def assertUnique(uniqueStr : String, msg : String) {
+    // Multiple empty strings are allowed
+    if (uniqueStr != "") {
+      if ( uniqueSet.contains(uniqueStr))
+        ChiselError.warning("[BUG] Internal error: " + msg)
+      else
+        uniqueSet += uniqueStr
+    }
+  }
 
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
@@ -482,7 +495,7 @@ abstract class Backend extends FileSystemUtilities{
     val dfsStack = Stack[Node]()
     walked += root
     dfsStack.push(root)
-    val clock = root.clock getOrElse (throw new RuntimeException("Reg should have its own clock"))
+    val clock = root.clock getOrElse (throwException("Reg should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
       node.consumers filterNot (walked contains _) foreach {
@@ -515,7 +528,7 @@ abstract class Backend extends FileSystemUtilities{
           hasError = true
         }
       }
-      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
+      if (hasError) throwException("Could not elaborate code due to uninferred width(s)")
     }
 
     var count = 0
@@ -659,7 +672,7 @@ abstract class Backend extends FileSystemUtilities{
     val sccList = new ArrayBuffer[ArrayBuffer[Node]]
 
     def tarjanSCC(n: Node): Unit = {
-      if (n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+      if (n.isInstanceOf[Delay]) throwException("trying to DFS on a register")
 
       n.sccIndex = sccIndex
       n.sccLowlink = sccIndex
@@ -813,6 +826,10 @@ abstract class Backend extends FileSystemUtilities{
     markComponents
 
     verifyComponents
+
+    // Ensure all conditional assignments have defauts.
+    verifyAllMuxes
+    ChiselError.checkpoint()
 
     ChiselError.info("giving names")
     nameAll

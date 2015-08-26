@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,40 +28,45 @@
  MODIFICATIONS.
 */
 
-package Chisel
-import Literal._
+import org.junit.Test
 
-/** A bit pattern object to enable representation of dont cares */
-object BitPat {
-  /** Get a bit pattern from a string
-    * @param n a string with format b---- eg) b1?01
-    * @note legal characters are 0, 1, ? and must be base 2*/
-  def apply(n: String): BitPat = {
-    require(n(0) == 'b', "BINARY BitPats ONLY")
-    val (bits, mask, swidth) = parseLit(n.substring(1))
-    new BitPat(toLitVal(bits, 2), toLitVal(mask, 2), swidth)
+import Chisel._
+
+class DoubleSuite extends TestSuite {
+  @Test def testCompareDbl() {
+    println("\ntestCompareDbl...")
+    class CompareDblModule extends Module {
+      class IO extends Bundle {
+        val in1 = Dbl(INPUT)
+        val in2 = Dbl(INPUT)
+        val outLT = Bool(OUTPUT)
+        val outLE = Bool(OUTPUT)
+        val outGT = Bool(OUTPUT)
+        val outGE = Bool(OUTPUT)
+      }
+      val io = new IO()
+      val dbl1 = io.in1
+      val dbl2 = io.in2
+      io.outLT := dbl1 < dbl2
+      io.outLE := dbl1 <= dbl2
+      io.outGT := dbl1 > dbl2
+      io.outGE := dbl1 >= dbl2
+    }
+
+    class CompareDblModuleTests(m: CompareDblModule) extends Tester(m) {
+      for (i <- 0 to 100) {
+        val dbl1 = rnd.nextDouble
+        val dbl2 = rnd.nextDouble
+        
+        poke(m.io.in1, dbl1)
+        poke(m.io.in2, dbl2)
+        expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)
+        expect(m.io.outLE, if (dbl1 <= dbl2) 1 else 0)
+        expect(m.io.outGT, if (dbl1 > dbl2) 1 else 0)
+        expect(m.io.outGE, if (dbl1 >= dbl2) 1 else 0)
+      }
+    }
+
+    launchCppTester((m: CompareDblModule) => new CompareDblModuleTests(m))
   }
-
-  /** Get a bit pattern of don't cares with a specified width */
-  def DC(width: Int): BitPat = BitPat("b" + ("?" * width))
-
-  // BitPat <-> UInt
-  /** enable conversion of a bit pattern to a UInt */
-  implicit def BitPatToUInt(x: BitPat): UInt = {
-    require(x.mask == (BigInt(1) << x.getWidth)-1)
-    UInt(x.value, x.getWidth)
-  }
-  /** create a bit pattern from a UInt */
-  implicit def apply(x: UInt): BitPat = {
-    require(x.isLit)
-    BitPat("b" + x.litValue().toString(2))
-  }
-}
-
-/** A class to create bit patterns
-  * Use the [[Chisel.BitPat$ BitPat]] object instead of this class directly */
-class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
-  def getWidth: Int = width
-  def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))
-  def != (other: Bits): Bool = !(this === other)
 }

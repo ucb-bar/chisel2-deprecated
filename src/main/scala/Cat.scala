@@ -31,13 +31,31 @@
 package Chisel
 
 object Cat {
+  /** Combine data elements together
+    * @param mod Data to combine with
+    * @param mods any number of other Data elements to be combined in order
+    * @return A UInt which is all of the bits combined together
+    */
   def apply[T <: Data](mod: T, mods: T*): UInt = apply(mod :: mods.toList)
+  /** Combine data elements together
+    * @param mods any number of other Data elements to be combined in order
+    * @return A UInt which is all of the bits combined together
+    */
   def apply[T <: Data](mods: Seq[T]): UInt =
     UInt(OUTPUT).fromNode(Concatenate(mods))
 }
 
 object Concatenate {
+  /** Combine nodes together
+    * @param mod Data to combine with
+    * @param mods any number of other Data elements to be combined in order
+    * @return A Node which is all of the bits combined together
+    */
   def apply(mod: Node, mods: Node*): Node = apply(mod :: mods.toList)
+  /** Combine nodes together
+    * @param mods any number of other Data elements to be combined in order
+    * @return A Node which is all of the bits combined together
+    */
   def apply(mods: Seq[Node]): Node = doCat(mods)
   private def doCat(mods: Seq[Node]): Node =
     if (mods.tail.isEmpty) mods.head

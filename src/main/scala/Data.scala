@@ -30,6 +30,8 @@
 
 package Chisel
 
+/** This trait enforces numerical properties on the data
+  such as being able to add, subtract, multiply, divide etc */
 abstract trait Num[T <: Data] {
   // def << (b: T): T
   // def >> (b: T): T
@@ -65,26 +67,29 @@ abstract class Data extends Node {
 
   // Interface required by Vec:
   def ===[T <: Data](right: T): Bool = {
-    throw new Exception("=== not defined on " + this.getClass
+    throwException("=== not defined on " + this.getClass
       + " and " + right.getClass)
   }
 
+  /** Try to convert this data to a Bool
+    * @throws ChiselException if the width is not 1*/
   def toBool(): Bool = {
     val gotWidth = this.getWidth()
     if( gotWidth < 1) {
-      throw new Exception("unable to automatically convert " + this + " to Bool, convert manually instead")
+      throwException("unable to automatically convert " + this + " to Bool, convert manually instead")
     } else if(gotWidth > 1) {
-      throw new Exception("multi bit signal " + this + " converted to Bool")
+      throwException("multi bit signal " + this + " converted to Bool")
     }
     chiselCast(this){Bool()}
   }
 
-  // Interface required by Cat:
+  /** Interface required by [[Chisel.Cat Cat]]
+    is an operator to combine data nodes together */
   def ##[T <: Data](right: T): this.type = {
-    throw new Exception("## not defined on " + this.getClass + " and " + right.getClass)
+    throwException("## not defined on " + this.getClass + " and " + right.getClass)
   }
 
-
+  /** make this node a type node */
   def setIsTypeNode {
     assert(inputs.length > 0, ChiselError.error("Type Node must have an input"))
     isTypeNode = true
@@ -93,15 +98,19 @@ abstract class Data extends Node {
 
   def apply(name: String): Data = null // TODO: neccessary?
   def flatten: Array[(String, Bits)]
+  /** Change INPUTs to OUTPUTs and visa versa */
   def flip(): this.type = this
+  /** Return this object as an INPUT */
   def asInput(): this.type = this
 
   /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
     or recursively sets members of Bundle/Vec to OUTPUT.
-    Returns this instance with its exact type.
+    @return this instance with its exact type.
     */
   def asOutput(): this.type
+  /** set this node as directionless */
   def asDirectionless(): this.type
+  /** check if this node is neither INPUT or OUTPUT */
   def isDirectionless: Boolean = true
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
@@ -198,6 +207,8 @@ abstract class Data extends Node {
     }
   }
 
+  /** name this node
+    * @note use [[Chisel.Node.setName setName]] in [[Chisel.Node Node]] rather than this directly */
   override def nameIt(path: String, isNamingIo: Boolean) {
     comp match {
       case Some(p) if isTypeNode => p nameIt (path, isNamingIo)

@@ -216,7 +216,7 @@ class PutativeMemWrite(mem: Mem[_ <: Data], addri: UInt) extends Node with proc 
 
 class MemReadWrite(val read: MemSeqRead, val write: MemWrite) extends MemAccess(read.mem, null)
 {
-  override def cond = throw new Exception("")
+  override def cond = throwException("")
   override def getPortType = if (write.isMasked) "mrw" else "rw"
 }
 
@@ -264,7 +264,7 @@ object SeqMem {
     new SeqMem(out, n)
 }
 
-class SeqMem[T <: Data](out: T, n: Int) {
+class SeqMem[T <: Data](out: T, val n: Int) extends Delay with VecLike[T] {
   private val mem = {
     // construct a Mem while pretending we aren't in compatibility mode
     val compat = Driver.minimumCompatibility
@@ -274,9 +274,20 @@ class SeqMem[T <: Data](out: T, n: Int) {
     mem
   }
 
+
+  def length: Int = n
+
+  def apply(addr: UInt): T = read(addr)
+  def apply(addr: Int): T = apply(UInt(addr))
+
+  override val hashCode: Int = _id
+  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+
   def read(addr: UInt): T = mem.read(Reg(next = addr))
   def read(addr: UInt, enable: Bool): T = mem.read(RegEnable(addr, enable))
 
   def write(addr: UInt, data: T): Unit = mem.write(addr, data)
   def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
+
+  override def setName(name: String): Unit = mem.setName(name)
 }

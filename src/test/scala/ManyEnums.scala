@@ -28,40 +28,30 @@
  MODIFICATIONS.
 */
 
-package Chisel
-import Literal._
+//package ChiselTests
+import org.junit.Assert._
+import org.junit.Test
+import org.junit.Ignore
 
-/** A bit pattern object to enable representation of dont cares */
-object BitPat {
-  /** Get a bit pattern from a string
-    * @param n a string with format b---- eg) b1?01
-    * @note legal characters are 0, 1, ? and must be base 2*/
-  def apply(n: String): BitPat = {
-    require(n(0) == 'b', "BINARY BitPats ONLY")
-    val (bits, mask, swidth) = parseLit(n.substring(1))
-    new BitPat(toLitVal(bits, 2), toLitVal(mask, 2), swidth)
+import Chisel._
+
+class ManyEnumsSuite extends TestSuite {
+  @Test def testManyEnums() {
+    println("\ntestManyEnums...")
+    class ManyEnums extends Module {
+      val io = UInt(OUTPUT, 16)
+      val states = Enum(UInt(),
+        List('e_00, 'e_01, 'e_02, 'e_03, 'e_04, 'e_05, 'e_06, 'e_07,
+             'e_08, 'e_09, 'e_10, 'e_11, 'e_12, 'e_13, 'e_14, 'e_15, 'e_16, 'e_17,
+             'e_18, 'e_19, 'e_20, 'e_21, 'e_22))
+      val state = Reg(UInt(), init = states('e_22))
+      io := state
+    }
+
+    class ManyEnumsTester(m: ManyEnums) extends Tester(m) {
+      expect(m.io, 22)
+    }
+
+    launchCppTester((c: ManyEnums) => new ManyEnumsTester(c))
   }
-
-  /** Get a bit pattern of don't cares with a specified width */
-  def DC(width: Int): BitPat = BitPat("b" + ("?" * width))
-
-  // BitPat <-> UInt
-  /** enable conversion of a bit pattern to a UInt */
-  implicit def BitPatToUInt(x: BitPat): UInt = {
-    require(x.mask == (BigInt(1) << x.getWidth)-1)
-    UInt(x.value, x.getWidth)
-  }
-  /** create a bit pattern from a UInt */
-  implicit def apply(x: UInt): BitPat = {
-    require(x.isLit)
-    BitPat("b" + x.litValue().toString(2))
-  }
-}
-
-/** A class to create bit patterns
-  * Use the [[Chisel.BitPat$ BitPat]] object instead of this class directly */
-class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
-  def getWidth: Int = width
-  def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))
-  def != (other: Bits): Bool = !(this === other)
 }
