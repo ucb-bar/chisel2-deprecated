@@ -86,7 +86,7 @@ object Reg {
     val gen = (outType match {case Some(t) => t case None => 
       next match { case Some(t) => t case None => 
       init match { case Some(t) => t case None =>
-        throw new Exception("cannot infer type of Reg.")}}}).cloneType
+        throwException("cannot infer type of Reg.")}}}).cloneType
     validateGen(gen)
 
     // asOutput flip the direction and returns this.

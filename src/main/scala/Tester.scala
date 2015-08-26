@@ -100,7 +100,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         dumpLogs
         while (!_logs.isEmpty)
           println(testOutputString)
-        throw new Exception("Errors occurred in simulation")
+        throw new RuntimeException("Errors occurred in simulation")
       case Some(ln) => ln
     }
   }

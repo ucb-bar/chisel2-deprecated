@@ -33,7 +33,7 @@ import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, S
 
 object Module {
   /** @return the top level module
-    * @throws Exception no top component is set
+    * @throws ChiselException if no top component is set
     */
   def topMod = Driver.topComponent getOrElse (throwException("no top component"))
 
@@ -154,6 +154,8 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
   /** Set the name of this module to the string 'n' */
   def setName(n: String) { name = n ; named = true }
+  /** Set the declaration name of the module to be string 'n' */
+  def setModuleName(n : String) { moduleName = n }
 
   private[Chisel] val bindings = ArrayBuffer[Binding]()
   private[Chisel] val printfs = ArrayBuffer[Printf]()
@@ -399,7 +401,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   /** Add a default reset to the module*/
   def addDefaultReset {
     _reset match {
-      case None => throw new RuntimeException
+      case None => throwException("no default reset")
       case Some(r) => resetPin match {
         case None => 
         case Some(p) =>

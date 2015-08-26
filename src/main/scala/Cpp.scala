@@ -491,6 +491,8 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") < toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d<=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>=") {
@@ -740,7 +742,7 @@ class CppBackend extends Backend {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
       val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
-      if (!run(cmd)) throw new Exception("make failed...")
+      if (!run(cmd)) throwException("make failed...")
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {

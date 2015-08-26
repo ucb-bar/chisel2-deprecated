@@ -221,7 +221,7 @@ class FloBackend extends Backend {
         List(floDir + "fix-sched", ">", dir + name + ".hex")
       val cmdString = cmd.mkString(" ")
       println("BUILDING " + cmdString)
-      if (!run(cmdString)) throw new Exception("failed to build flo")
+      if (!run(cmdString)) throwException("failed to build flo")
     }
     build(c.name)
   }

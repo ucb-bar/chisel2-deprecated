@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.math.{ceil, floor, log}
+import scala.collection.mutable.ArrayBuffer
 
 /** Compute the log2 rounded up with min value of 1 */
 object log2Up
@@ -489,12 +490,14 @@ object Queue
   }
 }
 
-/** An async fifo
-  * @param gen The type of data in the fifo
-  * @param entries The max number of entries in the fifo
-  * @param enq_clk clk used for queuing data
-  * @param deq_clk clk used for dequeuing data from the fifo
-  */
+/** Asynchronous Fifo. Used to cross two clock domains.
+  *
+  * @param gen the type of data in the fifo
+  * @param entries the max number of entries in the fifo. The actual
+size will be rounded up to the next power of 2 - (size = 1<<log2Up(entries))
+  * @param enq_clk clock for the input (writing, queuing) side
+  * @param deq_clk clock for the output (reading, dequeuing side) side
+ */
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
@@ -541,7 +544,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(gen, entries, clock=enq_clk)
+  val mem = Mem(gen, 1 << asize, clock=enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }
@@ -644,5 +647,118 @@ object Wire
                    UInt().asInstanceOf[T] } }
     res.setIsWired(true)
     res.asDirectionless
+  }
+}
+
+/** DelayBetween works out the number of registers or delays for all possible directional paths between two nodes
+  */
+object DelayBetween {
+
+  /** This method recursively searchs backwards along the directional graph from visited to end
+      12/08/2015 - Duncan: Changed to the standard depth frist search
+   */
+  private def nodePathDepthSearch(visited : List[Node], end : Node, paths : ArrayBuffer[Int]) : ArrayBuffer[Int] = {
+    val startList : List[Node] = visited.last.inputs.toList
+    for (node <- startList) {
+      if (!visited.contains(node)) {
+        if (node._id == end._id) {
+          val completePath : List[Node] = visited :+ node
+          paths += completePath.filter(_.isReg).length
+        } else {
+          val nextPath = visited :+ node
+          paths ++= nodePathDepthSearch(nextPath, end, new ArrayBuffer[Int])
+        }
+      }
+    }
+    paths
+  }
+
+  /** Find all paths between the two nodes using a breadth first search */
+  private def nodePathBreadthSearch(start : Node, end : Node) : ArrayBuffer[Int] = {
+    val que = new scala.collection.mutable.Queue[Node]
+    val paths = new scala.collection.mutable.Queue[List[Node]]
+    val completePaths = new ArrayBuffer[Int]
+    var visited = List(start._id)
+    que.enqueue(start)
+    paths.enqueue(List(start))
+    while(!que.isEmpty) {
+      val node = que.dequeue()
+      val currentPath = paths.dequeue()
+      if (node._id == end._id) {
+        completePaths.append(currentPath.filter(_.isReg).length)
+        visited = visited diff List(node._id)
+      } else {
+        node.inputs.foreach(l => if(!visited.contains(l._id)) {
+          visited :::= List(l._id)
+          que.enqueue(l)
+          val nextPath = currentPath :+ l
+          paths.enqueue(nextPath)
+          })
+      }
+    }
+    completePaths
+  }
+
+
+  /** Finds to shortest path between two nodes using a multi-stage depth first search */
+  private def nodeShortestPathSearch(startList : List[Node], end : Node) : Int = {
+    // We what this to operate in two different stages, first is to find either a register or the end
+    // if the end is found return the value, otherwise start the search again from the registers 
+    var searchNodes = startList
+    val visited = new ArrayBuffer[Int]
+    var count = -1
+    var found = false
+    while (!found & !searchNodes.isEmpty) {
+      count += 1
+      val nodesToSearch = new ArrayBuffer[Node]
+      for (node <- searchNodes) {
+        if (!visited.contains(node._id) & !found) {
+          visited.append(node._id)
+          val delayLevel = nodeFindRegOrEnd(List(node), end, new ArrayBuffer[Node]).toList
+          found = delayLevel.contains(end)
+          delayLevel.foreach(n => nodesToSearch.append(n))
+        } 
+      }
+      searchNodes = nodesToSearch.toList
+    }
+    if(!found) count = -1
+    count
+  }
+
+  /** Depth First Search to find either the end or a register */
+  private def nodeFindRegOrEnd(visited : List[Node], end : Node, nodes : ArrayBuffer[Node]) : ArrayBuffer[Node] = {
+    visited.last.inputs.toList.map(node => {
+        if (!visited.contains(node)) {
+          if (node._id == end._id || node.isReg) {
+            nodes += node
+          } else {
+            val nextPath = visited :+ node
+            nodes ++= nodeFindRegOrEnd(nextPath, end, new ArrayBuffer[Node])
+          }
+        }
+      })
+    nodes
+  }
+
+
+  /** Find all delays for paths from a to b
+    * @param a starting node
+    * @param b finishing node
+    * @param breadth used depth first search by default, true if you want to use breadth first search
+    * @return the all delays between a and b from smallest to largest
+    */
+  def apply(a : Node, b : Node, breadth : Boolean = false) : List[Int] = {
+    // Do a bfs looking at all inputs of b until a is reached
+    val res = if (breadth) nodePathBreadthSearch(b, a) else nodePathDepthSearch(List(b), a, new ArrayBuffer[Int])
+    res.distinct.sorted.toList
+  }
+
+  /** Find the Shortest path from a to b
+    * @param a starting node
+    * @param b finishing node
+    * @return the shorted delay between a and b
+    */
+  def findShortest(a : Node, b : Node) : Int = {
+    nodeShortestPathSearch(List(b), a)
   }
 }

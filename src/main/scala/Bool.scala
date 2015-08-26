@@ -66,9 +66,9 @@ class Bool extends UInt {
     case _ => {
       val gotWidth = src.getWidth()
       if (gotWidth < 1) {
-        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead")
+        throwException("unable to automatically convert " + src + " to Bool, convert manually instead")
       } else if (gotWidth > 1) {
-        throw new Exception("multi bit signal " + src + " converted to Bool")
+        throwException("multi bit signal " + src + " converted to Bool")
       }
       super.colonEquals(src(0)) // We only have one bit in *src*.
     }

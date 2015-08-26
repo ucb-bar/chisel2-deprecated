@@ -35,42 +35,23 @@ import org.junit.Ignore
 
 import Chisel._
 
-
-class OuterSuite extends TestSuite {
-  @Test def testOuterSuite() {
-    println("\ntestOuterSuite...")
-
-    class Inner extends Module {
-      val io = new Bundle {
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
-      }
-      io.out := io.in + Bits(1)
-    }
-    
-    class Outer extends Module {
-      val io = new Bundle { 
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
-      }
-      // val c = Module(new Inner)
-      val c = Array(Module(new Inner))
-      // val w = Wire(Bits(NO_DIR, 8))
-      // w := io.in
-      c(0).io.in := io.in
-      io.out  := (c(0).io.out * Bits(2))(7,0)
-    }
-    
-    class OuterTester(c: Outer) extends Tester(c) {
-      for (t <- 0 until 16) {
-        val test_in = rnd.nextInt(256)
-        poke(c.io.in, test_in)
-        step(1)
-        expect(c.io.out, ((test_in + 1) * 2)&255)
-      }
+class ManyEnumsSuite extends TestSuite {
+  @Test def testManyEnums() {
+    println("\ntestManyEnums...")
+    class ManyEnums extends Module {
+      val io = UInt(OUTPUT, 16)
+      val states = Enum(UInt(),
+        List('e_00, 'e_01, 'e_02, 'e_03, 'e_04, 'e_05, 'e_06, 'e_07,
+             'e_08, 'e_09, 'e_10, 'e_11, 'e_12, 'e_13, 'e_14, 'e_15, 'e_16, 'e_17,
+             'e_18, 'e_19, 'e_20, 'e_21, 'e_22))
+      val state = Reg(UInt(), init = states('e_22))
+      io := state
     }
 
-    launchCppTester((c: Outer) => new OuterTester(c))
+    class ManyEnumsTester(m: ManyEnums) extends Tester(m) {
+      expect(m.io, 22)
+    }
+
+    launchCppTester((c: ManyEnums) => new ManyEnumsTester(c))
   }
 }
-

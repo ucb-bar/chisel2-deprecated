@@ -75,7 +75,7 @@ object UnaryOp {
       case "dfloor" => Op("dfloor", fixWidth(doubleWidth), x)
       case "dceil" => Op("dceil", fixWidth(doubleWidth), x)
       case "dround" => Op("dround", fixWidth(doubleWidth), x)
-      case any => throw new Exception("Unrecognized operator " + op)
+      case any => throwException("Unrecognized operator " + op)
     }
   }
 }
@@ -118,7 +118,7 @@ object BinaryOp {
       case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
       case "+&"   => Op("+", maxWidthPlusOne _,  x, y )
       case "-&"   => Op("-", maxWidthPlusOne _,  x, y )
-      case any   => throw new Exception("Unrecognized operator " + op)
+      case any   => throwException("Unrecognized operator " + op)
     }
   }
 
@@ -152,7 +152,7 @@ object LogicalOp {
       case "d<"  => Op("d<",  fixWidth(1), x, y)
       case "d<=" => Op("d<=", fixWidth(1), x, y)
       case "d>=" => Op("d>=", fixWidth(1), x, y)
-      case any   => throw new Exception("Unrecognized operator " + op);
+      case any   => throwException("Unrecognized operator " + op);
     }
     Bool(OUTPUT).fromNode(node)
   }
@@ -163,7 +163,7 @@ object ReductionOp {
   def apply(x: Node, op: String): Node = {
     op match {
       case "^" => Op("^", fixWidth(1), x)
-      case any => throw new Exception("Unrecognized operator " + op)
+      case any => throwException("Unrecognized operator " + op)
     }
   }
 }
@@ -424,7 +424,7 @@ abstract class Op extends Node {
     case _ => false
   }
 
-  def lower: Node = throw new Exception("lowering " + op + " is not supported")
+  def lower: Node = throwException("lowering " + op + " is not supported")
   def identityFromNode: Int = op match {
     case "<<"  => 0
     case ">>"  => 0
