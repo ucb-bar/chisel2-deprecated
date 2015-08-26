@@ -491,6 +491,8 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") < toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d<=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>=") {
