@@ -67,6 +67,33 @@ class FixedSuite extends TestSuite {
     val dummyInst = Module(new Dummy)
   }
 
+  @Test def testFixedColonEqual() {
+    class FixedColonEqual extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 32, 16)
+        val b = Fixed(OUTPUT, 16, 8)
+      }
+      io.b := io.a
+      assertTrue( io.a.getWidth() == 32)
+      assertTrue( io.a.getFractionalWidth() == 16)
+      assertTrue( io.b.getWidth() == 16)
+      assertTrue( io.b.getFractionalWidth() == 8)
+    }
+
+    class FixedColonEqualTests(c : FixedColonEqual) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+        val inA = BigInt(r.nextInt(1 << 30))
+        poke(c.io.a, inA)
+        expect(c.io.b, toFixedT(toDouble(inA, 16), 8))
+      }
+    }
+
+    launchCppTester((c: FixedColonEqual) => new FixedColonEqualTests(c))
+  }
+
   @Test def testFixedEqual() {
     class FixedEqual extends Module {
       val io = new Bundle {
@@ -108,8 +135,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
+        val inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         expect(c.io.c, toFixed(toDouble(inA, 16) + toDouble(inB, 16), 16))
@@ -134,8 +161,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
+        val inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         expect(c.io.c, toFixed(toDouble(inA, 16) - toDouble(inB, 16), 16))
@@ -159,7 +186,7 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
+        val inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         step(1)
         expect(c.io.c, inA)
@@ -183,7 +210,7 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
+        val inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         expect(c.io.c, -inA)
       }
@@ -213,8 +240,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
+        val inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         expect(c.io.gt, Bool(inA > inB).litValue())
@@ -244,13 +271,13 @@ class FixedSuite extends TestSuite {
       for (i <- 0 until trials) {
 
         // For the testing find two numbers that we also give a number that is representable in fixed point
-        var inA = BigInt(r.nextInt(1 << 30))
-        var inB = BigInt(r.nextInt(1 << 30))
+        var inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        var inB = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
         var doubleA = toDouble(inA, 16)
         var doubleB = toDouble(inB, 16)
         while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
-          inA = BigInt(r.nextInt(1 << 30))
-          inB = BigInt(r.nextInt(1 << 30))
+          inA = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
+          inB = BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt
           doubleA = toDouble(inA, 16)
           doubleB = toDouble(inB, 16)
         }
@@ -262,6 +289,32 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedDiv) => new FixedDivTests(c))
   }
+
+  @Test def testFixedMul() {
+    class FixedMul extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 32, 16)
+        val b = Fixed(INPUT, 32, 16)
+        val c = Fixed(OUTPUT, 64, 32)
+      }
+      io.c := io.a * io.b
+    }
+
+    class FixedMulTests(c : FixedMul) extends Tester(c) {
+      val trials = 10
+      val r = scala.util.Random
+
+      for (i <- 0 until trials) {
+        val inA = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        poke(c.io.a, inA)
+        poke(c.io.b, inB)
+        expect(c.io.c, toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 32))
+      }
+    }
+
+    launchCppTester((c: FixedMul) => new FixedMulTests(c))
+  }
   
   @Test def testFixedMulT() {
     class FixedMulT extends Module {
@@ -270,7 +323,7 @@ class FixedSuite extends TestSuite {
         val b = Fixed(INPUT, 32, 16)
         val c = Fixed(OUTPUT, 32, 16)
       }
-      io.c := io.a * io.b
+      io.c := io.a *% io.b
     }
 
     class FixedMulTTests(c : FixedMulT) extends Tester(c) {
@@ -278,11 +331,16 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
+        val inA = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        expect(c.io.c, toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 16))
+        val expected = toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 16)
+        val res = peek(c.io.c)
+        val errorVal = scala.math.abs(scala.math.abs(expected.toInt) - scala.math.abs(res.toInt))
+        val error = errorVal > 1
+        val errorMessage = if(error) "Error outside acceptiable Range: " + errorVal.toString else "Error within acceptiable range: " + errorVal.toString
+        expect(!error, errorMessage)
       }
     }
 
@@ -304,8 +362,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
+        val inA = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
         expect(c.io.c, toFixed(toDouble(inA, 16) * toDouble(inB, 16), 16))
@@ -323,7 +381,7 @@ class FixedSuite extends TestSuite {
         val c = Fixed(OUTPUT, 32, 16)
       }
       val temp = io.a + io.b
-      val temp2 = temp - io.a
+      val temp2 = temp *& io.a
       val temp3 = temp2 - io.b
       io.c := temp3
     }
@@ -333,11 +391,11 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
+        val inA = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        expect(c.io.c, toFixed(toDouble(inA, 16) + toDouble(inB, 16) - toDouble(inA, 16) - toDouble(inB, 16), 16))
+        expect(c.io.c, toFixed((toDouble(inA, 16) + toDouble(inB, 16)) * toDouble(inA, 16) - toDouble(inB, 16), 16))
       }
     }
 
@@ -362,9 +420,9 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
-        val inC = BigInt(r.nextInt(1 << 15))
+        val inA = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inB = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
+        val inC = BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt
         val inSel = r.nextInt(2)
         poke(c.io.a, inA)
         poke(c.io.b, inB)
@@ -393,8 +451,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = Array.fill(8){BigInt(r.nextInt(1 << 30))}
-        val inB = Array.fill(8){BigInt(r.nextInt(1 << 30))}
+        val inA = Array.fill(8){BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt}
+        val inB = Array.fill(8){BigInt(r.nextInt(1 << 30)) * scala.math.pow(-1, r.nextInt(2)).toInt}
         (c.io.a, inA).zipped.map((w, v) => poke(w, v))
         (c.io.b, inB).zipped.map((w, v) => poke(w, v))
         val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_+_).reduce(_+_)
@@ -420,8 +478,8 @@ class FixedSuite extends TestSuite {
       val r = scala.util.Random
 
       for (i <- 0 until trials) {
-        val inA = Array.fill(8){BigInt(r.nextInt(1 << 15))}
-        val inB = Array.fill(8){BigInt(r.nextInt(1 << 15))}
+        val inA = Array.fill(8){BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt}
+        val inB = Array.fill(8){BigInt(r.nextInt(1 << 15)) * scala.math.pow(-1, r.nextInt(2)).toInt}
         (c.io.a, inA).zipped.map((w, v) => poke(w, v))
         (c.io.b, inB).zipped.map((w, v) => poke(w, v))
         val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_*_)
@@ -451,19 +509,10 @@ class FixedSuite extends TestSuite {
         // For the testing find two numbers that we also give a number that is representable in fixed point
         var inA = BigInt(r.nextInt(1 << 30))
         var inB = BigInt(r.nextInt(1 << 30))
-        var doubleA = toDouble(inA, 16)
-        var doubleB = toDouble(inB, 16)
-        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
-          inA = BigInt(r.nextInt(1 << 30))
-          inB = BigInt(r.nextInt(1 << 30))
-          doubleA = toDouble(inA, 16)
-          doubleB = toDouble(inB, 16)
-        }
         poke(c.io.a, inA)
         poke(c.io.b, inB)
-        val div = toDouble(inA, 16) / toDouble(inB, 16)
-        val mod = div - div.toInt.toDouble
-        expect(c.io.c, toFixedT(mod, 16))
+        val mod = inA % inB
+        expect(c.io.c, mod)
       }
     }
 
