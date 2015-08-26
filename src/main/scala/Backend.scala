@@ -828,6 +828,10 @@ abstract class Backend extends FileSystemUtilities{
 
     verifyComponents
 
+    // Ensure all conditional assignments have defauts.
+    verifyAllMuxes
+    ChiselError.checkpoint()
+
     ChiselError.info("giving names")
     nameAll
     ChiselError.checkpoint()
