@@ -1,15 +1,10 @@
-import sbt._
-import Keys._
-
-object BuildSettings extends Build {
-
-  val buildSettings = Defaults.defaultSettings ++ Seq (
+lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
     // version := "2.2.28",
     version := "2.3-SNAPSHOT",
     name := "chisel",
-    scalaVersion := "2.10.4",
-    crossScalaVersions := Seq("2.10.4", "2.11.5"),
+    scalaVersion := "2.11.6",
+    crossScalaVersions := Seq("2.10.5", "2.11.6"),
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -74,8 +69,13 @@ object BuildSettings extends Build {
     scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("chisel"), version) map { (bd, v) =>
       Seq("-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
     }
-  ) ++ org.scalastyle.sbt.ScalastylePlugin.Settings
+ )
 
-  lazy val root = Project("chisel", file("."), settings=buildSettings)
-}
-
+lazy val chisel = (project in file(".")).
+  enablePlugins(BuildInfoPlugin).
+  settings(chiselBuildSettings: _*).
+  settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    // We should really be using name.vale, but currently, the package is "Chisel" (uppercase first letter)
+    buildInfoPackage := /* name.value */ "Chisel"
+  )

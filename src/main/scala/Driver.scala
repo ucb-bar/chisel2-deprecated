@@ -32,6 +32,7 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import sys.process.stringSeqToProcess
+import BuildInfo._
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -133,9 +134,10 @@ object Driver extends FileSystemUtilities{
 
     // Do BFS
     val _walked = HashSet[Node](queue:_*)
+    // Avoid a "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements" if node is null - unassigned MUX
     def walked(node: Node) = _walked contains node
     def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
-    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueInputs(top: Node) { top.inputs filterNot(_ == null) filterNot walked foreach enqueueNode }
     def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
@@ -169,9 +171,10 @@ object Driver extends FileSystemUtilities{
 
     // Do DFS
     val _walked = HashSet[Node](stack:_*)
+    // Avoid a "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements" if node is null - unassigned MUX
     def walked(node: Node) = _walked contains node
     def pushNode(node: Node) { stack push node ; _walked += node }
-    def pushInputs(top: Node) { top.inputs.toList filterNot walked foreach pushNode }
+    def pushInputs(top: Node) { top.inputs.toList filterNot(_ == null) filterNot walked foreach pushNode }
     def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
@@ -405,6 +408,7 @@ object Driver extends FileSystemUtilities{
         }
         case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
         case "--wError" => wError = true
+        case "--version" => println(version)
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -488,6 +492,7 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  val version = BuildInfo.version
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0

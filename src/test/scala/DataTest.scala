@@ -156,6 +156,7 @@ class DataSuite extends TestSuite {
       assertTrue( dat.assigned );
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
    */
 
@@ -207,6 +208,7 @@ class DataSuite extends TestSuite {
       assertTrue( dat.assigned );
       assertFalse( dat.named );
     }
+    val dummyInst = Module(new Dummy)
   }
    */
 
