@@ -1,0 +1,17 @@
+#include "{!name!}.h"
+
+void {!name!}::component_thread(void){
+  while(true){
+    {!input_thread!}
+    //Clock Lo
+    c->clock_lo(reset);
+
+    //Clock Hi
+    c->clock_hi(reset);
+
+    {!output_thread!}
+
+    wait(Step);
+  }
+}
+
