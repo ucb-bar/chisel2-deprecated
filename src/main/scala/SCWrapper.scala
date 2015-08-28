@@ -54,21 +54,21 @@ object SCWrapper {
 
   def example_component_def(): ComponentDef = {
     val cdef = new ComponentDef("GCD_t", "GCD")
-    cdef.entries += new CEntry("a", true, "dat_t<1>", "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
-    cdef.entries += new CEntry("z", false, "dat_t<1>", "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
+    cdef.entries += new CEntry("a", true, "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
+    cdef.entries += new CEntry("z", false, "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
     cdef
   }
 
   def example_component_def2(): ComponentDef = {
     val cdef = new ComponentDef("AddFilter_t", "AddFilter")
-    cdef.entries += new CEntry("a", true, "dat_t<16>", "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
-    cdef.entries += new CEntry("b", false, "dat_t<16>", "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
+    cdef.entries += new CEntry("a", true, "dat_t<16>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
+    cdef.entries += new CEntry("b", false, "dat_t<16>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
     cdef
   }
 
-  def genwrapper(c: ComponentDef, filename:  String) {
+  def genwrapper(c: ComponentDef, filename:  String, templatefile: String) {
     //Read in template
-    val template = read_resource("template.txt")
+    val template = read_resource(templatefile)
 
     //Generate replacements
     val replacements = generate_replacements(c)
@@ -81,9 +81,9 @@ object SCWrapper {
     System.out.println(filled)
   }
 
-  def genwrapper(c: ComponentDef, filewriter: java.io.FileWriter){
+  def genwrapper(c: ComponentDef, filewriter: java.io.FileWriter, templatefile: String){
     //Read in template
-    val template = read_resource("template.txt")
+    val template = read_resource(templatefile)
 
     //Generate replacements
     val replacements = generate_replacements(c)
@@ -106,62 +106,80 @@ object SCWrapper {
     replacements += (("name", "SCWrapped" + c.name))
     replacements += (("component_type", c.ctype))
 
-    //I/O Fifos
+    //I/O Ports
     /*begin*/{
-      var input_fifos = ""
-      var output_fifos = ""
+      var input_ports = ""
+      var output_ports = ""
+	  var sctor_list = ""
+      var input_thread = ""
+      var output_thread = ""
+
       for( e <- c.entries) {
-        val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
+        val decl_in  = "sc_in<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
+        val decl_out = "sc_out<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
+        val thread_in = "c->%s__io_%s = LIT<%s>(%s__io_%s->read());\n    ".format(c.name, e.name, e.cwidth, c.name, e.name)
+        val thread_out = "%s__io_%s->write(c->%s__io_%s.to_ulong());\n    ".format(c.name, e.name, c.name, e.name)
+        //val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
         if(e.is_input) {
-          input_fifos += decl
+          input_ports += decl_in
+          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
+          //sensitive_list += " << %s__io_%s".format(c.name, e.name)
+          input_thread += thread_in
         } else {
-          output_fifos += decl
+          output_ports += decl_out
+          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
+          output_thread += thread_out
         }
       }
-      replacements += (("input_fifos", input_fifos))
-      replacements += (("output_fifos", output_fifos))
+      replacements += (("input_ports", input_ports))
+      replacements += (("output_ports", output_ports))
+      replacements += (("sctor_list", sctor_list))
+      //sensitive_list += ";"
+      //replacements += (("sensitive_list", sensitive_list))
+      replacements += (("input_thread", input_thread))
+      replacements += (("output_thread", output_thread))
     }
 
-    /*Initialize output fifos*/{
-      //Pull out output fifos
-      val fifos = ArrayBuffer[CEntry]();
+    /*Initialize output ports*/{
+      //Pull out output ports
+      val ports = ArrayBuffer[CEntry]();
       for(e <- c.entries) {
         if(!e.is_input) {
-          fifos += e;
+          ports += e;
         }
       }
       //Initialize
       var init = "";
-      for( i <- 0 until fifos.size) {
-        init += "%s = new sc_fifo<%s >(1);\n  ".format(fifos(i).name, fifos(i).ctype)
+      for( i <- 0 until ports.size) {
+        init += "%s = new sc_fifo**???**<%s >(1);\n  ".format(ports(i).name, ports(i).ctype)
       }
       replacements += (("init_output_fifos", init))
     }
 
     /*Check input queues*/{
-      //Pull out input fifos
+      //Pull out input ports
       val dvar = ArrayBuffer[String]()
       val fvar = ArrayBuffer[String]()
-      val fifos = ArrayBuffer[CEntry]()
+      val ports = ArrayBuffer[CEntry]()
       for( e <- c.entries) {
         if(e.is_input) {
           dvar += genvar("dat")
           fvar += genvar("filled")
-          fifos += e
+          ports += e
         }
       }
       //Initialize
       var init = ""
       var fill = ""
       var check = ""
-      for( i <- 0 until fifos.size) {
-        val ctype = fifos(i).ctype
+      for( i <- 0 until ports.size) {
+        val ctype = ports(i).ctype
         val data = dvar(i)
         val filled = fvar(i)
-        val in = fifos(i).name
-        val in_data = fifos(i).data
-        val ready = fifos(i).ready
-        val valid = fifos(i).valid
+        val in = ports(i).name
+        val in_data = ports(i).data
+        val ready = ports(i).ready
+        val valid = ports(i).valid
         init += "%s %s;\n    ".format(ctype, data)
         init += "int %s = 0;\n    ".format(filled)
         fill += "if(!%s){%s = %s->nb_read(%s);}\n      "format(filled, filled, in, data)
@@ -183,22 +201,22 @@ object SCWrapper {
     }
 
     /*Check Output Queues*/{
-      //Pull out output fifos
-      val fifos = ArrayBuffer[CEntry]()
+      //Pull out output ports
+      val ports = ArrayBuffer[CEntry]()
           for (e <- c.entries) {
             if(!e.is_input) {
-              fifos += e
+              ports += e
             }
           }
       //Check
       var check = ""
       var valid_output = "";
-      for(i <- 0 until fifos.size) {
-        val ctype = fifos(i).ctype
-        val valid = fifos(i).valid
-        val data = fifos(i).data
-        val ready = fifos(i).ready
-        val out = fifos(i).name
+      for(i <- 0 until ports.size) {
+        val ctype = ports(i).ctype
+        val valid = ports(i).valid
+        val data = ports(i).data
+        val ready = ports(i).ready
+        val out = ports(i).name
         check += "c->%s = LIT<1>(%s->num_free() > 0);\n      "format(ready, out)
         // Is this a structured data-type?
         if (ctype == data) {
@@ -220,11 +238,11 @@ object SCWrapper {
 
     // If we have structured FIFO elements, we need to generate the struct definitions
     //  and the ostream "<<" definition to keep SystemC happy.
-    val ostream_lsh = ArrayBuffer[String]()
+/*    val ostream_lsh = ArrayBuffer[String]()
     for((name, struct) <- c.structs) {
       ostream_lsh += struct.toString + "inline ostream& operator << (ostream& os, const %s& arg){  return os; }\n".format(name)
     }
-    replacements += (("ostream_lsh", ostream_lsh.mkString("\n")))
+    replacements += (("ostream_lsh", ostream_lsh.mkString("\n")))	*/
     replacements
   }
 
@@ -309,10 +327,11 @@ object SCWrapper {
   }
 }
 
-class CEntry(a_name: String, input: Boolean, a_type: String, a_data: String, a_ready: String, a_valid: String) {
+class CEntry(a_name: String, input: Boolean, a_type: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
    val name = a_name
    val is_input = input
    val ctype = a_type
+   val cwidth = a_width
    val data = a_data
    val ready = a_ready
    val valid = a_valid
@@ -321,6 +340,7 @@ class CEntry(a_name: String, input: Boolean, a_type: String, a_data: String, a_r
      name + " " +
      is_input + " " +
      ctype + " " +
+     cwidth + " " +
      data + " " +
      ready + " " +
      valid

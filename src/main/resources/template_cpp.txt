@@ -1,0 +1,27 @@
+#include "{!name!}.h"
+
+void {!name!}::input_thread(void){
+  while(true){
+//    wait(data_written_event);
+    {!input_thread!}
+    {!set_valid_ready!}
+    //Clock Lo
+    c->clock_lo(reset);
+    wait(Step);
+//    data_read_event.notify(SC_ZERO_TIME);
+  }
+}
+
+void {!name!}::output_thread(void){
+//  data_written_event.notify(SC_ZERO_TIME);
+  while(true){
+    wait(data_read_event);
+    {!output_thread!}
+    {!reset_valid_ready!}
+    //Clock Hi
+    c->clock_hi(reset);
+    wait(Step);
+//    data_written_event.notify(SC_ZERO_TIME);
+  }
+}
+

@@ -30,9 +30,7 @@
 
 package Chisel
 
-/** If we have structured/aggregate types as top-level ports, we define suitable structures
-  * for encapsulating their components, in order to treat them as sc_fifo elements.
-  */
+
 class SysCBackend extends CppBackend {
    override def elaborate(c: Module): Unit = {
       super.elaborate(c)
@@ -51,28 +49,34 @@ class SysCBackend extends CppBackend {
             case bits: Bits => {
               val is_input = bits.dir == INPUT
               val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
-              val entry = new CEntry(name, is_input, vtype, bits.name, delt.ready.name, delt.valid.name)
+              val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, delt.ready.name, delt.valid.name)
               cdef.entries += (entry)
             }
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
               if (inputs.length > 0) {
-                val aName = "cs_" + aggregate.name + "_i"
-                cdef.structs(aName)= new CStruct(aName, inputs)
-                val entry = new CEntry(name, true, aName, aName, delt.ready.name, delt.valid.name)
+                val aName = "dat_t<" + aggregate.width + ">"		//"cs_" + aggregate.name + "_i"
+                //cdef.structs(aName)= new CStruct(aName, inputs)
+                val entry = new CEntry(name, true, aName, aggregate.width, aggregate.name, delt.ready.name, delt.valid.name)
                 cdef.entries += (entry)
               }
               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
               if (outputs.length > 0) {
-                val aName = "cs_" + aggregate.name + "_o"
-                cdef.structs(aName) = new CStruct(aName, outputs)
-                val entry = new CEntry(name, false, aName, aName, delt.ready.name, delt.valid.name)
+                val aName = "dat_t<" + aggregate.width + ">"		//"cs_" + aggregate.name + "_o"
+                //cdef.structs(aName) = new CStruct(aName, outputs)
+                val entry = new CEntry(name, false, aName, aggregate.width, aggregate.name, delt.ready.name, delt.valid.name)
                 cdef.entries += (entry)
               }
             }
             case _ => badElements(name) = elt
           }
+        }
+        case bits: Bits => {
+          val is_input = bits.dir == INPUT
+          val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
+          val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, "ready", "valid")
+          cdef.entries += (entry)
         }
         case _ => badElements(name) = elt
       }
@@ -93,9 +97,13 @@ class SysCBackend extends CppBackend {
       //Print out the component definition.
       println(cdef)
 
-      //Generate the file.
-      val out_p = createOutputFile("SCWrapped" + c.name + ".cpp");
-      SCWrapper.genwrapper(cdef, out_p)
+      //Generate SCWrapped files
+      val out_h = createOutputFile("SCWrapped" + c.name + ".h");
+      val template_h = "template_h.txt"
+      SCWrapper.genwrapper(cdef, out_h, template_h)
+      val out_cpp = createOutputFile("SCWrapped" + c.name + ".cpp");
+      val template_cpp = "template_cpp.txt"
+      SCWrapper.genwrapper(cdef, out_cpp, template_cpp)
     }
   }
 }
