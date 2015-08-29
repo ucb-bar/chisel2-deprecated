@@ -34,7 +34,6 @@ SC_MODULE({!name!}){
 
     // Clock Initialization? Don't understand what this is for. Copied from emulator.
     for(int i = 0; i < 5; i++) {
-      dat_t<1> reset = LIT<1>(1);
       c->clock_lo(reset);
       c->clock_hi(reset);
     }
