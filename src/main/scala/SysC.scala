@@ -51,6 +51,7 @@ class SysCBackend extends CppBackend {
               val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
               val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, delt.ready.name, delt.valid.name)
               cdef.entries += (entry)
+			  cdef.valid_ready = true
             }
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
@@ -76,6 +77,7 @@ class SysCBackend extends CppBackend {
                 //cdef.structs(aName) = new CStruct(aName, outputs)
                 //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
               }
+			  cdef.valid_ready = true
             }
             case _ => badElements(name) = elt
           }
@@ -85,6 +87,7 @@ class SysCBackend extends CppBackend {
           val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
           val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, "ready", "valid")
           cdef.entries += (entry)
+		  cdef.valid_ready = false
         }
         case _ => badElements(name) = elt
       }
