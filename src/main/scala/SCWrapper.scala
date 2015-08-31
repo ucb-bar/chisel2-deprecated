@@ -115,22 +115,32 @@ object SCWrapper {
       var output_thread = ""
 
       for( e <- c.entries) {
-        val decl_in  = "sc_in<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
-        val decl_out = "sc_out<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
-        val thread_in = "c->%s__io_%s = LIT<%s>(%s__io_%s->read());\n    ".format(c.name, e.name, e.cwidth, c.name, e.name)
-        val thread_out = "%s__io_%s->write(c->%s__io_%s.to_ulong());\n    ".format(c.name, e.name, c.name, e.name)
+        val decl_in  = "sc_in<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
+        val decl_out = "sc_out<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
+        val thread_in = "c->%s = LIT<%s>(%s->read().to_uint64());\n    ".format(e.data, e.cwidth, e.data)
+        val thread_out = "%s->write(c->%s.to_ulong());\n    ".format(e.data, e.data)
         //val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
         if(e.is_input) {
           input_ports += decl_in
-          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
+          sctor_list += ", %s(\"%s\")\n  ".format(e.data, e.data)
           //sensitive_list += " << %s__io_%s".format(c.name, e.name)
           input_thread += thread_in
         } else {
           output_ports += decl_out
-          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
+          sctor_list += ", %s(\"%s\")\n  ".format(e.data, e.data)
           output_thread += thread_out
         }
       }
+	  output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
+	  output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
+	  sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
+	  sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
+	  input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
+	  input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
+	  output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
+	  output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
+	  output_thread += "c->%s__io_in_valid = reset;\n    ".format(c.name)
+	  output_thread += "c->%s__io_out_ready = reset;".format(c.name)
       replacements += (("input_ports", input_ports))
       replacements += (("output_ports", output_ports))
       replacements += (("sctor_list", sctor_list))

@@ -4,7 +4,6 @@ void {!name!}::input_thread(void){
   while(true){
 //    wait(data_written_event);
     {!input_thread!}
-//    {!set_valid_ready!}
     //Clock Lo
     c->clock_lo(reset);
     wait(Step);
@@ -17,7 +16,6 @@ void {!name!}::output_thread(void){
   while(true){
 //    wait(data_read_event);
     {!output_thread!}
-//    {!reset_valid_ready!}
     //Clock Hi
     c->clock_hi(reset);
     wait(Step);

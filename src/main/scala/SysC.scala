@@ -55,28 +55,26 @@ class SysCBackend extends CppBackend {
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
-             // if (inputs.length > 0) {
-				val l = inputs.length
-				for (i <- 1 to l) {
-				  //val aName = "cs_" + aggregate.name + "_i"
-				  val cmpnt = aggregate.flatten.map(_._2)
-				  val vtype = "dat_t<" + 1 + ">" 
-                  //cdef.structs(aName)= new CStruct(aName, inputs)
-                  //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
-                  val entry = new CEntry(name, true, vtype, 1, aggregate.name, "ready", "valid")
+              if (inputs.length > 0) {
+			    for (in <- inputs) { 
+				  val vtype = "dat_t<" + in._2.width + ">" 
+                  val entry = new CEntry(name, true, vtype, in._2.width, in._2.name, "ready", "valid")
                   cdef.entries += (entry)
 				}
-              //}
+				//val aName = "cs_" + aggregate.name + "_i"
+                //cdef.structs(aName)= new CStruct(aName, inputs)
+                //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+              }
               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
               if (outputs.length > 0) {
-				for (t <- 0 until outputs.length) {
-                  //val aName = "cs_" + aggregate.name + "_o"
-				  val vtype = "dat_t<" + 1 + ">" 
-                  //cdef.structs(aName) = new CStruct(aName, outputs)
-                  //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
-                  val entry = new CEntry(name, false, vtype, 1, aggregate.name, "ready", "valid")
+			    for (out <- outputs) { 
+				  val vtype = "dat_t<" + out._2.width + ">" 
+                  val entry = new CEntry(name, false, vtype, out._2.width, out._2.name, "ready", "valid")
                   cdef.entries += (entry)
 				}
+                //val aName = "cs_" + aggregate.name + "_o"
+                //cdef.structs(aName) = new CStruct(aName, outputs)
+                //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
               }
             }
             case _ => badElements(name) = elt
