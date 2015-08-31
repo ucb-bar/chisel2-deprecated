@@ -131,16 +131,18 @@ object SCWrapper {
           output_thread += thread_out
         }
       }
-	  output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
-	  output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
-	  sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
-	  sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
-	  input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
-	  input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
-	  output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
-	  output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
-	  output_thread += "c->%s__io_in_valid = reset;\n    ".format(c.name)
-	  output_thread += "c->%s__io_out_ready = reset;".format(c.name)
+	  if (c.valid_ready == true){
+		sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
+		sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
+		output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
+		output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
+		input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
+		input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
+		output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
+		output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
+		output_thread += "c->%s__io_in_valid = reset;\n    ".format(c.name)
+		output_thread += "c->%s__io_out_ready = reset;".format(c.name)
+	  }
       replacements += (("input_ports", input_ports))
       replacements += (("output_ports", output_ports))
       replacements += (("sctor_list", sctor_list))
@@ -360,6 +362,7 @@ class CEntry(a_name: String, input: Boolean, a_type: String, a_width: Int, a_dat
 class ComponentDef(a_type: String, a_name: String) {
   val ctype: String = a_type
   val name: String = a_name
+  var valid_ready: Boolean = false
   val entries = ArrayBuffer[CEntry]()
   val structs = scala.collection.mutable.LinkedHashMap[String, CStruct]()
 
