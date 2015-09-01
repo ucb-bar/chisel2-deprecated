@@ -40,15 +40,12 @@ SC_MODULE({!name!}){
 
     //Register Thread
     SC_THREAD(input_thread);
-//    {!sensitive_list!}
     SC_THREAD(output_thread);
   }
 
   void input_thread(void);
   void output_thread(void);
 
-//  sc_event data_read_event;
-//  sc_event data_written_event;
   dat_t<1> reset = LIT<1>(0);
   dat_t<1> set = LIT<1>(1);
   sc_time Step;

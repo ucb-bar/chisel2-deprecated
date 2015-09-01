@@ -54,15 +54,15 @@ object SCWrapper {
 
   def example_component_def(): ComponentDef = {
     val cdef = new ComponentDef("GCD_t", "GCD")
-    cdef.entries += new CEntry("a", true, "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
-    cdef.entries += new CEntry("z", false, "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
+    cdef.entries += new CEntry("a", true, "dat_t<1>", "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
+    cdef.entries += new CEntry("z", false, "dat_t<1>", "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
     cdef
   }
 
   def example_component_def2(): ComponentDef = {
     val cdef = new ComponentDef("AddFilter_t", "AddFilter")
-    cdef.entries += new CEntry("a", true, "dat_t<16>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
-    cdef.entries += new CEntry("b", false, "dat_t<16>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
+    cdef.entries += new CEntry("a", true, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
+    cdef.entries += new CEntry("b", false, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
     cdef
   }
 
@@ -115,10 +115,10 @@ object SCWrapper {
       var output_thread = ""
 
       for( e <- c.entries) {
-        val decl_in  = "sc_in<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
-        val decl_out = "sc_out<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
-        val thread_in = "c->%s = LIT<%s>(%s->read().to_uint64());\n    ".format(e.data, e.cwidth, e.data)
-        val thread_out = "%s->write(c->%s.to_ulong());\n    ".format(e.data, e.data)
+        val decl_in  = "sc_in<%s > %s;\n  ".format(e.ctype, e.data)
+        val decl_out = "sc_out<%s > %s;\n  ".format(e.ctype, e.data)
+        val thread_in = "c->%s = LIT<%s>(%s->read()%s);\n    ".format(e.data, e.cwidth, e.data, e.ccast)
+        val thread_out = "%s->write(c->%s%s);\n    ".format(e.data, e.data, e.ccast)
         //val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
         if(e.is_input) {
           input_ports += decl_in
@@ -339,24 +339,25 @@ object SCWrapper {
   }
 }
 
-class CEntry(a_name: String, input: Boolean, a_type: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
-   val name = a_name
-   val is_input = input
-   val ctype = a_type
-   val cwidth = a_width
-   val data = a_data
-   val ready = a_ready
-   val valid = a_valid
+class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
+  val name = a_name
+  val is_input = input
+  val ctype = a_type
+  val ccast = a_cast
+  val cwidth = a_width
+  val data = a_data
+  val ready = a_ready
+  val valid = a_valid
 
-   override def toString(): String = {
-     name + " " +
-     is_input + " " +
-     ctype + " " +
-     cwidth + " " +
-     data + " " +
-     ready + " " +
-     valid
-   }
+  override def toString(): String = {
+    name + " " +
+    is_input + " " +
+    ctype + " " +
+    cwidth + " " +
+    data + " " +
+    ready + " " +
+    valid
+  }
 }
 
 class ComponentDef(a_type: String, a_name: String) {

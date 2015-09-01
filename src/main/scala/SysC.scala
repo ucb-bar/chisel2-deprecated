@@ -48,8 +48,11 @@ class SysCBackend extends CppBackend {
           delt.bits match {
             case bits: Bits => {
               val is_input = bits.dir == INPUT
-              val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
-              val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, delt.ready.name, delt.valid.name)
+              val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
+			  if (is_input) { tcast = ".to_uint64()" }
+			  else { tcast = ".to_ulong()" }
+			  val vcast = tcast
+              val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name, delt.ready.name, delt.valid.name)
               cdef.entries += (entry)
 			  cdef.valid_ready = true
             }
@@ -57,35 +60,67 @@ class SysCBackend extends CppBackend {
               // Collect all the inputs and outputs.
               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
               if (inputs.length > 0) {
-			    for (in <- inputs) { 
-				  val vtype = "dat_t<" + in._2.width + ">" 
-                  val entry = new CEntry(name, true, vtype, in._2.width, in._2.name, "ready", "valid")
+			    for (in <- inputs) {
+				  var ttype = ""; var tcast = ""
+				   in._2 match {
+					case inUBool: Bool => ttype = "bool"; tcast = ""
+					case inSInt: SInt => ttype = "sc_int<" + in._2.width + ">";  tcast = ".to_uint64()"
+					//Bits is implemented as UInt
+					case inUInt: UInt => ttype = "sc_uint<" + in._2.width + ">"; tcast = ".to_uint64()"
+				  }
+				  val vtype = ttype; val vcast = tcast
+                  val entry = new CEntry(name, true, vtype, vcast, in._2.width, in._2.name, "ready", "valid")
                   cdef.entries += (entry)
 				}
-				//val aName = "cs_" + aggregate.name + "_i"
-                //cdef.structs(aName)= new CStruct(aName, inputs)
-                //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
               }
               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
               if (outputs.length > 0) {
-			    for (out <- outputs) { 
-				  val vtype = "dat_t<" + out._2.width + ">" 
-                  val entry = new CEntry(name, false, vtype, out._2.width, out._2.name, "ready", "valid")
+			    for (out <- outputs) {
+				  var ttype = ""; var tcast = ""
+				   out._2 match {
+					case outUBool: Bool => ttype = "bool"; tcast = ".to_ulong()"
+					case outSInt: SInt => ttype = "sc_int<" + out._2.width + ">";  tcast = ".to_ulong()"
+					//Bits is implemented as UInt
+					case outUInt: UInt => ttype = "sc_uint<" + out._2.width + ">"; tcast = ".to_ulong()"
+				  }
+				  val vtype = ttype; val vcast = tcast
+                  val entry = new CEntry(name, false, vtype, vcast, out._2.width, out._2.name, "ready", "valid")
                   cdef.entries += (entry)
 				}
-                //val aName = "cs_" + aggregate.name + "_o"
-                //cdef.structs(aName) = new CStruct(aName, outputs)
-                //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
               }
 			  cdef.valid_ready = true
             }
             case _ => badElements(name) = elt
           }
         }
-        case bits: Bits => {
-          val is_input = bits.dir == INPUT
-          val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
-          val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, "ready", "valid")
+        case bool: Bool => {
+          val is_input = bool.dir == INPUT
+          val vtype = "bool"; var tcast = ""
+		  if (is_input) { tcast = "" }
+		  else { tcast = ".to_ulong()" }
+		  val vcast = tcast
+          val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name, "ready", "valid")
+          cdef.entries += (entry)
+		  cdef.valid_ready = false
+        }
+        case sint: SInt => {
+          val is_input = sint.dir == INPUT
+          val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
+		  if (is_input) { tcast = ".to_uint64()" }
+		  else { tcast = ".to_ulong()" }
+		  val vcast = tcast
+          val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name, "ready", "valid")
+          cdef.entries += (entry)
+		  cdef.valid_ready = false
+        }
+		//Bits is implemented as UInt
+        case uint: UInt => {
+          val is_input = uint.dir == INPUT
+          val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
+		  if (is_input) { tcast = ".to_uint64()" }
+		  else { tcast = ".to_ulong()" }
+		  val vcast = tcast
+          val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name, "ready", "valid")
           cdef.entries += (entry)
 		  cdef.valid_ready = false
         }
