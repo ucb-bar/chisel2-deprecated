@@ -37,6 +37,7 @@ MAN_PAGES := chisel.man
 srcDir    := .
 installTop:= ../www
 SUPPORT ?= $(srcDir)/../bin
+VPYTHON ?= ~/.virtualenvs/cit27/bin/python
 
 # Set the current release info
 # RELEASE_TAGTEXT is something like: v2.2.18 125 g3501d7f
@@ -97,7 +98,7 @@ chisel-%.pdf: %.tex %_date.sty
 	$(SUPPORT)/jinja2html.py $(notdir $<) $@
 
 releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html FORCE
-	~/bin/chgrelfromgit/prepreleases.py $< $@
+	PYTHONPATH=${PYTHONPATH}:$(SUPPORT) $(VPYTHON) $(SUPPORT)/chgrelfromgit/prepreleases.py $< $@
 
 clean:
 	-rm -f $(TEX_TEMP_FILES)
