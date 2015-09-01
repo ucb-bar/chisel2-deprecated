@@ -12,7 +12,6 @@
 
 version   := 2.2.0
 
-SUPPORT ?= ~/bin
 PDFLATEX  := pdflatex
 WWW_PAGES := index.html documentation.html download.html faq.html releases.html
 WWW_EXTRA := manual.html getting-started.html parameters.html
@@ -37,6 +36,7 @@ MAN_PAGES := chisel.man
 
 srcDir    := .
 installTop:= ../www
+SUPPORT ?= $(srcDir)/../bin
 
 # Set the current release info
 # RELEASE_TAGTEXT is something like: v2.2.18 125 g3501d7f
@@ -85,7 +85,7 @@ chisel-%.pdf: %.tex %_date.sty
 %.html: %.tex %_date.sty
 	cd $(dir $<) && for c in 0 1; do htlatex $(notdir $<) $(PWD)/$(srcDir)/html.cfg "" -d/$(PWD)/ ; done
 	mv $(subst .tex,.html,$(notdir $<)) $@~
-	$(srcDir)/../bin/tex2html.py $@~ $@
+	$(SUPPORT)/tex2html.py $@~ $@
 
 %.man: %.mtt
 	# cd into the directory containing the .tex file and massage it
@@ -94,10 +94,10 @@ chisel-%.pdf: %.tex %_date.sty
 	latex2man $(basename $@).ttex $@
 
 %.html: $(srcDir)/templates/%.html $(srcDir)/templates/base.html
-	$(srcDir)/../bin/jinja2html.py $(notdir $<) $@
+	$(SUPPORT)/jinja2html.py $(notdir $<) $@
 
 releases.html:	$(srcDir)/templates/releases.html $(srcDir)/templates/base.html FORCE
-	$(SUPPORT)/chgrelfromgit/prepreleases.py $< $@
+	~/bin/chgrelfromgit/prepreleases.py $< $@
 
 clean:
 	-rm -f $(TEX_TEMP_FILES)
