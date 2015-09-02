@@ -1,0 +1,28 @@
+From 6097f4bf7e38d2d79a4e7747fa6fd99e585ef046 Mon Sep 17 00:00:00 2001
+From: Carlos Alberto Petry <carlos.petry@ic.unicamp.br>
+Date: Wed, 2 Sep 2015 10:12:32 -0300
+Subject: [PATCH 7/7] Updated SCWrapper.scala. Cheked Chisel generation for
+ Decoupled and non-Decoupled signals -> all works fine.
+
+---
+ src/main/scala/SCWrapper.scala | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/main/scala/SCWrapper.scala b/src/main/scala/SCWrapper.scala
+index e5d2993..8b11632 100644
+--- a/src/main/scala/SCWrapper.scala
++++ b/src/main/scala/SCWrapper.scala
+@@ -134,8 +134,8 @@ object SCWrapper {
+ 	  if (c.valid_ready == true){
+ 		sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
+ 		sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
+-		output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
+-		output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
++		output_ports += "sc_out<bool > %s__io_in_ready;\n  ".format(c.name)
++		output_ports += "sc_out<bool > %s__io_out_valid;\n  ".format(c.name)
+ 		input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
+ 		input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
+ 		output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
+-- 
+2.1.0
+
