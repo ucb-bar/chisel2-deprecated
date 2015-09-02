@@ -11,6 +11,7 @@ ChangeLog for Chisel v2.2.28
 #438 Add --assertWarn flag converting Assert to Warn.
 #431 Use the standard Chisel error mechanism in SystemC backend.
 #172 Add a test for issue 172 - unused top level IOs were trimmed.
+ (Cpp backend) Constant pool literals should be identified by width as well as value.
  Update Enum Doc for size > 22 Tuple Limitation and add a test for Enums with more than 22 elements.
  Convert project/build.scala to build.sbt
  Update scalastyle plugin version.
