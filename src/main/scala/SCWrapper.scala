@@ -134,8 +134,8 @@ object SCWrapper {
 	  if (c.valid_ready == true){
 		sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
 		sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
-		output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
-		output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
+		output_ports += "sc_out<bool > %s__io_in_ready;\n  ".format(c.name)
+		output_ports += "sc_out<bool > %s__io_out_valid;\n  ".format(c.name)
 		input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
 		input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
 		output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
