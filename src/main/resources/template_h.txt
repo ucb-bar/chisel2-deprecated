@@ -30,7 +30,7 @@ SC_MODULE({!name!}){
     // Initialize Component, Clock in RESET
     c = new {!component_type!}();
     c->init();
-    Step = Step/2;
+    Step = Step;
 
     // Clock Initialization? Don't understand what this is for. Copied from emulator.
     for(int i = 0; i < 5; i++) {
@@ -39,12 +39,10 @@ SC_MODULE({!name!}){
     }
 
     //Register Thread
-    SC_THREAD(input_thread);
-    SC_THREAD(output_thread);
+    SC_THREAD(component_thread);
   }
 
-  void input_thread(void);
-  void output_thread(void);
+  void component_thread(void);
 
   dat_t<1> reset = LIT<1>(0);
   dat_t<1> set = LIT<1>(1);

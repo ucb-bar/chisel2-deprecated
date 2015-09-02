@@ -1,16 +1,11 @@
 #include "{!name!}.h"
 
-void {!name!}::input_thread(void){
+void {!name!}::component_thread(void){
   while(true){
     {!input_thread!}
     //Clock Lo
     c->clock_lo(reset);
-    wait(Step);
-  }
-}
 
-void {!name!}::output_thread(void){
-  while(true){
     {!output_thread!}
     //Clock Hi
     c->clock_hi(reset);
