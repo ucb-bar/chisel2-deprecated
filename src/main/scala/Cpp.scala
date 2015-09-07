@@ -98,7 +98,7 @@ class CppBackend extends Backend {
 
   // Manage a constant pool.
   protected[this] val coalesceConstants = multiwordLiteralInObject
-  protected[this] val constantPool = HashMap[String, Literal]()
+  protected[this] val constantPool = HashMap[(String, Width), Literal]()
 
   protected[this] def emitValue(value: BigInt, w: Int = 0): String = {
     val hex = value.toString(16)
@@ -119,13 +119,10 @@ class CppBackend extends Backend {
       if (words(x) == 1) {
         emitRef(x)
       } else {
-        // Are we maintaining a constant pool?
-        if (coalesceConstants) {
-           val cn = constantPool.getOrElseUpdate(l.name, l)
-          s"T${cn.emitIndex}[${w}]"
-        } else {
-          s"T${x.emitIndex}[${w}]"
-        }
+        val node = // Are we maintaining a constant pool?
+          if (!coalesceConstants) x
+          else constantPool.getOrElseUpdate((l.name, l.width_), l)
+        s"T${node.emitIndex}[${w}]"
       }
     case _ =>
       if (x.isInObject) s"${emitRef(x)}.values[${w}]"
@@ -177,7 +174,7 @@ class CppBackend extends Backend {
         if (coalesceConstants) {
           // Is this the node that actually defines the constant?
           // If so, output the definition (we must do this only once).
-          if (constantPool.contains(l.name) && constantPool(l.name) == l) {
+          if (constantPool.contains((l.name, l.width_)) && constantPool((l.name, l.width_)) == l) {
             List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
           } else {
             List()
@@ -491,6 +488,8 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") < toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d<=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>=") {
@@ -1181,7 +1180,7 @@ class CppBackend extends Backend {
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
         if (coalesceConstants) {
-          for ((v,l) <- constantPool) {
+          for (((v,w),l) <- constantPool) {
             writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
           }

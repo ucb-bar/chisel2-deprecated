@@ -490,12 +490,14 @@ object Queue
   }
 }
 
-/** An async fifo
-  * @param gen The type of data in the fifo
-  * @param entries The max number of entries in the fifo
-  * @param enq_clk clk used for queuing data
-  * @param deq_clk clk used for dequeuing data from the fifo
-  */
+/** Asynchronous Fifo. Used to cross two clock domains.
+  *
+  * @param gen the type of data in the fifo
+  * @param entries the max number of entries in the fifo. The actual
+size will be rounded up to the next power of 2 - (size = 1<<log2Up(entries))
+  * @param enq_clk clock for the input (writing, queuing) side
+  * @param deq_clk clock for the output (reading, dequeuing side) side
+ */
 class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) extends Module {
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
@@ -542,7 +544,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(gen, entries, clock=enq_clk)
+  val mem = Mem(gen, 1 << asize, clock=enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }
