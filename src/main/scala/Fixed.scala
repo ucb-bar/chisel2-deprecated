@@ -108,30 +108,45 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     /** Convert a Node to a Fixed data type with the same fractional width as this instantiation */
     override def fromNode(n : Node): this.type = {
         val res = Fixed(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
-        res.fractionalWidth = this.fractionalWidth
+        res.fractionalWidth = this.getFractionalWidth()
         res
     }
 
     /** Create a Fixed representation from an Int */
-    override def fromInt(x : Int) : this.type = {
-        Fixed(x, this.getWidth(), this.fractionalWidth).asInstanceOf[this.type]
-    }
+    override def fromInt(x : Int) : this.type = Fixed(x, this.getWidth(), this.getFractionalWidth()).asInstanceOf[this.type]
 
     /** clone this Fixed instantiation */
-    override def cloneType: this.type = {
-        val res = Fixed(this.dir, this.getWidth(), this.fractionalWidth).asInstanceOf[this.type];
-        res
+    override def cloneType: this.type = Fixed(this.dir, this.getWidth(), this.getFractionalWidth()).asInstanceOf[this.type];
+
+    override protected def colonEquals(that : Bits): Unit = that match {
+      case f: Fixed => {
+        val res = if((f.getWidth() == this.getWidth()*2) && (f.getFractionalWidth() == this.getFractionalWidth()*2)) {
+          truncate(f, this.getFractionalWidth())
+        } else {
+          checkAligned(f)
+          f
+        }
+        super.colonEquals(res)
+      }
+      case _ => illegalAssignment(that)
     }
 
-    def getFractionalWidth : Int = this.fractionalWidth
+    def getFractionalWidth() : Int = this.fractionalWidth
+
+    private def truncate(f : Fixed, truncateAmount : Int) : Fixed = fromSInt(f.toSInt >> UInt(truncateAmount))
+    private def truncate(f : SInt, truncateAmount : Int) : SInt = f >> UInt(truncateAmount)
 
     /** Ensure two Fixed point data types have the same fractional width, Error if not */
-    def checkAligned(b : Fixed) = if(this.fractionalWidth != b.fractionalWidth) ChiselError.error(this.fractionalWidth + " Fractional Bits does not match " + b.fractionalWidth)
+    private def checkAligned(b : Fixed) {
+      if(this.getFractionalWidth() != b.getFractionalWidth()) ChiselError.error(this.getFractionalWidth() + " Fractional Bits does not match " + b.getFractionalWidth())
+      if(this.getWidth() != b.getWidth()) ChiselError.error(this.getWidth() + " Width does not match " + b.getWidth())
+    }
 
     /** Convert a SInt to a Fixed by reinterpreting the Bits */
-    def fromSInt(s : SInt) : Fixed = {
+    private def fromSInt(s : SInt, width : Int = this.getWidth(), fracWidth : Int = this.getFractionalWidth()) : Fixed = {
         val res = chiselCast(s){Fixed()}
-        res.fractionalWidth = fractionalWidth
+        res.fractionalWidth = fracWidth
+        res.width = width
         res
     }
 
@@ -155,7 +170,7 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         checkAligned(b)
         this.toSInt <= b.toSInt
     }
-    
+
     def === (b : Fixed) : Bool = {
         checkAligned(b)
         this.toSInt === b.toSInt
@@ -166,7 +181,7 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
     }
 
     // Arithmetic Operators
-    def unary_-() : Fixed = Fixed(0, this.getWidth(), this.fractionalWidth) - this
+    def unary_-() : Fixed = Fixed(0, this.getWidth(), this.getFractionalWidth()) - this
 
     def + (b : Fixed) : Fixed = {
         checkAligned(b)
@@ -178,26 +193,36 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
         fromSInt(this.toSInt - b.toSInt)
     }
 
+    /** Multiply increasing the Bit Width */
+    def * (b : Fixed) : Fixed = {
+        checkAligned(b)
+        val temp = this.toSInt * b.toSInt
+        fromSInt(temp, temp.getWidth(), this.getFractionalWidth()*2)
+    }
+
     /** Multiply with one bit of rounding */
     def *& (b : Fixed) : Fixed = {
         checkAligned(b)
         val temp = this.toSInt * b.toSInt
-        val res = temp + ((temp & UInt(1)<<UInt(this.fractionalWidth-1))<<UInt(1))
-        fromSInt(res >> UInt(this.fractionalWidth))
+        val res = temp + ((temp & UInt(1)<<UInt(this.getFractionalWidth()-1))<<UInt(1))
+        fromSInt(truncate(res, this.getFractionalWidth()))
     }
 
     /** Multiply truncating the result to the same Fixed format */
-    def * (b : Fixed) : Fixed = {
+    def *% (b : Fixed) : Fixed = {
         checkAligned(b)
         val temp = this.toSInt * b.toSInt
-        fromSInt(temp >> UInt(this.fractionalWidth))
+        fromSInt(truncate(temp, this.getFractionalWidth()))
     }
 
     def / (b : Fixed) : Fixed = {
         checkAligned(b)
-        fromSInt((this.toSInt << UInt(this.fractionalWidth)) / b.toSInt)
+        fromSInt((this.toSInt << UInt(this.getFractionalWidth())) / b.toSInt)
     }
 
-    /** The remainder of the division this/b */
-    def % (b : Fixed) : Fixed = (this / b) & Fill(this.fractionalWidth, UInt(1))
+    /** This is just the modulo of the two fixed point bit representations changed into SInt and operated on */
+    def % (b : Fixed) : Fixed = {
+      checkAligned(b)
+      fromSInt(this.toSInt % b.toSInt)
+    }
 }

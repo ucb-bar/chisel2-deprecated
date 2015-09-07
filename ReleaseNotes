@@ -13,7 +13,7 @@ incompatible with the specified version. To issue warnings for
 currently valid code that will be incompatible with Chisel3, add the
 following option to your Chisel compilation command:
 
-    --minimumCompatibility 3
+    --minimumCompatibility 3.0.0
 
 This will report warnings for the following Chisel3 issues -
 
@@ -36,3 +36,5 @@ if your code is ready for Chisel3.
 
 Look at the [Chisel tests](https://github.com/ucb-bar/chisel/tree/master/src/test/scala/) for
 examples of these changes.
+
+See the ChangeLog for additional changes and bug fixes.

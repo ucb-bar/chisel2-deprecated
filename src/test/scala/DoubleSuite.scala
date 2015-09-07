@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,49 +28,45 @@
  MODIFICATIONS.
 */
 
-//package ChiselTests
-import org.junit.Assert._
 import org.junit.Test
-import org.junit.Ignore
 
 import Chisel._
 
-
-class OuterSuite extends TestSuite {
-  @Test def testOuterSuite() {
-    println("\ntestOuterSuite...")
-
-    class Inner extends Module {
-      val io = new Bundle {
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
+class DoubleSuite extends TestSuite {
+  @Test def testCompareDbl() {
+    println("\ntestCompareDbl...")
+    class CompareDblModule extends Module {
+      class IO extends Bundle {
+        val in1 = Dbl(INPUT)
+        val in2 = Dbl(INPUT)
+        val outLT = Bool(OUTPUT)
+        val outLE = Bool(OUTPUT)
+        val outGT = Bool(OUTPUT)
+        val outGE = Bool(OUTPUT)
       }
-      io.out := io.in + Bits(1)
-    }
-    
-    class Outer extends Module {
-      val io = new Bundle { 
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
-      }
-      // val c = Module(new Inner)
-      val c = Array(Module(new Inner))
-      // val w = Wire(Bits(NO_DIR, 8))
-      // w := io.in
-      c(0).io.in := io.in
-      io.out  := (c(0).io.out * Bits(2))(7,0)
-    }
-    
-    class OuterTester(c: Outer) extends Tester(c) {
-      for (t <- 0 until 16) {
-        val test_in = rnd.nextInt(256)
-        poke(c.io.in, test_in)
-        step(1)
-        expect(c.io.out, ((test_in + 1) * 2)&255)
-      }
+      val io = new IO()
+      val dbl1 = io.in1
+      val dbl2 = io.in2
+      io.outLT := dbl1 < dbl2
+      io.outLE := dbl1 <= dbl2
+      io.outGT := dbl1 > dbl2
+      io.outGE := dbl1 >= dbl2
     }
 
-    launchCppTester((c: Outer) => new OuterTester(c))
+    class CompareDblModuleTests(m: CompareDblModule) extends Tester(m) {
+      for (i <- 0 to 100) {
+        val dbl1 = rnd.nextDouble
+        val dbl2 = rnd.nextDouble
+        
+        poke(m.io.in1, dbl1)
+        poke(m.io.in2, dbl2)
+        expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)
+        expect(m.io.outLE, if (dbl1 <= dbl2) 1 else 0)
+        expect(m.io.outGT, if (dbl1 > dbl2) 1 else 0)
+        expect(m.io.outGE, if (dbl1 >= dbl2) 1 else 0)
+      }
+    }
+
+    launchCppTester((m: CompareDblModule) => new CompareDblModuleTests(m))
   }
 }
-

@@ -1,6 +1,6 @@
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.28",
+    // version := "2.2.29",
     version := "2.3-SNAPSHOT",
     name := "chisel",
     scalaVersion := "2.11.6",
@@ -72,10 +72,4 @@ lazy val chiselBuildSettings = Seq (
  )
 
 lazy val chisel = (project in file(".")).
-  enablePlugins(BuildInfoPlugin).
-  settings(chiselBuildSettings: _*).
-  settings(
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-    // We should really be using name.vale, but currently, the package is "Chisel" (uppercase first letter)
-    buildInfoPackage := /* name.value */ "Chisel"
-  )
+  settings(chiselBuildSettings: _*)
