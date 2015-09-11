@@ -287,7 +287,10 @@ class SeqMem[T <: Data](out: T, val n: Int) extends Delay with VecLike[T] {
   def read(addr: UInt, enable: Bool): T = mem.read(RegEnable(addr, enable))
 
   def write(addr: UInt, data: T): Unit = mem.write(addr, data)
-  def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
+  def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+    val bitmask = FillInterleaved(out.asInstanceOf[Vec[Data]].head.getWidth, mask)
+    mem.write(addr, data, bitmask)
+  }
 
   def setMemName(name: String): Unit = mem.setName(name)
 }
