@@ -291,7 +291,6 @@ object Driver extends FileSystemUtilities{
     parallelMakeJobs = 0
     isVCDinline = false
     isSupportW0W = false
-    hasMem = false
     backend = new CppBackend
     topComponent = None
     moduleNamePrefix = ""
@@ -462,7 +461,6 @@ object Driver extends FileSystemUtilities{
   var parallelMakeJobs = 0
   var isVCDinline = false
   var isSupportW0W = false
-  var hasMem = false
   var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
   var moduleNamePrefix = ""

@@ -43,7 +43,6 @@ object Mem {
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (clock != null) res.clock = Some(clock)
-    Driver.hasMem = true
     if (Driver.minimumCompatibility > "2" && seqRead)
       ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     res
