@@ -76,11 +76,9 @@ protected:
 
 private:
   virtual void put_value(dat_api_base* &sig) {
-    for (ssize_t k = sig->get_num_words() - 1 ; k >= 0 ; k--) {
-      val_t value;
-      std::cin >> std::hex >> value;
-      sig->put_value(value, k);
-    }
+    std::string value;
+    std::cin >> value;
+    sig->put_value(value);
   }
 
   virtual void get_value(dat_api_base* &sig) {
