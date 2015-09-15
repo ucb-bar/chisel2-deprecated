@@ -277,6 +277,9 @@ class SeqMem[T <: Data](out: T, n: Int) extends Mem[T](() => out, n, true, false
     else doWrite(addr, Module.current.whenCond, out.fromBits(data.toBits & bitmask | super.read(addr).toBits & ~bitmask), None)
   }
 
+  override def write(addr: UInt, data: T, mask: UInt): Unit =
+    throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+
   @deprecated("setMemName is equivalent to setName and will be removed", "2.0")
   def setMemName(name: String): Unit = setName(name)
 }
