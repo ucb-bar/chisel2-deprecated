@@ -70,8 +70,8 @@ class VcdBackend(top: Module) extends Backend {
 
   private def emitDef2(node: Node, offset: Int, index: Int) =
     "L" + index + ":\n" +
-    "  " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
-    emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    "  " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
+    emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
     emitDefUnconditional(node, offset, index) +
     "  goto K" + index + ";\n"
 
@@ -88,8 +88,8 @@ class VcdBackend(top: Module) extends Backend {
   private def emitDefInline(node: Node, offset: Int, index: Int) =
     "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
     "__prev.get(0x" + offset.toHexString + ")) {\n" +
-    "    " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
-    "    " + emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    "    " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
+    "    " + emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
     "    " + emitDefUnconditional(node, offset, index) +
     "  }\n"
 
