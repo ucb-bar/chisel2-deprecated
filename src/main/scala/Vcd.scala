@@ -114,17 +114,21 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(baseIdx + i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     baseIdx += sortedMods.size
-    for (mem <- sortedMems if c == mem.component && !mem.name.isEmpty) {
-      for (offset <- 0 until mem.n) {
-        write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (mem <- sortedMems) {
+      if (mem.component == c && !mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += mem.n
     }
-    for (rom <- sortedROMs if c == rom.component && !rom.name.isEmpty) {
-      for (offset <- 0 until rom.lits.size) {
-        write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (rom <- sortedROMs) {
+      if (rom.component == c && !rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += rom.lits.size
     }
@@ -138,17 +142,21 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     var baseIdx = sortedMods.size
-    for (mem <- sortedMems if mem.name.isEmpty) {
-      for (offset <- 0 until mem.n) {
-        write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (mem <- sortedMems) {
+      if (mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += mem.n
     }
-    for (rom <- sortedROMs if rom.name.isEmpty) {
-      for (offset <- 0 until rom.lits.size) {
-        write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (rom <- sortedROMs) {
+      if (rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += rom.lits.size
     }
