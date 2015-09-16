@@ -140,9 +140,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  /** @param id the unique id of a node
-    * @return the current value of the node with the id */
-  def peek(id: Int) = {
+  private def peek(id: Int) = {
     sendCmd(SIM_CMD.PEEK)
     writeln(id.toString)
     try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
@@ -191,13 +189,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
   }
 
-  /** set the value of a node with unique 'id'
-    * @param id The unique id of the node to set
-    * @param v The BigInt representing the bits to set
-    * @param w The number of 64 bit chunks to write, default is 1
-    * @example {{{ poke(id, BigInt(63) << 60, 2) }}}
-    */
-  def poke(id: Int, v: BigInt, w: Int = 1) {
+  private def poke(id: Int, v: BigInt) { 
     sendCmd(SIM_CMD.POKE)
     writeln(id.toString)
     writeValue(v)
@@ -205,11 +197,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** set the value of a node with its path
     * @param path The unique path of the node to set
     * @param v The BigInt representing the bits to set
-    * @param w The number of 64 bit chunks to write, default is 1
     * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
     */
-  def pokePath(path: String, v: BigInt, w: Int = 1) {
-    poke(_signalMap getOrElseUpdate (path, getId(path)), v, w)
+  def pokePath(path: String, v: BigInt) { 
+    poke(_signalMap getOrElseUpdate (path, getId(path)), v)
   }
   /** set the value of a node
     * @param node The node to set
@@ -217,7 +208,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off The offset or index
     */
   def pokeNode(node: Node, v: BigInt, off: Option[Int] = None) {
-    pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v, node.needWidth)
+    pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v)
   }
   /** set the value of some memory
     * @param data The memory to write to
