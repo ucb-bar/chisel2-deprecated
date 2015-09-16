@@ -30,7 +30,6 @@
 
 package Chisel
 
-
 class SysCBackend extends CppBackend {
    override def elaborate(c: Module): Unit = {
       super.elaborate(c)
@@ -49,83 +48,177 @@ class SysCBackend extends CppBackend {
             case bits: Bits => {
               val is_input = bits.dir == INPUT
               val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
-			  if (is_input) { tcast = ".to_uint64()" }
-			  else { tcast = ".to_ulong()" }
-			  val vcast = tcast
+              if (is_input) { tcast = ".to_uint64()" }
+              else { tcast = ".to_ulong()" }
+              val vcast = tcast
               val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name, delt.ready.name, delt.valid.name)
               cdef.entries += (entry)
-			  cdef.valid_ready = true
+              cdef.valid_ready = true
             }
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
               if (inputs.length > 0) {
-			    for (in <- inputs) {
-				  var ttype = ""; var tcast = ""
-				   in._2 match {
-					case inUBool: Bool => ttype = "bool"; tcast = ""
-					case inSInt: SInt => ttype = "sc_int<" + in._2.width + ">";  tcast = ".to_uint64()"
-					//Bits is implemented as UInt
-					case inUInt: UInt => ttype = "sc_uint<" + in._2.width + ">"; tcast = ".to_uint64()"
-				  }
-				  val vtype = ttype; val vcast = tcast
+                for (in <- inputs) {
+                  var ttype = ""; var tcast = ""
+                   in._2 match {
+                    case inBool: Bool => ttype = "bool"; tcast = ""
+                    case inSInt: SInt => ttype = "sc_int<" + in._2.width + ">";  tcast = ".to_uint64()"
+                    //Bits is implemented as UInt
+                    case inUInt: UInt => ttype = "sc_uint<" + in._2.width + ">"; tcast = ".to_uint64()"
+                  }
+                  val vtype = ttype; val vcast = tcast
                   val entry = new CEntry(name, true, vtype, vcast, in._2.width, in._2.name, "ready", "valid")
                   cdef.entries += (entry)
-				}
+                }
               }
               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
               if (outputs.length > 0) {
-			    for (out <- outputs) {
-				  var ttype = ""; var tcast = ""
-				   out._2 match {
-					case outUBool: Bool => ttype = "bool"; tcast = ".to_ulong()"
-					case outSInt: SInt => ttype = "sc_int<" + out._2.width + ">";  tcast = ".to_ulong()"
-					//Bits is implemented as UInt
-					case outUInt: UInt => ttype = "sc_uint<" + out._2.width + ">"; tcast = ".to_ulong()"
-				  }
-				  val vtype = ttype; val vcast = tcast
+                for (out <- outputs) {
+                  var ttype = ""; var tcast = ""
+                   out._2 match {
+                    case outBool: Bool => ttype = "bool"; tcast = ".to_ulong()"
+                    case outSInt: SInt => ttype = "sc_int<" + out._2.width + ">";  tcast = ".to_ulong()"
+                    //Bits is implemented as UInt
+                    case outUInt: UInt => ttype = "sc_uint<" + out._2.width + ">"; tcast = ".to_ulong()"
+                  }
+                  val vtype = ttype; val vcast = tcast
                   val entry = new CEntry(name, false, vtype, vcast, out._2.width, out._2.name, "ready", "valid")
                   cdef.entries += (entry)
-				}
+                }
               }
-			  cdef.valid_ready = true
+              cdef.valid_ready = true
             }
             case _ => badElements(name) = elt
           }
         }
+        case velt:ValidIO[_] => println("************ ValidIO detected! ************")
+
         case bool: Bool => {
           val is_input = bool.dir == INPUT
           val vtype = "bool"; var tcast = ""
-		  if (is_input) { tcast = "" }
-		  else { tcast = ".to_ulong()" }
-		  val vcast = tcast
+          if (is_input) { tcast = "" }
+          else { tcast = ".to_ulong()" }
+          val vcast = tcast
           val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name, "ready", "valid")
           cdef.entries += (entry)
-		  cdef.valid_ready = false
+          cdef.valid_ready = false
         }
         case sint: SInt => {
           val is_input = sint.dir == INPUT
           val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
-		  if (is_input) { tcast = ".to_uint64()" }
-		  else { tcast = ".to_ulong()" }
-		  val vcast = tcast
+          if (is_input) { tcast = ".to_uint64()" }
+          else { tcast = ".to_ulong()" }
+          val vcast = tcast
           val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name, "ready", "valid")
           cdef.entries += (entry)
-		  cdef.valid_ready = false
+          cdef.valid_ready = false
         }
-		//Bits is implemented as UInt
+        //Bits is implemented as UInt
         case uint: UInt => {
           val is_input = uint.dir == INPUT
           val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
-		  if (is_input) { tcast = ".to_uint64()" }
-		  else { tcast = ".to_ulong()" }
-		  val vcast = tcast
+          if (is_input) { tcast = ".to_uint64()" }
+          else { tcast = ".to_ulong()" }
+          val vcast = tcast
           val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name, "ready", "valid")
           cdef.entries += (entry)
-		  cdef.valid_ready = false
+          cdef.valid_ready = false
+        }
+        case belt: Bundle => {
+          val mid_bundle = c.io.asInstanceOf[Bundle]
+          for ((bname, belt) <- mid_bundle.elements){
+            belt match{
+              case delt:DecoupledIO[_] => {
+                delt.bits match {
+                  case bits: Bits => {
+                    val is_input = bits.dir == INPUT
+                    val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
+                    if (is_input) { tcast = ".to_uint64()" }
+                    else { tcast = ".to_ulong()" }
+                    val vcast = tcast
+                    val entry = new CEntry(bname, is_input, vtype, vcast, bits.width, bits.name, delt.ready.name, delt.valid.name)
+                    cdef.entries += (entry)
+                    cdef.valid_ready = true
+                  }
+                  case aggregate: Aggregate => {
+                    // Collect all the inputs and outputs.
+                    val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+                    if (inputs.length > 0) {
+                      for (in <- inputs) {
+                        var ttype = ""; var tcast = ""
+                         in._2 match {
+                          case inBool: Bool => ttype = "bool"; tcast = ""
+                          case inSInt: SInt => ttype = "sc_int<" + in._2.width + ">";  tcast = ".to_uint64()"
+                          //Bits is implemented as UInt
+                          case inUInt: UInt => ttype = "sc_uint<" + in._2.width + ">"; tcast = ".to_uint64()"
+                        }
+                        val vtype = ttype; val vcast = tcast
+                        val entry = new CEntry(bname, true, vtype, vcast, in._2.width, in._2.name, "ready", "valid")
+                        cdef.entries += (entry)
+                      }
+                    }
+                    val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+                    if (outputs.length > 0) {
+                      for (out <- outputs) {
+                        var ttype = ""; var tcast = ""
+                         out._2 match {
+                          case outBool: Bool => ttype = "bool"; tcast = ".to_ulong()"
+                          case outSInt: SInt => ttype = "sc_int<" + out._2.width + ">";  tcast = ".to_ulong()"
+                          //Bits is implemented as UInt
+                          case outUInt: UInt => ttype = "sc_uint<" + out._2.width + ">"; tcast = ".to_ulong()"
+                        }
+                        val vtype = ttype; val vcast = tcast
+                        val entry = new CEntry(bname, false, vtype, vcast, out._2.width, out._2.name, "ready", "valid")
+                        cdef.entries += (entry)
+                      }
+                    }
+                    cdef.valid_ready = true
+                  }
+                  case _ => badElements(bname) = belt
+                }
+              }
+              case bool: Bool => {
+                val is_input = bool.dir == INPUT
+                val vtype = "bool"; var tcast = ""
+                if (is_input) { tcast = "" }
+                else { tcast = ".to_ulong()" }
+                val vcast = tcast
+                val entry = new CEntry(bname, is_input, vtype, vcast, bool.width, bool.name, "ready", "valid")
+                cdef.entries += (entry)
+                cdef.valid_ready = false
+              }
+              case sint: SInt => {
+                val is_input = sint.dir == INPUT
+                val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
+                if (is_input) { tcast = ".to_uint64()" }
+                else { tcast = ".to_ulong()" }
+                val vcast = tcast
+                val entry = new CEntry(bname, is_input, vtype, vcast, sint.width, sint.name, "ready", "valid")
+                cdef.entries += (entry)
+                cdef.valid_ready = false
+              }
+              //Bits is implemented as UInt
+              case uint: UInt => {
+                val is_input = uint.dir == INPUT
+                val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
+                if (is_input) { tcast = ".to_uint64()" }
+                else { tcast = ".to_ulong()" }
+                val vcast = tcast
+                val entry = new CEntry(bname, is_input, vtype, vcast, uint.width, uint.name, "ready", "valid")
+                cdef.entries += (entry)
+                cdef.valid_ready = false
+              }
+              case htif: HTIFIO => {
+                println("************ HTIFIO detected! ************")
+              }
+              case _ => badElements(bname) = belt
+            }
+          }
         }
         case _ => badElements(name) = elt
       }
+
     }
 
     if (badElements.size > 0) {

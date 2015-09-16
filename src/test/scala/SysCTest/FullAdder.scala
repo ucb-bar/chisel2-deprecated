@@ -63,9 +63,6 @@ class FullAdderTests(c: FullAdder) extends Tester(c) {
     val a    = rnd.nextInt(2)
     val b    = rnd.nextInt(2)
     val cin  = rnd.nextInt(2)
-    val res  = a + b + cin
-    val sum  = res & 1
-    val cout = (res >> 1) & 1
     var transfer = false
     poke(c.io.in.valid, 0)
     poke(c.io.out.ready, 0)
@@ -80,6 +77,10 @@ class FullAdderTests(c: FullAdder) extends Tester(c) {
     poke(c.io.in.bits.cin, cin)
     poke(c.io.in.valid, 1)
     poke(c.io.out.ready, 1)
+
+    val res  = a + b + cin
+    val sum  = res & 1
+    val cout = (res >> 1) & 1
 
     do {
       transfer = (peek(c.io.out.valid) == 1)
