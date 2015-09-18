@@ -36,16 +36,35 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
-                       orderedWrites: Boolean = false,
-                       clock: Clock = null): Mem[T] = {
-    val gen = out.cloneType
+  private def construct[T <: Data](n: Int, t: T, seqRead: Boolean,
+                       orderedWrites: Boolean,
+                       clock: Clock): Mem[T] = {
+    val gen = t.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (clock != null) res.clock = Some(clock)
-    if (Driver.minimumCompatibility > "2" && seqRead)
-      ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     res
+  }
+
+  def apply[T <: Data](n: Int, t: T): Mem[T] = {
+    construct(n, t, false, false, null)
+  }
+
+  def apply[T <: Data](n: Int, t: T, clock: Clock): Mem[T] = {
+    construct(n, t, false, false, clock)
+  }
+
+  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
+                       orderedWrites: Boolean = false,
+                       clock: Clock = null): Mem[T] = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.warning("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
+      if (seqRead)
+        ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
+      if (orderedWrites)
+        ChiselError.warning("Mem(..., orderedWrites) is deprecated.")
+    }
+    construct(n, out, seqRead, orderedWrites, clock)
   }
 }
 
@@ -259,14 +278,20 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 
 // Chisel3
 object SeqMem {
-  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
+  def apply[T <: Data](n: Int, out: T): SeqMem[T] = {
     val gen = out.cloneType
     Reg.validateGen(gen)
-    new SeqMem(gen, n)
+    new SeqMem(n, gen)
+  }
+
+  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
+    if (Driver.minimumCompatibility > "2")
+      ChiselError.warning("SeqMem(out:T, n:Int) is deprecated. Please use SeqMem(n:Int, out:T) instead.")
+    apply(n, out)
   }
 }
 
-class SeqMem[T <: Data](out: T, n: Int) extends Mem[T](() => out, n, true, false) {
+class SeqMem[T <: Data](n: Int, out: T) extends Mem[T](() => out, n, true, false) {
   override def apply(addr: UInt): T = throwException("SeqMem.apply unsupported")
   override def read(addr: UInt): T = super.read(Reg(next = addr))
   def read(addr: UInt, enable: Bool): T = super.read(RegEnable(addr, enable))

@@ -434,7 +434,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
 {
   val io = new QueueIO(gen, entries)
 
-  val ram = Mem(gen, entries)
+  val ram = Mem(entries, gen)
   val enq_ptr = Counter(entries)
   val deq_ptr = Counter(entries)
   val maybe_full = Reg(init=Bool(false))
@@ -544,7 +544,7 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(gen, 1 << asize, clock=enq_clk)
+  val mem = Mem(1 << asize, gen, clock=enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }

@@ -47,9 +47,14 @@ object VecMux {
 }
 
 object Vec {
+  def apply[T <: Data](n: Int, t: T): Vec[T] =
+    apply((0 until n).map(i => t.cloneType))
 
-  def apply[T <: Data](gen: T, n: Int): Vec[T] = 
-    /* new */ Vec((0 until n).map(i => gen.cloneType))
+  def apply[T <: Data](gen: T, n: Int): Vec[T] = {
+    if (Driver.minimumCompatibility > "2")
+      ChiselError.warning("Vec(gen:T, n:Int) is deprecated. Please use Vec(n:Int, t:T) instead.")
+    apply(n, gen)
+  }
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
