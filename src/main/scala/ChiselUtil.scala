@@ -430,7 +430,10 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   * @param flow
   * @param _reset
   */
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
+class Queue[T <: Data](gen: T, val entries: Int,
+                       pipe: Boolean = false,
+                       flow: Boolean = false,
+                       _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -466,7 +469,11 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
-    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
+    io.count := Mux(ptr_match,
+                    Mux(maybe_full,
+                      UInt(entries), UInt(0)),
+                    Mux(deq_ptr.value > enq_ptr.value,
+                      UInt(entries) + ptr_diff, ptr_diff))
   }
 }
 
