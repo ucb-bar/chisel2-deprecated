@@ -429,6 +429,11 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   * @param pipe
   * @param flow
   * @param _reset
+  *
+  * Example usage:
+  *    {{{ val q = new Queue(UInt(), 16)
+  *    q.io.enq <> producer.io.out
+  *    consumer.io.in <> q.io.deq }}}
   */
 class Queue[T <: Data](gen: T, val entries: Int,
                        pipe: Boolean = false,
@@ -482,9 +487,9 @@ class Queue[T <: Data](gen: T, val entries: Int,
   from the inputs.
 
   Example usage:
-    {{{ val q = new Queue(UInt(), 16)
-    q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq }}}
+     {{{ val q = Queue(Decoupled(UInt()), 16)
+     q.io.enq <> producer.io.out
+     consumer.io.in <> q.io.deq }}}
   */
 object Queue
 {
