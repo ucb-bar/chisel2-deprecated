@@ -423,7 +423,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-/** A hardware module implmenting a Queue
+/** A hardware module implementing a Queue
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue
   * @param pipe
