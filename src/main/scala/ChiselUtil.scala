@@ -597,15 +597,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Bits](in: Iterable[(Bool, T)]): T = {
+  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Bits](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
-  def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
+  def apply[T <: Data](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
