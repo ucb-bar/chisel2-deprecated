@@ -602,6 +602,55 @@ try {
       () => Module(new PriorityMuxComp()))
   }
 
+  /** PriorityMux can be used with Bundles.
+    */
+  @Test def testPriorityMuxWithBundles() {
+    println("\ntestPriorityMuxWithBundles ...")
+    class BundleStub extends Bundle {
+      val x = Bool(INPUT)
+
+      override def cloneType: this.type = new BundleStub().asInstanceOf[this.type]
+    }
+    class PriorityMuxComp extends Module {
+      val io = new Bundle {
+        val sel = UInt(INPUT, width = 2)
+        val in0 = new BundleStub()
+        val in1 = new BundleStub()
+        val out = new BundleStub().flip()
+      }
+      io.out := PriorityMux(io.sel, io.in0 :: io.in1 :: Nil)
+    }
+
+    class PriorityMuxCompTester(m: PriorityMuxComp) extends Tester(m) {
+      // Put the value 0 in the first bundle, and 1 in the second
+      // bundle and verify that we get the expected output for sel =
+      // 0b01, 0b10, and 0b11.
+
+      poke(m.io.in0.x, 0)
+      poke(m.io.in1.x, 1)
+
+      poke(m.io.sel, 1)
+      expect(m.io.out.x, 0)
+
+      poke(m.io.sel, 2)
+      expect(m.io.out.x, 1)
+
+      poke(m.io.sel, 3)
+      expect(m.io.out.x, 0)
+    }
+
+    chiselMainTest(
+      Array[String](
+        "--backend", "c",
+        "--targetDir", dir.getPath.toString(),
+        "--genHarness",
+        "--compile",
+        "--test"
+      ),
+      () => Module(new PriorityMuxComp())
+    ) {m => new PriorityMuxCompTester(m)}
+  }
+
   /** Generate a PriorityEncoder
     */
   @Test def testPriorityEncoder() {
