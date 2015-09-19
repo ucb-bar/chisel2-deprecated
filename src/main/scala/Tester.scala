@@ -37,6 +37,42 @@ import java.lang.Double.{longBitsToDouble, doubleToLongBits}
 import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessIO}
 
+// Provides a template to define tester transactions
+trait Tests {
+  def t: Int 
+  def delta: Int 
+  def rnd: Random
+  def setClocks(clocks: Iterable[(Clock, Int)]): Unit
+  def peek(data: Bits): BigInt
+  def peek(data: Aggregate): Array[BigInt]
+  def peek(data: Flo): Float
+  def peek(data: Dbl): Double
+  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt
+  def poke(data: Bits, x: Boolean): Unit
+  def poke(data: Bits, x: Int): Unit
+  def poke(data: Bits, x: Long): Unit
+  def poke(data: Bits, x: BigInt): Unit
+  def poke(data: Aggregate, x: Array[BigInt]): Unit
+  def poke(data: Flo, x: Float): Unit 
+  def poke(data: Dbl, x: Double): Unit
+  def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
+  def reset(n: Int = 1): Unit
+  def step(n: Int): Unit
+  def int(x: Boolean): BigInt 
+  def int(x: Int):     BigInt 
+  def int(x: Long):    BigInt 
+  def int(x: Bits):    BigInt 
+  def expect (good: Boolean, msg: String): Boolean
+  def expect (data: Bits, expected: BigInt): Boolean
+  def expect (data: Aggregate, expected: Array[BigInt]): Boolean
+  def expect (data: Bits, expected: Int): Boolean
+  def expect (data: Bits, expected: Long): Boolean
+  def expect (data: Flo, expected: Float): Boolean
+  def expect (data: Dbl, expected: Double): Boolean
+  def testOutputString: String
+  def run(s: String): Boolean
+}
+
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
@@ -430,7 +466,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     waitForStreams()
     t = 0
     readOutputs
-    reset(5)
+    // reset(5)
+    for (i <- 0 until 5) {
+      sendCmd(SIM_CMD.RESET)
+      readOutputs
+    }
     while (_logger.ready) println(_logger.readLine)
     process
   }
