@@ -158,7 +158,7 @@ object ShiftRegister
       RegEnable(in, en)
     } else if (n != 0) {
       if ( n < 0 ) {
-        ChiselError.error("Cannot have negitive number of cycles for shift register")
+        ChiselError.error("Cannot have negative number of cycles for shift register")
         in
       } else
         RegNext(apply(in, n-1, en))
