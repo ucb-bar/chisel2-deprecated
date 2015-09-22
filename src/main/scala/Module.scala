@@ -334,6 +334,12 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     res
   }
 
+  def addNode[T <: Node](node: T) = {
+    nodes += node.getNode
+    node.getNode.compOpt = Some(this)
+    node
+  }
+
   // TODO: should be private[Chisel]?
   /** A breadth first search of the graph of nodes */
   def bfs (visit: Node => Unit) = {
