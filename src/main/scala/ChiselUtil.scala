@@ -427,14 +427,22 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val count = UInt(OUTPUT, log2Up(entries + 1))
 }
 
-/** A hardware module implmenting a Queue
+/** A hardware module implementing a Queue
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue
   * @param pipe
   * @param flow
   * @param _reset
+  *
+  * Example usage:
+  *    {{{ val q = new Queue(UInt(), 16)
+  *    q.io.enq <> producer.io.out
+  *    consumer.io.in <> q.io.deq }}}
   */
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
+class Queue[T <: Data](gen: T, val entries: Int,
+                       pipe: Boolean = false,
+                       flow: Boolean = false,
+                       _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
   val io = new QueueIO(gen, entries)
 
@@ -470,7 +478,11 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
-    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
+    io.count := Mux(ptr_match,
+                    Mux(maybe_full,
+                      UInt(entries), UInt(0)),
+                    Mux(deq_ptr.value > enq_ptr.value,
+                      UInt(entries) + ptr_diff, ptr_diff))
   }
 }
 
@@ -479,9 +491,9 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   from the inputs.
 
   Example usage:
-    {{{ val q = new Queue(UInt(), 16)
-    q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq }}}
+     {{{ val q = Queue(Decoupled(UInt()), 16)
+     q.io.enq <> producer.io.out
+     consumer.io.in <> q.io.deq }}}
   */
 object Queue
 {
