@@ -57,12 +57,7 @@ private:
 
   void put_value(vpiHandle& sig) {
     std::string value;
-    for (size_t k = 0 ; k < ((vpi_get(vpiSize, sig) - 1) >> 6) + 1 ; k++) {
-      // 64 bit chunks are given
-      std::string v;
-      std::cin >> v;
-      value += v;
-    }
+    std::cin >> value;
     s_vpi_value value_s;
     value_s.format = vpiHexStrVal;
     value_s.value.str = (PLI_BYTE8*) value.c_str();
