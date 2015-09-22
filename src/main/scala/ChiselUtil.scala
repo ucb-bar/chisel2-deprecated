@@ -430,9 +430,9 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 /** A hardware module implementing a Queue
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue
-  * @param pipe
-  * @param flow
-  * @param _reset
+  * @param pipe True if a single entry queue can run at full throughput (like a pipeline). The ''ready'' signals are combinationally coupled.
+  * @param flow True if the inputs can be consumed on the same cycle
+(the inputs "flow" through the queue immediately). The ''valid'' signals are coupled.
   *
   * Example usage:
   *    {{{ val q = new Queue(UInt(), 16)
