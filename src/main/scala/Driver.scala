@@ -32,7 +32,6 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import sys.process.stringSeqToProcess
-import BuildInfo._
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -292,7 +291,6 @@ object Driver extends FileSystemUtilities{
     parallelMakeJobs = 0
     isVCDinline = false
     isSupportW0W = false
-    hasMem = false
     backend = new CppBackend
     topComponent = None
     moduleNamePrefix = ""
@@ -408,7 +406,6 @@ object Driver extends FileSystemUtilities{
         }
         case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
         case "--wError" => wError = true
-        case "--version" => println(version)
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -464,7 +461,6 @@ object Driver extends FileSystemUtilities{
   var parallelMakeJobs = 0
   var isVCDinline = false
   var isSupportW0W = false
-  var hasMem = false
   var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
   var moduleNamePrefix = ""
@@ -492,7 +488,6 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
-  val version = BuildInfo.version
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0

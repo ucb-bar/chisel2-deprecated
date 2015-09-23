@@ -43,7 +43,6 @@ object Mem {
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (clock != null) res.clock = Some(clock)
-    Driver.hasMem = true
     if (Driver.minimumCompatibility > "2" && seqRead)
       ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     res
@@ -260,34 +259,27 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 
 // Chisel3
 object SeqMem {
-  def apply[T <: Data](out: T, n: Int): SeqMem[T] =
-    new SeqMem(out, n)
+  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
+    val gen = out.cloneType
+    Reg.validateGen(gen)
+    new SeqMem(gen, n)
+  }
 }
 
-class SeqMem[T <: Data](out: T, val n: Int) extends Delay with VecLike[T] {
-  private val mem = {
-    // construct a Mem while pretending we aren't in compatibility mode
-    val compat = Driver.minimumCompatibility
-    Driver.minimumCompatibility = "0"
-    val mem = Mem(out, n, true)
-    Driver.minimumCompatibility = compat
-    mem
+class SeqMem[T <: Data](out: T, n: Int) extends Mem[T](() => out, n, true, false) {
+  override def apply(addr: UInt): T = throwException("SeqMem.apply unsupported")
+  override def read(addr: UInt): T = super.read(Reg(next = addr))
+  def read(addr: UInt, enable: Bool): T = super.read(RegEnable(addr, enable))
+
+  def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+    val bitmask = FillInterleaved(out.asInstanceOf[Vec[Data]].head.getWidth, mask)
+    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, bitmask)
+    else doWrite(addr, Module.current.whenCond, out.fromBits(data.toBits & bitmask | super.read(addr).toBits & ~bitmask), None)
   }
 
+  override def write(addr: UInt, data: T, mask: UInt): Unit =
+    throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
 
-  def length: Int = n
-
-  def apply(addr: UInt): T = read(addr)
-  def apply(addr: Int): T = apply(UInt(addr))
-
-  override val hashCode: Int = _id
-  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
-
-  def read(addr: UInt): T = mem.read(Reg(next = addr))
-  def read(addr: UInt, enable: Bool): T = mem.read(RegEnable(addr, enable))
-
-  def write(addr: UInt, data: T): Unit = mem.write(addr, data)
-  def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
-
-  override def setName(name: String): Unit = mem.setName(name)
+  @deprecated("setMemName is equivalent to setName and will be removed", "2.0")
+  def setMemName(name: String): Unit = setName(name)
 }

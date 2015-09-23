@@ -37,6 +37,42 @@ import java.lang.Double.{longBitsToDouble, doubleToLongBits}
 import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessIO}
 
+// Provides a template to define tester transactions
+trait Tests {
+  def t: Int 
+  def delta: Int 
+  def rnd: Random
+  def setClocks(clocks: Iterable[(Clock, Int)]): Unit
+  def peek(data: Bits): BigInt
+  def peek(data: Aggregate): Array[BigInt]
+  def peek(data: Flo): Float
+  def peek(data: Dbl): Double
+  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt
+  def poke(data: Bits, x: Boolean): Unit
+  def poke(data: Bits, x: Int): Unit
+  def poke(data: Bits, x: Long): Unit
+  def poke(data: Bits, x: BigInt): Unit
+  def poke(data: Aggregate, x: Array[BigInt]): Unit
+  def poke(data: Flo, x: Float): Unit 
+  def poke(data: Dbl, x: Double): Unit
+  def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
+  def reset(n: Int = 1): Unit
+  def step(n: Int): Unit
+  def int(x: Boolean): BigInt 
+  def int(x: Int):     BigInt 
+  def int(x: Long):    BigInt 
+  def int(x: Bits):    BigInt 
+  def expect (good: Boolean, msg: String): Boolean
+  def expect (data: Bits, expected: BigInt): Boolean
+  def expect (data: Aggregate, expected: Array[BigInt]): Boolean
+  def expect (data: Bits, expected: Int): Boolean
+  def expect (data: Bits, expected: Long): Boolean
+  def expect (data: Flo, expected: Float): Boolean
+  def expect (data: Dbl, expected: Double): Boolean
+  def testOutputString: String
+  def run(s: String): Boolean
+}
+
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
@@ -109,11 +145,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     writeln(cmd.id.toString)
   }
 
-  private val writeMask = int(-1L) 
-  private def writeValue(v: BigInt, w: Int = 1) {
-    for (i <- ((w - 1) >> 6) to 0 by -1) {
-      writeln(((v >> (64 * i)) & writeMask).toString(16))
-    }
+  private def writeValue(v: BigInt) {
+    writeln(v.toString(16))
   }
 
   def dumpName(data: Node): String = Driver.backend match {
@@ -143,9 +176,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  /** @param id the unique id of a node
-    * @return the current value of the node with the id */
-  def peek(id: Int) = {
+  private def peek(id: Int) = {
     sendCmd(SIM_CMD.PEEK)
     writeln(id.toString)
     try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
@@ -173,8 +204,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @return a BigInt representation of the bits */
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
-                else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
+    val value = 
+      if (data.isLit) data.litValue()
+      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
+      else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
     if (isTrace) println("  PEEK " + dumpName(data) + " -> " + value.toString(16))
     value
   }
@@ -192,25 +225,18 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
   }
 
-  /** set the value of a node with unique 'id'
-    * @param id The unique id of the node to set
-    * @param v The BigInt representing the bits to set
-    * @param w The number of 64 bit chunks to write, default is 1
-    * @example {{{ poke(id, BigInt(63) << 60, 2) }}}
-    */
-  def poke(id: Int, v: BigInt, w: Int = 1) {
+  private def poke(id: Int, v: BigInt) { 
     sendCmd(SIM_CMD.POKE)
     writeln(id.toString)
-    writeValue(v, w)
+    writeValue(v)
   }
   /** set the value of a node with its path
     * @param path The unique path of the node to set
     * @param v The BigInt representing the bits to set
-    * @param w The number of 64 bit chunks to write, default is 1
     * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
     */
-  def pokePath(path: String, v: BigInt, w: Int = 1) {
-    poke(_signalMap getOrElseUpdate (path, getId(path)), v, w)
+  def pokePath(path: String, v: BigInt) { 
+    poke(_signalMap getOrElseUpdate (path, getId(path)), v)
   }
   /** set the value of a node
     * @param node The node to set
@@ -218,7 +244,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off The offset or index
     */
   def pokeNode(node: Node, v: BigInt, off: Option[Int] = None) {
-    pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v, node.needWidth)
+    pokePath(dumpName(node) + ((off map ("[" + _ + "]")) getOrElse ""), v)
   }
   /** set the value of some memory
     * @param data The memory to write to
@@ -241,14 +267,18 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       val cnt = (data.needWidth() - 1) >> 6
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
-    if (isTrace) println("  POKE " + dumpName(data) + " <- " + value.toString(16))
-    if (data.isTopLevelIO && data.dir == INPUT)
-      _pokeMap(data) = value
-    else if (data.isTopLevelIO && data.dir == OUTPUT)
-      println("  NOT ALLOWED TO POKE OUTPUT " + dumpName(data))
-    else 
-      pokeNode(data.getNode, value)
-    isStale = true
+    data.getNode match {
+      case _: Delay =>
+        if (isTrace) println("  POKE " + dumpName(data) + " <- " + value.toString(16))
+        pokeNode(data.getNode, value)
+        isStale = true
+      case _ if data.isTopLevelIO && data.dir == INPUT =>
+        if (isTrace) println("  POKE " + dumpName(data) + " <- " + value.toString(16))
+        _pokeMap(data) = value
+        isStale = true
+      case _ =>
+        if (isTrace) println("  NOT ALLOWED POKE " + dumpName(data))
+    }
   }
   /** Set the value of Aggregate data */
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
@@ -270,7 +300,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def writeInputs {
-    _inputs foreach (x => writeValue(_pokeMap getOrElse (x, BigInt(0)), x.needWidth()))
+    _inputs foreach (x => writeValue(_pokeMap getOrElse (x, BigInt(0))))
   }
 
   /** Send reset to the hardware
@@ -436,7 +466,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     waitForStreams()
     t = 0
     readOutputs
-    reset(5)
+    // reset(5)
+    for (i <- 0 until 5) {
+      sendCmd(SIM_CMD.RESET)
+      readOutputs
+    }
     while (_logger.ready) println(_logger.readLine)
     process
   }

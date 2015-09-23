@@ -571,15 +571,13 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def computeMemPorts(mod: Module) {
-    if (Driver.hasMem) {
-      Driver.bfs { 
-        case memacc: MemAccess => memacc.referenced = true
-        case _ =>
-      }
-      Driver.bfs { 
-        case mem: Mem[_] => mem.computePorts
-        case _ =>
-      }
+    Driver.bfs {
+      case memacc: MemAccess => memacc.referenced = true
+      case _ =>
+    }
+    Driver.bfs {
+      case mem: Mem[_] => mem.computePorts
+      case _ =>
     }
   }
 
