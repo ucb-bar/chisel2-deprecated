@@ -33,7 +33,6 @@ package Chisel
 class FloBackend extends Backend {
   // TODO: SHOULD BE IN ENV VAR
   val floDir = java.lang.System.getenv("DREAMER") + "/emulator/"
-  val keywords = Set[String]()
   override val needsLowering = Set("PriEnc", "OHToUInt")
   var isRnd = false
 

@@ -92,7 +92,7 @@ trait FileSystemUtilities {
 
 abstract class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: Set[String]
+  val keywords = VerilogBackend.keywords
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */

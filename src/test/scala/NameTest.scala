@@ -540,4 +540,36 @@ class NameSuite extends TestSuite {
         () => Module(new NameItTooEager153()))
     
   }
+
+  class KeywordsModule extends Module {
+    val io = new Bundle {
+      val a = UInt(INPUT, 2)
+      val z = UInt(OUTPUT, 2)
+    }
+    val begin = RegNext(io.a)
+    val time  = RegNext(begin)
+    val end   = RegNext(time)
+    io.z := end
+  }
+
+  class KeywordsModuleTests(c: KeywordsModule) extends Tester(c) {
+    val values = Vector(3,2,1)
+    values foreach { v => 
+      poke(c.io.a, v) 
+      step(1)
+    }
+    expect(peekPath("NameSuite_KeywordsModule.begin_") == 1, "begin -> begin_: ")
+    expect(peekPath("NameSuite_KeywordsModule.time_") == 2, "time -> time_: ")
+    expect(peekPath("NameSuite_KeywordsModule.end_") == 3, "end -> end_: ")
+  }
+ 
+  @Test def testKeywordsCpp() {
+    println("testKeywordsCpp:")
+    launchCppTester((c: KeywordsModule) => new KeywordsModuleTests(c))
+  }
+
+  @Test def testKeywordsVerilog() {
+    println("testKeywordsVerilog:")
+    launchVerilogTester((c: KeywordsModule) => new KeywordsModuleTests(c))
+  }
 }

@@ -53,7 +53,6 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  val keywords = VerilogBackend.keywords
   override val needsLowering = Set("PriEnc", "OHToUInt", "Log2")
 
   override def isEmittingComponents: Boolean = true
