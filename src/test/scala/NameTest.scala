@@ -552,24 +552,43 @@ class NameSuite extends TestSuite {
     io.z := end
   }
 
-  class KeywordsModuleTests(c: KeywordsModule) extends Tester(c) {
+  trait KeywordsModuleTestsCommon extends Tests {
     val values = Vector(3,2,1)
-    values foreach { v => 
-      poke(c.io.a, v) 
-      step(1)
+    def init(c: KeywordsModule) {
+      values foreach { v => 
+        poke(c.io.a, v) 
+        step(1)
+      }
     }
+  }
+
+  class KeywordsModulePathTests(c: KeywordsModule) extends Tester(c) with KeywordsModuleTestsCommon {
+    init(c)
     expect(peekPath("NameSuite_KeywordsModule.begin_") == 1, "begin -> begin_: ")
     expect(peekPath("NameSuite_KeywordsModule.time_") == 2, "time -> time_: ")
     expect(peekPath("NameSuite_KeywordsModule.end_") == 3, "end -> end_: ")
   }
+
+  class KeywordsModuleNullTests(c: KeywordsModule) extends Tester(c) with KeywordsModuleTestsCommon {
+    init(c)
+    expect(c.begin, 1)
+    expect(c.time, 2)
+    expect(c.end, 3)
+  }
  
   @Test def testKeywordsCpp() {
     println("testKeywordsCpp:")
-    launchCppTester((c: KeywordsModule) => new KeywordsModuleTests(c))
+    launchCppTester((c: KeywordsModule) => new KeywordsModulePathTests(c))
   }
 
   @Test def testKeywordsVerilog() {
     println("testKeywordsVerilog:")
-    launchVerilogTester((c: KeywordsModule) => new KeywordsModuleTests(c))
+    launchVerilogTester((c: KeywordsModule) => new KeywordsModulePathTests(c))
+  }
+
+  @Test def testKeywordsNull() {
+    println("testKeywordsNull:")
+    launchTester("null", (c: KeywordsModule) => new KeywordsModuleNullTests(c),
+      Some((args: Array[String]) => args ++ Array("--testCommand", "NameSuite_KeywordsModule", "-q")))
   }
 }

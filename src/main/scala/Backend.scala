@@ -90,7 +90,7 @@ trait FileSystemUtilities {
   }
 }
 
-abstract class Backend extends FileSystemUtilities{
+class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
   val keywords = VerilogBackend.keywords
   val nameSpace = HashSet[String]()

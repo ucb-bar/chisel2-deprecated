@@ -417,11 +417,11 @@ object Driver extends FileSystemUtilities{
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
     backend = backendName match  {
+      case "null" => new Backend
       case "c" => new CppBackend
       case "dot" => new DotBackend
       case "flo" => new FloBackend
       case "fpga" => new FPGABackend
-      case "null" => new NullBackend
       case "sysc" => new SysCBackend
       case "v" => new VerilogBackend
       case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
