@@ -9,6 +9,14 @@ PLI_INT32 tick_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
+  virtual void tick() {
+    while(!forces.empty()) {
+      vpi_put_value(forces.front(), NULL, NULL, vpiReleaseFlag);
+      forces.pop();
+    }
+    sim_api_t::tick();
+  }
+
   void init_clks() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
@@ -54,14 +62,20 @@ public:
 
 private:
   vpiHandle top_handle;
+  std::queue<vpiHandle> forces;
 
-  void put_value(vpiHandle& sig) {
+  void put_value(vpiHandle& sig, bool force = false) {
     std::string value;
     std::cin >> value;
     s_vpi_value value_s;
-    value_s.format = vpiHexStrVal;
+    s_vpi_time time_s;
+    value_s.format    = vpiHexStrVal;
     value_s.value.str = (PLI_BYTE8*) value.c_str();
-    vpi_put_value(sig, &value_s, NULL, vpiNoDelay);
+    time_s.type       = vpiSimTime;
+    time_s.low        = 0;
+    time_s.high       = 0;
+    vpi_put_value(sig, &value_s, &time_s, force ? vpiForceFlag : vpiTransportDelay);
+    if (force) forces.push(sig); 
   }
 
   void get_value(vpiHandle& sig) {
@@ -74,7 +88,7 @@ private:
   virtual void reset() {
     for (size_t i = 0 ; i < sim_data.resets.size() ; i++) {
       s_vpi_value value_s;
-      value_s.format = vpiHexStrVal;
+      value_s.format    = vpiHexStrVal;
       value_s.value.str = (PLI_BYTE8*) "1";
       vpi_put_value(sim_data.resets[i], &value_s, NULL, vpiNoDelay);
     }
@@ -83,7 +97,7 @@ private:
   virtual void start() {
     for (size_t i = 0 ; i < sim_data.resets.size() ; i++) {
       s_vpi_value value_s;
-      value_s.format = vpiHexStrVal;
+      value_s.format    = vpiHexStrVal;
       value_s.value.str = (PLI_BYTE8*) "0";
       vpi_put_value(sim_data.resets[i], &value_s, NULL, vpiNoDelay);
     }

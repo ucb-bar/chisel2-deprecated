@@ -75,7 +75,7 @@ protected:
   mod_t* module;
 
 private:
-  virtual void put_value(dat_api_base* &sig) {
+  virtual void put_value(dat_api_base* &sig, bool force = false) {
     std::string value;
     std::cin >> value;
     sig->put_value(value);
