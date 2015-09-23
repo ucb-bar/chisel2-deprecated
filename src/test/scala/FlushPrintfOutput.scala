@@ -34,12 +34,16 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
+import FlushPrintfOutput._
+
+object FlushPrintfOutput {
+    val whiteSpaceRE = """\s""".r
+    def eliminateWhiteSpace(s: String): String = whiteSpaceRE.replaceAllIn(s, "")
+}
 
 class FlushPrintfOutput extends TestSuite {
   @Test def testFlushPrintfOutput() {
     println("\ntestFlushPrintfOutput ...")
-    val whiteSpaceRE = """\s""".r
-    def eliminateWhiteSpace(s: String): String = whiteSpaceRE.replaceAllIn(s, "")
 
     class PrintfModule extends Module {
       val io = new DecoupledUIntIO
