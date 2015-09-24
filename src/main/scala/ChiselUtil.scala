@@ -227,7 +227,7 @@ object Mux1H
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
 
-/** An I/O Bundle containing data and a signal determining if its valid
+/** An I/O Bundle containing data and a signal determining if it is valid
   * @constructor A bundle containing the Bool(OUTPUT) 'valid' and 'bits' OUTPUT of type T
   * @note can be constucted using the object [[Chisel.Valid$ Valid]]
   * @example
