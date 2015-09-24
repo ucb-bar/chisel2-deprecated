@@ -23,9 +23,9 @@ class BundleWireSuite extends TestSuite {
     class BundleWire extends Module {
       val io = new Bundle {
         val in   = (new Coord).asInput
-        val outs = Vec((new Coord).asOutput, 4)
+        val outs = Vec(4, (new Coord).asOutput)
       }
-      val coords = Wire(Vec(new Coord, 4))
+      val coords = Wire(Vec(4, new Coord))
       for (i <- 0 until 4) {
         coords(i)  := io.in
         io.outs(i) := coords(i)

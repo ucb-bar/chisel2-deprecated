@@ -45,7 +45,7 @@ class SeqMemSuite extends TestSuite {
         val value   = UInt(INPUT, 32)
         val out    = UInt(OUTPUT, 32)
       }
-      val mem = SeqMem(UInt(width = 32), size)
+      val mem = SeqMem(size, UInt(width = 32))
       when(io.wEnable) {
         mem.write(io.addr, io.value)
       }
