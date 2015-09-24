@@ -36,7 +36,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  private def construct[T <: Data](n: Int, t: T, seqRead: Boolean,
+  private def construct[T <: Data](n: Int, t: => T, seqRead: Boolean,
                        orderedWrites: Boolean,
                        clock: Clock): Mem[T] = {
     val gen = t.cloneType
@@ -46,15 +46,15 @@ object Mem {
     res
   }
 
-  def apply[T <: Data](n: Int, t: T): Mem[T] = {
+  def apply[T <: Data](n: Int, t: => T): Mem[T] = {
     construct(n, t, false, false, null)
   }
 
-  def apply[T <: Data](n: Int, t: T, clock: Clock): Mem[T] = {
+  def apply[T <: Data](n: Int, t: => T, clock: Clock): Mem[T] = {
     construct(n, t, false, false, clock)
   }
 
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
+  def apply[T <: Data](out: => T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
     if (Driver.minimumCompatibility > "2") {
@@ -278,15 +278,14 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 
 // Chisel3
 object SeqMem {
-  def apply[T <: Data](n: Int, out: T): SeqMem[T] = {
+  def apply[T <: Data](n: Int, out: => T): SeqMem[T] = {
     val gen = out.cloneType
     Reg.validateGen(gen)
     new SeqMem(n, gen)
   }
 
-  def apply[T <: Data](out: T, n: Int): SeqMem[T] = {
-    if (Driver.minimumCompatibility > "2")
-      ChiselError.warning("SeqMem(out:T, n:Int) is deprecated. Please use SeqMem(n:Int, out:T) instead.")
+  @deprecated("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", "2.29")
+  def apply[T <: Data](out: => T, n: Int): SeqMem[T] = {
     apply(n, out)
   }
 }
