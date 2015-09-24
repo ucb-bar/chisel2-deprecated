@@ -31,19 +31,25 @@ class BundleWireSuite extends TestSuite {
         io.outs(i) := coords(i)
       }
     }
-    
-    class BundleWireTester(c: BundleWire) extends Tester(c) {
-      for (t <- 0 until 4) {
-        val test_in_x = rnd.nextInt(256)
-        val test_in_y = rnd.nextInt(256)
-        poke(c.io.in.x, test_in_x)
-        poke(c.io.in.y, test_in_y)
-        step(1)
-        for (i <- 0 until 4) {
-          expect(c.io.outs(i).x, test_in_x)
-          expect(c.io.outs(i).y, test_in_y)
-        }
+   
+    trait BundleWireTests extends Tests {
+      def tests(c: BundleWire) {
+       for (t <- 0 until 4) {
+         val test_in_x = rnd.nextInt(256)
+         val test_in_y = rnd.nextInt(256)
+         poke(c.io.in.x, test_in_x)
+         poke(c.io.in.y, test_in_y)
+         step(1)
+         for (i <- 0 until 4) {
+           expect(c.io.outs(i).x, test_in_x)
+           expect(c.io.outs(i).y, test_in_y)
+         }
+       }
       }
+    }
+ 
+    class BundleWireTester(c: BundleWire) extends Tester(c) with BundleWireTests {
+      tests(c)
     }
     val args = chiselEnvironmentArguments() ++ Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test")

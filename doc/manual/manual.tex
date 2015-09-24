@@ -1692,8 +1692,7 @@ class RRArbiter[T <: Data](type: T, n: Int)
 class Queue[T <: Data]
     (type: T, entries: Int, 
      pipe: Boolean = false,
-     flow: Boolean = false
-     flushable: Boolean = false)
+     flow: Boolean = false)
     extends Module  
 
 // A hardware module that delays data 

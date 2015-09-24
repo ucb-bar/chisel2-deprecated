@@ -53,20 +53,26 @@ class DoubleSuite extends TestSuite {
       io.outGE := dbl1 >= dbl2
     }
 
-    class CompareDblModuleTests(m: CompareDblModule) extends Tester(m) {
-      for (i <- 0 to 100) {
-        val dbl1 = rnd.nextDouble
-        val dbl2 = rnd.nextDouble
-        
-        poke(m.io.in1, dbl1)
-        poke(m.io.in2, dbl2)
-        expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)
-        expect(m.io.outLE, if (dbl1 <= dbl2) 1 else 0)
-        expect(m.io.outGT, if (dbl1 > dbl2) 1 else 0)
-        expect(m.io.outGE, if (dbl1 >= dbl2) 1 else 0)
+    trait CompareDblModuleTests extends Tests {
+      def tests(m: CompareDblModule) {
+        for (i <- 0 to 100) {
+          val dbl1 = rnd.nextDouble
+          val dbl2 = rnd.nextDouble
+          
+          poke(m.io.in1, dbl1)
+          poke(m.io.in2, dbl2)
+          expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)
+          expect(m.io.outLE, if (dbl1 <= dbl2) 1 else 0)
+          expect(m.io.outGT, if (dbl1 > dbl2) 1 else 0)
+          expect(m.io.outGE, if (dbl1 >= dbl2) 1 else 0)
+        }
       }
     }
 
-    launchCppTester((m: CompareDblModule) => new CompareDblModuleTests(m))
+    class CompareDblModuleTester(m: CompareDblModule) extends Tester(m) with CompareDblModuleTests {
+      tests(m)
+    }
+
+    launchCppTester((m: CompareDblModule) => new CompareDblModuleTester(m))
   }
 }

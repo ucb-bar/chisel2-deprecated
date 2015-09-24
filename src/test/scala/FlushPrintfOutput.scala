@@ -34,12 +34,16 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
+import FlushPrintfOutput._
+
+object FlushPrintfOutput {
+    val whiteSpaceRE = """\s""".r
+    def eliminateWhiteSpace(s: String): String = whiteSpaceRE.replaceAllIn(s, "")
+}
 
 class FlushPrintfOutput extends TestSuite {
   @Test def testFlushPrintfOutput() {
     println("\ntestFlushPrintfOutput ...")
-    val whiteSpaceRE = """\s""".r
-    def eliminateWhiteSpace(s: String): String = whiteSpaceRE.replaceAllIn(s, "")
 
     class PrintfModule extends Module {
       val io = new DecoupledUIntIO
@@ -49,15 +53,21 @@ class FlushPrintfOutput extends TestSuite {
       printf(counterString, counter);
     }
 
-    class FlushPrintfOutputTests(m: PrintfModule) extends Tester(m) {
-      for (i <- 0 until 4) {
-        step(1)
-        // Fetch the output printed on stdout by the test.
-        val printfOutput = testOutputString
-        val expectedString = m.counterString.format(i)
-        assertTrue("incorrect output - %s".format(printfOutput), eliminateWhiteSpace(printfOutput) == eliminateWhiteSpace(expectedString))
+    trait FlushPrintfOutputTests extends Tests {
+      def tests(m: PrintfModule) {
+        for (i <- 0 until 4) {
+          step(1)
+          // Fetch the output printed on stdout by the test.
+          val printfOutput = testOutputString
+          val expectedString = m.counterString.format(i)
+          assertTrue("incorrect output - %s".format(printfOutput), eliminateWhiteSpace(printfOutput) == eliminateWhiteSpace(expectedString))
+        }
       }
     }
-    launchCppTester((m: PrintfModule) => new FlushPrintfOutputTests(m))
+
+    class FlushPrintfOutputTester(m: PrintfModule) extends Tester(m) with FlushPrintfOutputTests {
+      tests(m)
+    }
+    launchCppTester((m: PrintfModule) => new FlushPrintfOutputTester(m))
   }
 }
