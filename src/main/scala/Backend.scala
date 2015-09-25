@@ -178,7 +178,8 @@ abstract class Backend extends FileSystemUtilities{
           } yield new_cand).head // only use the first one
         } else candidate
       }
-      def reserveName(name: String): Unit = assert(name == getUniqueName(name))
+      // Ignore attempts to reserve an empty ("") name - pr499, issue 459
+      def reserveName(name: String): Unit = if (name != "") assert(name == getUniqueName(name), "name " + name + " cannot be reserved")
       def getUniqueName(candidate: String): String = {
         val unique_name = ensureUnique(candidate)
         namespace += unique_name.toLowerCase
