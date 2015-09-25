@@ -68,13 +68,9 @@ private:
     std::string value;
     std::cin >> value;
     s_vpi_value value_s;
-    s_vpi_time time_s;
     value_s.format    = vpiHexStrVal;
     value_s.value.str = (PLI_BYTE8*) value.c_str();
-    time_s.type       = vpiSimTime;
-    time_s.low        = 0;
-    time_s.high       = 0;
-    vpi_put_value(sig, &value_s, &time_s, force ? vpiForceFlag : vpiTransportDelay);
+    vpi_put_value(sig, &value_s, NULL, force ? vpiForceFlag : vpiNoDelay);
     if (force) forces.push(sig); 
   }
 
