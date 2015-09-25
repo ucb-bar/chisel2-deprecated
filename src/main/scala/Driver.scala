@@ -136,8 +136,8 @@ object Driver extends FileSystemUtilities{
     val _walked = HashSet[Node](queue:_*)
     // Avoid a "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements" if node is null - unassigned MUX
     def walked(node: Node) = node == null || _walked(node)
-    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
-    def enqueueInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach enqueueNode }
+    def enqueueNode(node: Node) { if (node != null) { queue enqueue node ; _walked += node }}
+    def enqueueInputs(top: Node) { ListSet((top.inputs.filter(_ != null)):_*) filterNot walked foreach enqueueNode }
     def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue

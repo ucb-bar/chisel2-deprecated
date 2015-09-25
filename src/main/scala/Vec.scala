@@ -47,9 +47,10 @@ object VecMux {
 }
 
 object Vec {
-
-  def apply[T <: Data](gen: T, n: Int): Vec[T] = 
-    /* new */ Vec((0 until n).map(i => gen.cloneType))
+  @deprecated("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", "2.29")
+  def apply[T <: Data](gen: => T, n: Int): Vec[T] = {
+    apply(n, gen)
+  }
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */

@@ -176,7 +176,8 @@ class Backend extends FileSystemUtilities{
           } yield new_cand).head // only use the first one
         } else candidate
       }
-      def reserveName(name: String): Unit = assert(name == getUniqueName(name))
+      // Ignore attempts to reserve an empty ("") name - pr499, issue 459
+      def reserveName(name: String): Unit = if (name != "") assert(name == getUniqueName(name), "name " + name + " cannot be reserved")
       def getUniqueName(candidate: String): String = {
         val unique_name = ensureUnique(candidate)
         namespace += unique_name.toLowerCase
@@ -436,8 +437,8 @@ class Backend extends FileSystemUtilities{
       case x: Delay =>
         val clock = x.clock getOrElse x.component._clock.get
         val reset =
-          if (x.component.hasExplicitReset) x.component._reset.get
-          else if (x.clock != None) x.clock.get.getReset
+          if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.component.hasExplicitClock) x.component._clock.get.getReset
           else x.component._reset.get
         x.assignReset(x.component addResetPin reset)

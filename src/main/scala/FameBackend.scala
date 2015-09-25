@@ -101,7 +101,7 @@ class FameQueueTrackerIO() extends Bundle{
 
 class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module{
   val io = new FameQueueTrackerIO()
-  val aregs = Reg { Vec(UInt(0, width = log2Up(num_tgt_entries)), num_tgt_cycles) }
+  val aregs = Reg { Vec(num_tgt_cycles, UInt(0, width = log2Up(num_tgt_entries))) }
   val tail_pointer = Reg(init = UInt(1, width = log2Up(num_tgt_cycles)))
 
   val next_tail_pointer = Wire(UInt())
