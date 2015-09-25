@@ -479,6 +479,7 @@ class NameSuite extends TestSuite {
   /* XXX test case derived from issue #6 on github.
    */
   @Test def testInputPortNameChange() {
+    println("testInputPortNameChange:")
     class InputPortNameComp extends Module {
       val io = new Bundle {
         val in = Bits(INPUT, 20)
@@ -498,6 +499,7 @@ class NameSuite extends TestSuite {
   /* XXX test case derived from issue #153 on github.
    */
   @Test def testNameItTooEager153() {
+    println("testNameItTooEager153:")
     class MyBundle extends Bundle
     {
       val x = Bool()
@@ -539,5 +541,25 @@ class NameSuite extends TestSuite {
         "--targetDir", dir.getPath.toString()),
         () => Module(new NameItTooEager153()))
     
+  }
+
+  /* Multiple directionless IO's don't throw assertion error - issue #459.
+   */
+  @Test def testMultipleDirectionlessIO459() {
+    println("testMultipleDirectionlessIO459:")
+    class MultipleDirectionlessIO459 extends Module {
+      val io = new Bundle {
+        val send = Reg(UInt(0, 8))
+        val recv = Reg(UInt(0, 8))
+      }
+    }
+    
+    // This should fail since we don't assign a directiom to the IO ports.
+    intercept[IllegalStateException] {
+      chiselMain(Array[String]("--backend", "v",
+          "--targetDir", dir.getPath.toString()),
+          () => Module(new MultipleDirectionlessIO459()))
+    }
+    assertTrue(ChiselError.hasErrors)
   }
 }
