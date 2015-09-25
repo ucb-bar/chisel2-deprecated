@@ -152,6 +152,14 @@ class VerilogBackend extends Backend {
     }
   }
 
+  // Add trailing comma to port declarations.
+  def delimitUncommentedPortDecls(portDecls: ArrayBuffer[StringBuilder]) {
+    val uncommentedPorts = portDecls.filter(!_.result.contains("//"))
+    if (!uncommentedPorts.isEmpty) {
+      uncommentedPorts.init map (_ append ",")
+    }
+  }
+
   def emitDef(c: Module): StringBuilder = {
     val spacing = (if(c.verilog_parameters != "") " " else "")
     var res = new StringBuilder 
@@ -201,8 +209,8 @@ class VerilogBackend extends Backend {
       portDec append " )"
       portDecs += portDec
     }
-    val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented portDecs
+    delimitUncommentedPortDecls(portDecs)
     portDecs map (_ insert (0, "       "))
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res append ",\n" else res append "\n"
     res append (portDecs addString (new StringBuilder, "\n"))
@@ -577,8 +585,8 @@ class VerilogBackend extends Backend {
           ports += List("    ", prune, "output", emitWidth(io), " ", emitRef(io)) addString (new StringBuilder)
       }
     }
-    val uncommentedPorts = ports.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented ports
+    delimitUncommentedPortDecls(ports)
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res.append(",\n") else res.append("\n")
     res.append(ports addString (new StringBuilder, "\n"))
     res.append("\n);\n\n")
