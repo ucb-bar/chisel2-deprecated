@@ -110,7 +110,7 @@ object SCWrapper {
     /*begin*/{
       var input_ports = ""
       var output_ports = ""
-	  var sctor_list = ""
+	    var sctor_list = ""
       var input_thread = ""
       var output_thread = ""
 
@@ -131,23 +131,27 @@ object SCWrapper {
           output_thread += thread_out
         }
       }
-	  if (c.valid_ready == true){
-		sctor_list += ", %s__io_in_valid(\"%s__io_in_valid\")".format(c.name, c.name)
-		sctor_list += ", %s__io_out_ready(\"%s__io_out_ready\")\n  ".format(c.name, c.name)
-		sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
-		sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
+	    if (c.valid_ready == 1 || c.valid_ready == 2){  // 1= only valid signal -> ValidIO
+		    sctor_list += ", %s__io_in_valid(\"%s__io_in_valid\")\n  ".format(c.name, c.name)
+		    sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")\n  ".format(c.name, c.name)
 
-		input_ports += "sc_in<bool > %s__io_in_valid;\n  ".format(c.name)
-		input_ports += "sc_in<bool > %s__io_out_ready;\n  ".format(c.name)
-		output_ports += "sc_out<bool > %s__io_out_valid;\n  ".format(c.name)
-		output_ports += "sc_out<bool > %s__io_in_ready;\n  ".format(c.name)
-		input_thread += "c->%s__io_in_valid = LIT<1>(%s__io_in_valid->read());\n    ".format(c.name, c.name)
-		input_thread += "c->%s__io_out_ready = LIT<1>(%s__io_out_ready->read());\n    ".format(c.name, c.name)
+		    input_ports += "sc_in<bool > %s__io_in_valid;\n  ".format(c.name)
+		    output_ports += "sc_out<bool > %s__io_out_valid;\n  ".format(c.name)
+		    input_thread += "c->%s__io_in_valid = LIT<1>(%s__io_in_valid->read());\n    ".format(c.name, c.name)
 
+		    output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
+	    }
+	    if (c.valid_ready == 2){  // 2= both valid & ready signals -> DecoupledIO
+		    sctor_list += ", %s__io_out_ready(\"%s__io_out_ready\")\n  ".format(c.name, c.name)
+		    sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
 
-		output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
-		output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
-	  }
+		    input_ports += "sc_in<bool > %s__io_out_ready;\n  ".format(c.name)
+		    output_ports += "sc_out<bool > %s__io_in_ready;\n  ".format(c.name)
+		    input_thread += "c->%s__io_out_ready = LIT<1>(%s__io_out_ready->read());\n    ".format(c.name, c.name)
+
+		    output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
+
+      }
       replacements += (("input_ports", input_ports))
       replacements += (("output_ports", output_ports))
       replacements += (("sctor_list", sctor_list))
@@ -220,11 +224,11 @@ object SCWrapper {
     /*Check Output Queues*/{
       //Pull out output ports
       val ports = ArrayBuffer[CEntry]()
-          for (e <- c.entries) {
-            if(!e.is_input) {
-              ports += e
-            }
-          }
+      for (e <- c.entries) {
+        if(!e.is_input) {
+          ports += e
+        }
+      }
       //Check
       var check = ""
       var valid_output = "";
@@ -368,7 +372,7 @@ class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_w
 class ComponentDef(a_type: String, a_name: String) {
   val ctype: String = a_type
   val name: String = a_name
-  var valid_ready: Boolean = false
+  var valid_ready: Int = 0
   val entries = ArrayBuffer[CEntry]()
   val structs = scala.collection.mutable.LinkedHashMap[String, CStruct]()
 
