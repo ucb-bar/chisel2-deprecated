@@ -90,9 +90,9 @@ trait FileSystemUtilities {
   }
 }
 
-abstract class Backend extends FileSystemUtilities{
+class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: Set[String]
+  val keywords = VerilogBackend.keywords
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
@@ -160,9 +160,7 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
-  def asValidName( name: String ): String = {
-    if (keywords contains name) name + "_" else name;
-  }
+  def asValidName( name: String ): String = if (keywords(name)) name + "_" else name
 
   def nameAll() {
     // Helper classes to get unique names for everything
@@ -219,7 +217,7 @@ abstract class Backend extends FileSystemUtilities{
       children.foreach(c => c.name = namespace.getUniqueName(c.name))
       // Then, check all other nodes in the design
       comp dfs { 
-        case reg: Reg =>
+        case reg: Reg => 
           reg setName namespace.getUniqueName(reg.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary

@@ -53,7 +53,6 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  val keywords = VerilogBackend.keywords
   override val needsLowering = Set("PriEnc", "OHToUInt", "Log2")
 
   override def isEmittingComponents: Boolean = true
@@ -717,6 +716,7 @@ class VerilogBackend extends Backend {
       copyToTarget("sim_api.h")
       copyToTarget("vpi.h")
       copyToTarget("vpi.cpp")
+      copyToTarget("vpi.tab")
     }
   }
 
@@ -727,7 +727,7 @@ class VerilogBackend extends Backend {
     val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc", 
      "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
-    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
+    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-P", "vpi.tab", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)
     link(dir, "vpi.so", List("vpi.o"), isLib=true)
     if (!run(cmd)) throw new RuntimeException("vcs command failed")

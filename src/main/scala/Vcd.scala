@@ -31,8 +31,6 @@
 package Chisel
 
 class VcdBackend(top: Module) extends Backend {
-  val keywords = Set[String]()
-
   override def emitTmp(node: Node): String =
     emitRef(node)
   override def emitRef(node: Node): String =

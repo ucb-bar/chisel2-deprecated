@@ -50,7 +50,6 @@ object CString {
 
 class CppBackend extends Backend {
   import PartitionIslands._
-  val keywords = Set[String]()
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
   protected[this] val onceOnlyFiles = HashSet[String]()

@@ -103,7 +103,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   /** Valid commands to send to the Simulator
     * @todo make private? */
-  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, GETID, SETCLK, FIN = Value }
+  object SIM_CMD extends Enumeration { val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, SETCLK, FIN = Value }
   /**
    * Waits until the emulator streams are ready. This is a dirty hack related
    * to the way Process works. TODO: FIXME.
@@ -225,8 +225,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
   }
 
-  private def poke(id: Int, v: BigInt) { 
-    sendCmd(SIM_CMD.POKE)
+  private def poke(id: Int, v: BigInt, force: Boolean = false) { 
+    val cmd = if (!force) SIM_CMD.POKE else SIM_CMD.FORCE
+    sendCmd(cmd)
     writeln(id.toString)
     writeValue(v)
   }
@@ -235,8 +236,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param v The BigInt representing the bits to set
     * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
     */
-  def pokePath(path: String, v: BigInt) { 
-    poke(_signalMap getOrElseUpdate (path, getId(path)), v)
+  def pokePath(path: String, v: BigInt, force: Boolean = false) { 
+    poke(_signalMap getOrElseUpdate (path, getId(path)), v, force)
   }
   /** set the value of a node
     * @param node The node to set
