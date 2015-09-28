@@ -463,7 +463,13 @@ abstract class Node extends nameable {
     */
   override def equals(that: Any): Boolean = that match {
     case n: Node => this eq n
-    case _ => ChiselError.error("can't compare Node " + this + " and non-Node " + that); false
+    case _ => {
+      // Comparison against null is legal and returns false.
+      if (that != null) {
+        ChiselError.error("can't compare Node " + this + " and non-Node " + that)
+      }
+      false
+    }
   }
 
   def canCSE: Boolean = false
