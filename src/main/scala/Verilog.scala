@@ -369,6 +369,8 @@ class VerilogBackend extends Backend {
       harness write "  integer min = 1 << 31 - 1;\n\n"
       clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
     }
+    harness write "  reg [1023:0] vcdfile = 0;\n"
+    harness write "  reg [1023:0] vpdfile = 0;\n"
 
     harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
@@ -394,12 +396,18 @@ class VerilogBackend extends Backend {
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_sigs(%s);\n".format(c.name)
 
-    if (Driver.isVCD) {
-      harness write "    /*** VPD dump ***/\n"
-      harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
-      harness write "    $vcdpluson(0);\n"
-      if (Driver.isVCDMem) harness.write("    $vcdplusmemon;\n")
-    }
+    harness write "    /*** VCD & VPD dump ***/\n"
+    harness write "    if ($value$plusargs(\"vcdfile=%s\", vcdfile)) begin\n"
+    harness write "      $dumpfile(vcdfile);\n"
+    harness write "      $dumpvars(0, %s);\n".format(c.name)
+    harness write "    end\n"
+    harness write "    if ($value$plusargs(\"vpdfile=%s\", vpdfile)) begin\n"
+    harness write "      $vcdplusfile(vpdfile);\n"
+    harness write "      $vcdpluson(0);\n"
+    harness write "    end\n"
+    harness write "    if ($test$plusargs(\"vpdmem\")) begin\n"
+    harness write "      $vcdplusmemon;\n"
+    harness write "    end\n"
     harness write "  end\n\n"
 
     if (clocks.size > 1) {

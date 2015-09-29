@@ -589,6 +589,6 @@ class NameSuite extends TestSuite {
   @Test def testKeywordsNull() {
     println("testKeywordsNull:")
     launchTester("null", (c: KeywordsModule) => new KeywordsModuleNullTests(c),
-      Some((args: Array[String]) => args ++ Array("--testCommand", "NameSuite_KeywordsModule", "-q")))
+      Some((args: Array[String]) => args ++ Array("--testCommand", dir.getPath.toString() + "/NameSuite_KeywordsModule", "-q")))
   }
 }

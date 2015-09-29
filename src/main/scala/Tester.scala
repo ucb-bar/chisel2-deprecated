@@ -446,7 +446,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val target = Driver.targetDir + "/" + n
     // If the caller has provided a specific command to execute, use it.
     val cmd = Driver.testCommand match {
-      case Some(cmd) => Driver.targetDir + "/" + cmd
+      case Some(cmd) => cmd
       case None => Driver.backend match {
         case b: FloBackend =>
           val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
@@ -454,7 +454,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
           if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
           command ++= ArrayBuffer(":target-dir", Driver.targetDir)
           command.mkString(" ")
-        case b: VerilogBackend => target + " -q +vcs+initreg+0 "
+        case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
+          if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
+          if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
         case _ => target
       }
     }
