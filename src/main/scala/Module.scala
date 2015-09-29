@@ -30,6 +30,7 @@
 
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
+import scala.collection.immutable.ListSet
 
 /** Methods to insert [[Chisel.Module Modules]] into components correctly */
 object Module {
@@ -333,6 +334,13 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     res
   }
 
+  def addNode[T <: Node](node: T) = {
+    nodes += node.getNode
+    node.getNode.compOpt = Some(this)
+    node
+  }
+
+  // TODO: should be private[Chisel]?
   /** A breadth first search of the graph of nodes */
   def bfs (visit: Node => Unit) = {
     // initialize BFS
@@ -349,9 +357,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
     // Do BFS
     val _walked = HashSet[Node](queue:_*)
-    def walked(node: Node) = (_walked contains node) || node.isIo
+    def walked(node: Node) = node == null || _walked(node) || node.isIo
     def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
-    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach enqueueNode }
     def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
@@ -379,9 +387,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
     // Do DFS
     val _walked = HashSet[Node](stack:_*)
-    def walked(node: Node) = (_walked contains node) || node.isIo
+    def walked(node: Node) = node == null || _walked(node) || node.isIo
     def pushNode(node: Node) { stack push node ; _walked += node }
-    def pushInputs(top: Node) { top.inputs filterNot walked foreach pushNode }
+    def pushInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach pushNode }
     def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop

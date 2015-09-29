@@ -543,6 +543,64 @@ class NameSuite extends TestSuite {
     
   }
 
+  class KeywordsModule extends Module {
+    val io = new Bundle {
+      val a = UInt(INPUT, 2)
+      val z = UInt(OUTPUT, 2)
+    }
+    val begin = RegNext(io.a)
+    val time  = RegNext(begin)
+    val end   = RegNext(time)
+    io.z := end
+  }
+
+  trait KeywordsModuleTestsCommon extends Tests {
+    val values = Vector(3,2,1)
+    def init(c: KeywordsModule) {
+      values foreach { v => 
+        poke(c.io.a, v) 
+        step(1)
+      }
+    }
+  }
+
+  class KeywordsModulePathTests(c: KeywordsModule) extends Tester(c) with KeywordsModuleTestsCommon {
+    init(c)
+    expect(peekPath("NameSuite_KeywordsModule.begin_") == 1, "begin -> begin_: ")
+    expect(peekPath("NameSuite_KeywordsModule.time_") == 2, "time -> time_: ")
+    expect(peekPath("NameSuite_KeywordsModule.end_") == 3, "end -> end_: ")
+  }
+
+  class KeywordsModuleNullTests(c: KeywordsModule) extends Tester(c) with KeywordsModuleTestsCommon {
+    init(c)
+    expect(c.begin, 1)
+    expect(c.time, 2)
+    expect(c.end, 3)
+  }
+ 
+  @Test def testKeywordsCpp() {
+    println("testKeywordsCpp:")
+    launchCppTester((c: KeywordsModule) => new KeywordsModulePathTests(c))
+  }
+
+  @Test def testKeywordsVerilog() {
+    println("testKeywordsVerilog:")
+    // We'd like to use something like assume() here, but it generates
+    // a TestCanceledException. There should be a programmatic way to skip
+    // tests (without failing) but make a note of the fact.
+    if (!Driver.isVCSAvailable) {
+      assert(true, "vcs unavailable - skipping testKeywordsVerilog")
+    } else {
+      launchVerilogTester((c: KeywordsModule) => new KeywordsModulePathTests(c))
+    }
+  }
+
+  @Test def testKeywordsNull() {
+    println("testKeywordsNull:")
+    launchTester("null", (c: KeywordsModule) => new KeywordsModuleNullTests(c),
+      Some((args: Array[String]) => args ++ Array("--testCommand", "NameSuite_KeywordsModule", "-q")))
+  }
+
   /* Multiple directionless IO's don't throw assertion error - issue #459.
    */
   @Test def testMultipleDirectionlessIO459() {

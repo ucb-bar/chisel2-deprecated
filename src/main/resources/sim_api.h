@@ -6,8 +6,9 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <queue>
 
-enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, GETID, SETCLK, FIN };
+enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, SETCLK, FIN };
 
 template<class T> struct sim_data_t {
   std::vector<T> resets;
@@ -20,7 +21,7 @@ template<class T> struct sim_data_t {
 
 template <class T> class sim_api_t {
 public:
-  void tick() {
+  virtual void tick() {
     static bool is_reset = false;
     // First, Generates output tokens  (in hex)
     generate_tokens();
@@ -45,6 +46,7 @@ public:
           update(); exit = true; break;
         case POKE: poke(); break; 
         case PEEK: peek(); break;
+        case FORCE: poke(true); break;
         case GETID: getid(); break;
         case SETCLK: setclk(); break;
         case FIN:  finish(); exit = true; break;
@@ -59,18 +61,18 @@ private:
   virtual void update() = 0; 
   virtual void step() = 0;
   // Consumes input tokens (in hex)
-  virtual void put_value(T& sig) = 0;
+  virtual void put_value(T& sig, bool force = false) = 0;
   // Generate output tokens (in hex)
   virtual void get_value(T& sig) = 0;
   // Find a signal of path 
   virtual int search(std::string& path) { return -1; }
 
-  void poke() {
+  void poke(bool force = false) {
     size_t id;
     std::cin >> std::dec >> id;
     T obj = sim_data.signals[id];
     if (obj) {
-      put_value(obj);
+      put_value(obj, force);
     } else {
       std::cout << "Cannot find the object of id = " << id << std::endl;
       finish();

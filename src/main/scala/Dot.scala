@@ -32,7 +32,6 @@ package Chisel
 
 class DotBackend extends Backend {
   import PartitionIslands._
-  val keywords = Set[String]()
   var islands = Array[Island]()
   val allDottable = false
   val useComponentNames = false
