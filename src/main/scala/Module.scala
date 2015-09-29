@@ -32,6 +32,7 @@ package Chisel
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
 import scala.collection.immutable.ListSet
 
+/** Methods to insert [[Chisel.Module Modules]] into components correctly */
 object Module {
   /** @return the top level module
     * @throws ChiselException if no top component is set
@@ -111,11 +112,11 @@ object Module {
   }
 
   /** Do not use: call current instead */
-  def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
+  private[Chisel] def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
   /** @return the current module */
   def current = getComponent getOrElse topMod
 
-  /** @return the backend from the [[Chisel.Driver]] */
+  /** @return the backend from the [[Chisel.Driver Driver]] */
   def backend = Driver.backend
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
@@ -135,7 +136,21 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) {
+/** A Module or block to logically divide a hardware design
+  * @note This is the same construct as module in verilog
+  * Also see [[Chisel.Module$ Module]] object
+  * @example
+  * {{{ class MyModule extends Module {
+  *   val io = new Bundle {
+  *     val dataIn = UInt(INPUT, 4)
+  *     val dataOut = UInt(OUTPUT, 4)
+  *   }
+  *   io.dataOut := io.dataIn
+  * }
+  * val myInst = Module(new MyModule) // create a MyModule
+  * }}}
+  */
+abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) extends Nameable {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -145,16 +160,11 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     Module/modules source text before their first instantiation. */
   private[Chisel] var level = 0
   private[Chisel] var traversal = 0
-  /** Name of the instance. */
-  var name: String = ""
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = ""
-  var named = false
   var parent: Module = null
   val children = ArrayBuffer[Module]()
 
-  /** Set the name of this module to the string 'n' */
-  def setName(n: String) { name = n ; named = true }
   /** Set the declaration name of the module to be string 'n' */
   def setModuleName(n : String) { moduleName = n }
 
@@ -171,7 +181,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   private[Chisel] def hasWhenCond: Boolean = !whenConds.isEmpty
   private[Chisel] def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  var verilog_parameters = "";
+  private[Chisel] var verilog_parameters = "";
   //Parameter Stuff
   lazy val params = Module.params
   params.path = this.getClass :: params.path
@@ -201,8 +211,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     case Some(r) => r
   }
-  // TODO: make this private[Chisel]?
-  def reset_=(r: Bool) {
+  private[Chisel] def reset_=(r: Bool) {
     _reset = Some(r)
   }
   /** @return the pin connected to the reset signal or creates a new one if no such pin exists */
@@ -233,8 +242,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   /** the I/O for this module */
   def io: Data
 
-  // TODO: make private[Chisel]?
-  var nindex: Option[Int] = None
+  private[Chisel] var nindex: Option[Int] = None
   def nextIndex : Int = {
     nindex = nindex match { case None => Some(0) case Some(i) => Some(i+1) }
     nindex.get
@@ -279,14 +287,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   def <>(src: Module) { io <> src.io }
 
   def apply(name: String): Data = io(name)
-  // COMPILATION OF REFERENCE, TODO: make private[Chisel]?
-  def emitDec(b: Backend): String = {
-    var res = ""
-    // val wires = io.flatten;
-    for ((n, w) <- wires)
-      res += b.emitDec(w)
-    res
-  }
 
   /** Add a pin with a name to the module
     * @param pin the I/O to add
@@ -308,7 +308,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     gen
   }
 
-  // TODO: should be private[Chisel]?
   /** Add a submodule to this module */
   def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
     Driver.modStackPushed = true
@@ -321,7 +320,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     Driver.compStack.pop
     res
   }
-  // TODO: should be private[Chisel]?
+
   /** Add a submodule to this module */
   def addModule[T <: Module](c: => T)(implicit p:Parameters = params) = {
     Driver.modStackPushed = true
@@ -373,7 +372,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
   }
 
-  // TODO: should be private[Chisel]?
   /** A depth first search of the graph of nodes */
   def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
@@ -404,7 +402,6 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
   }
 
-  // TODO: should be private[Chisel]?
   /** Add a default reset to the module*/
   def addDefaultReset {
     _reset match {
