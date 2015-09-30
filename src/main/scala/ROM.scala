@@ -92,10 +92,6 @@ class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
     inferWidth = Node.fixWidth(w)
     elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
-  val lits = {
-    val dc = Bits.DC(w).litOf
-    Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
-  }
 
   override lazy val isInObject: Boolean = true
   override lazy val isInVCD: Boolean = Driver.isVCDMem

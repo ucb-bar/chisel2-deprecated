@@ -95,7 +95,7 @@ class VcdBackend(top: Module) extends Backend {
     case m: Mem[_] =>
       "  mem_t<" + m.needWidth() + "," + m.n + "> " + emitRef(node) + "__prev;\n"
     case r: ROMData =>
-      "  mem_t<" + r.needWidth() + "," + r.lits.size + "> " + emitRef(node) + "__prev;\n"
+      "  mem_t<" + r.needWidth() + "," + r.n + "> " + emitRef(node) + "__prev;\n"
     case _ =>
       "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev;\n"
   } 
@@ -123,12 +123,12 @@ class VcdBackend(top: Module) extends Backend {
     }
     for (rom <- sortedROMs) {
       if (rom.component == c && !rom.name.isEmpty) {
-        for (offset <- 0 until rom.lits.size) {
+        for (offset <- 0 until rom.n) {
           write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
             top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
     for (child <- c.children) dumpVCDScope(child, write)
     write("  fputs(\"$upscope $end\\n\", f);\n")
@@ -151,12 +151,12 @@ class VcdBackend(top: Module) extends Backend {
     }
     for (rom <- sortedROMs) {
       if (rom.name.isEmpty) {
-        for (offset <- 0 until rom.lits.size) {
+        for (offset <- 0 until rom.n) {
           write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
             top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
         }
       }
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
     write("  fputs(\"$upscope $end\\n\", f);\n")
   }
@@ -185,9 +185,9 @@ class VcdBackend(top: Module) extends Backend {
       baseIdx += mem.n
     }
     for (rom <- sortedROMs) {
-      for (offset <- 0 until rom.lits.size)
+      for (offset <- 0 until rom.n)
         write(emitDefUnconditional(rom, offset, baseIdx + offset))
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
   }
 
@@ -205,9 +205,9 @@ class VcdBackend(top: Module) extends Backend {
       baseIdx += mem.n
     }
     for (rom <- sortedROMs) {
-      for (offset <- 0 until rom.lits.size)
+      for (offset <- 0 until rom.n)
         write(emitDefInline(rom, offset, baseIdx + offset))
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
     write("  fprintf(f, \"#%d\\n\", (t << 1) + 1);\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
@@ -230,9 +230,9 @@ class VcdBackend(top: Module) extends Backend {
       baseIdx += mem.n
     }
     for (rom <- sortedROMs) {
-      for (offset <- 0 until rom.lits.size)
+      for (offset <- 0 until rom.n)
         write(emitDef1(rom, offset, baseIdx + offset))
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
     write("  fprintf(f, \"#%d\\n\", (t << 1) + 1);\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
@@ -252,9 +252,9 @@ class VcdBackend(top: Module) extends Backend {
       baseIdx += mem.n
     }
     for (rom <- sortedROMs) {
-      for (offset <- 0 until rom.lits.size)
+      for (offset <- 0 until rom.n)
         write(emitDef2(rom, offset, baseIdx + offset))
-      baseIdx += rom.lits.size
+      baseIdx += rom.n
     }
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
       write(emitDef2(clk, i, true))
