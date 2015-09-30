@@ -1,45 +1,38 @@
-ChangeLog for Chisel v2.2.28
+ChangeLog for Chisel v2.2.29
 
-#516 Add missing "d<" operator and Dbl() comparison tests.
-#513 Check for unassigned MUX default (conditional assignment) and issue a chisel-specific message "NO DEFAULT SPECIFIED FOR WIRE" instead of: "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements."
-#478 Added a setName method to Module.
-#446 Chisel Tutorial uses UFix instead of UInt.
-#442 (part b) Add the ability to change timescale in vcd dump file.
-#442 (part 1) Correct use of "is" in tutorial FSM switch.
-#440 Repeated printfs - clear printStream after returning accumulated output.
-#439 Chisel somehow finds a way to build negative width wires.
-#438 Add --assertWarn flag converting Assert to Warn.
-#431 Use the standard Chisel error mechanism in SystemC backend.
-#172 Add a test for issue 172 - unused top level IOs were trimmed.
- (Cpp backend) Constant pool literals should be identified by width as well as value.
- Update Enum Doc for size > 22 Tuple Limitation and add a test for Enums with more than 22 elements.
- Convert project/build.scala to build.sbt
- Update scalastyle plugin version.
- Make 2.11.6 the default build (and make 2.10.5 the cross scala version).
- Fixed comparison between signed and unsigned integer.
- Add python-jinja2 to ubuntu documentation dependencies.
- Added dependencies for docs build on Mac.
- Updated fixed test to randomly test against negatives.
- Replace generic "throw new Exception" with Chisel-specific throwException().
- Added a setModuleName method to Module.
- Added a new BlackBox interface.
- Added a DelayBetween method to ChiselUtil to get delays between two nodes.
- (Cpp backend) improved multi-word literal support.
- Deprecated SFix in favour of Fixed.
- Add LargeNumber tests.
- Added scaladoc comments.
- Always set testerSeed and use it, so printed value is meaningful.
- Issue more informative error messages for bad io definitions.
- Replace emulator with new emulator api, new testbench & vpi routines.
- Clone a copy of the input pin in addPin().
- Add Float/Double support to tester.
- Chisel3 support - merge chisel3prep branch into master.
- Support aggregate types in top level IOs in SystemC backend.
- Add Num trait to Complex, introduce conjugate.
- Change AsyncQueue references to AsyncFifo.
- Add fixed point data type that extends Bits with Num[Fixed]
- Add --assertWarn flag converting Assert to Warn.
- Stop suppressing compiler warnings for emulator library.
- Add parameters manual to the docs.
- Cosmetic changes to cheatsheet, installation, and man page.
- Removed old maven code.
+#545 Avoid java.lang.UnsupportedOperationException: empty.init when no uncommented ports
+#471 An explicit clock for a node should override the explicit reset for a component.
+#459 Don't reserve empty names. Slight change to pr499 - ignore attempts to reserve empty names.
+ Fix error message; remove unused code (that triggers deprecation warning).
+ Fix a bug in obj id construction
+ Pass vcd & vpd filenames as arguments
+ Allow comparison of Node with null.
+ Fix vpi_put_value timing
+ Change nameable to Nameable, move setName to Nameable, scope changes
+ Fix typo (spelling).
+ Comments and slight modifications to ChiselUtil
+ Replace gen: T with gen: => T in Vec and Mem constructors and factories. This seems more general and removes the need for a cloneType method on Bundles. Update internal Vec/Mem usage to eliminate deprecation warnings (incomplete - Mem() -> SeqMem() doesn't work since SeqMem() doesn't support an apply() method).
+ Make sure bfs & dfs visit each node only once
+ Backend is not abstract now, so NullBackend is not needed
+ Consistent naming for keywords
+ Support force to put values on nets in verilog sim
+ Incorporate Chris's Queue flow and pipe definitions.
+ Move static class definitions into a class object to placate Scala compiler.
+ addNode: api for module resolution in custom transforms
+ Correct error in Queue documentation
+ Provide a template to reuse tester transactions
+ Swapped arguments (out,n) in Vec and Mem.
+ Queue example was not for the object but for class Queue
+ Make poke(id, v), peek(id) private
+ Mask the value in dat_from_hex to get the correct value
+ Disallow Chisel2-style masked writes for SeqMem
+ Pass reference for put_value
+ Fix vcd recording for mem
+ Fix poke bug for long data
+ Allow for SeqMems to be named via reflection
+ Remove hasMem flag
+ Add Chisel3-compatible SeqMem masked writes
+ Error checking for shift register, negitive number resulted in stack overflow
+ Fixed vcdMem regression introduced in v28.
+ Replace overridden setName in seqMem with a working setMemName method
+ Change nameable to Nameable, move setName to Nameable, scope changes
