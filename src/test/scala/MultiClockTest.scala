@@ -113,4 +113,23 @@ class MultiClockSuite extends TestSuite {
       () => Module(new TestMultiClock2()))
     assertFile("MultiClockSuite_TestMultiClock2_1.v")
   }
+
+  @Test def testClockWithReset() {
+    class ClockDec extends Module {
+      val io = new Bundle {
+        val in = Bool(INPUT)
+        val out = Bool(OUTPUT)
+      }
+      val myNewReset = addResetPin(Bool())
+      myNewReset.setName("myNewReset")
+      val myClock    = new Clock(myNewReset)
+      val reg        = Reg(init=Bool(false), clock=myClock)
+      reg    := io.in
+      io.out := reg
+    }
+    chiselMain(Array[String]("--v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new ClockDec()))
+    assertFile("MultiClockSuite_ClockDec_1.v")
+  }
 }

@@ -4,8 +4,7 @@ import Chisel._
 class VecApp(n: Int, W: Int) extends Module {
   val io = new Bundle {
     val a = UInt(INPUT, n)
-    val i = Vec(Bits(INPUT, W), n)
-    // val o = Vec(n,  Bits(OUTPUT, W) )
+    val i = Vec(n, Bits(INPUT, W))
     val d = Bits(OUTPUT, W)
   }
   // for (j <- 0 until n)

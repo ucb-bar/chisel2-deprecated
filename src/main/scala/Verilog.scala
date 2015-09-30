@@ -53,7 +53,6 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  val keywords = VerilogBackend.keywords
   override val needsLowering = Set("PriEnc", "OHToUInt", "Log2")
 
   override def isEmittingComponents: Boolean = true
@@ -152,6 +151,14 @@ class VerilogBackend extends Backend {
     }
   }
 
+  // Add trailing comma to port declarations.
+  def delimitUncommentedPortDecls(portDecls: ArrayBuffer[StringBuilder]) {
+    val uncommentedPorts = portDecls.filter(!_.result.contains("//"))
+    if (!uncommentedPorts.isEmpty) {
+      uncommentedPorts.init map (_ append ",")
+    }
+  }
+
   def emitDef(c: Module): StringBuilder = {
     val spacing = (if(c.verilog_parameters != "") " " else "")
     var res = new StringBuilder 
@@ -201,8 +208,8 @@ class VerilogBackend extends Backend {
       portDec append " )"
       portDecs += portDec
     }
-    val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented portDecs
+    delimitUncommentedPortDecls(portDecs)
     portDecs map (_ insert (0, "       "))
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res append ",\n" else res append "\n"
     res append (portDecs addString (new StringBuilder, "\n"))
@@ -370,6 +377,8 @@ class VerilogBackend extends Backend {
       harness write "  integer min = 1 << 31 - 1;\n\n"
       clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
     }
+    harness write "  reg [1023:0] vcdfile = 0;\n"
+    harness write "  reg [1023:0] vpdfile = 0;\n"
 
     harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
@@ -395,12 +404,18 @@ class VerilogBackend extends Backend {
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_sigs(%s);\n".format(c.name)
 
-    if (Driver.isVCD) {
-      harness write "    /*** VPD dump ***/\n"
-      harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
-      harness write "    $vcdpluson(0);\n"
-      if (Driver.isVCDMem) harness.write("    $vcdplusmemon;\n")
-    }
+    harness write "    /*** VCD & VPD dump ***/\n"
+    harness write "    if ($value$plusargs(\"vcdfile=%s\", vcdfile)) begin\n"
+    harness write "      $dumpfile(vcdfile);\n"
+    harness write "      $dumpvars(0, %s);\n".format(c.name)
+    harness write "    end\n"
+    harness write "    if ($value$plusargs(\"vpdfile=%s\", vpdfile)) begin\n"
+    harness write "      $vcdplusfile(vpdfile);\n"
+    harness write "      $vcdpluson(0);\n"
+    harness write "    end\n"
+    harness write "    if ($test$plusargs(\"vpdmem\")) begin\n"
+    harness write "      $vcdplusmemon;\n"
+    harness write "    end\n"
     harness write "  end\n\n"
 
     if (clocks.size > 1) {
@@ -577,8 +592,8 @@ class VerilogBackend extends Backend {
           ports += List("    ", prune, "output", emitWidth(io), " ", emitRef(io)) addString (new StringBuilder)
       }
     }
-    val uncommentedPorts = ports.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented ports
+    delimitUncommentedPortDecls(ports)
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res.append(",\n") else res.append("\n")
     res.append(ports addString (new StringBuilder, "\n"))
     res.append("\n);\n\n")
@@ -709,6 +724,7 @@ class VerilogBackend extends Backend {
       copyToTarget("sim_api.h")
       copyToTarget("vpi.h")
       copyToTarget("vpi.cpp")
+      copyToTarget("vpi.tab")
     }
   }
 
@@ -719,7 +735,7 @@ class VerilogBackend extends Backend {
     val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc", 
      "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
-    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
+    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-P", "vpi.tab", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)
     link(dir, "vpi.so", List("vpi.o"), isLib=true)
     if (!run(cmd)) throw new RuntimeException("vcs command failed")

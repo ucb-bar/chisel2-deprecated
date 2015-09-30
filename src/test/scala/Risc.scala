@@ -48,8 +48,8 @@ class RiscSuite extends TestSuite {
         val valid  = Bool(OUTPUT)
         val out    = Bits(OUTPUT, 32)
       }
-      val file = Mem(Bits(width = 32), 256)
-      val code = Mem(Bits(width = 32), 256)
+      val file = Mem(256, Bits(width = 32))
+      val code = Mem(256, Bits(width = 32))
       val pc   = Reg(init=UInt(0, 8))
       
       val add_op :: imm_op :: Nil = Enum(Bits(width = 8), 2)

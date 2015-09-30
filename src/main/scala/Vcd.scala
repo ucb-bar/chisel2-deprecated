@@ -31,8 +31,6 @@
 package Chisel
 
 class VcdBackend(top: Module) extends Backend {
-  val keywords = Set[String]()
-
   override def emitTmp(node: Node): String =
     emitRef(node)
   override def emitRef(node: Node): String =
@@ -70,8 +68,8 @@ class VcdBackend(top: Module) extends Backend {
 
   private def emitDef2(node: Node, offset: Int, index: Int) =
     "L" + index + ":\n" +
-    "  " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
-    emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    "  " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
+    emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
     emitDefUnconditional(node, offset, index) +
     "  goto K" + index + ";\n"
 
@@ -88,8 +86,8 @@ class VcdBackend(top: Module) extends Backend {
   private def emitDefInline(node: Node, offset: Int, index: Int) =
     "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
     "__prev.get(0x" + offset.toHexString + ")) {\n" +
-    "    " + emitRef(node) + "__prev.get(0x" + offset.toHexString + ") = " +
-    "    " + emitRef(node) + ".get(0x" + offset.toHexString + ");\n" +
+    "    " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
+    "    " + emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
     "    " + emitDefUnconditional(node, offset, index) +
     "  }\n"
 
@@ -114,17 +112,21 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(baseIdx + i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     baseIdx += sortedMods.size
-    for (mem <- sortedMems if c == mem.component && !mem.name.isEmpty) {
-      for (offset <- 0 until mem.n) {
-        write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (mem <- sortedMems) {
+      if (mem.component == c && !mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += mem.n
     }
-    for (rom <- sortedROMs if c == rom.component && !rom.name.isEmpty) {
-      for (offset <- 0 until rom.lits.size) {
-        write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (rom <- sortedROMs) {
+      if (rom.component == c && !rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += rom.lits.size
     }
@@ -138,17 +140,21 @@ class VcdBackend(top: Module) extends Backend {
       write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
     }
     var baseIdx = sortedMods.size
-    for (mem <- sortedMems if mem.name.isEmpty) {
-      for (offset <- 0 until mem.n) {
-        write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (mem <- sortedMems) {
+      if (mem.name.isEmpty) {
+        for (offset <- 0 until mem.n) {
+          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += mem.n
     }
-    for (rom <- sortedROMs if rom.name.isEmpty) {
-      for (offset <- 0 until rom.lits.size) {
-        write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-          top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+    for (rom <- sortedROMs) {
+      if (rom.name.isEmpty) {
+        for (offset <- 0 until rom.lits.size) {
+          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
+            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+        }
       }
       baseIdx += rom.lits.size
     }

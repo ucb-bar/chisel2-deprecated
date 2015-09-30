@@ -13,7 +13,7 @@ public:
     mask = (rem) ? (1L << rem) - 1 : -1L;
   }
   virtual std::string get_value() = 0;
-  virtual bool put_value(std::string value) = 0;
+  virtual bool put_value(std::string &value) = 0;
   virtual void put_value(val_t value, size_t idx) = 0;
   virtual size_t get_width() = 0;
   virtual size_t get_num_words() = 0;
@@ -27,7 +27,7 @@ public:
   std::string get_value() { 
     return dat_ptr->to_str(); 
   }
-  bool put_value(std::string value) { 
+  bool put_value(std::string &value) { 
     return dat_from_hex<w>(value, *dat_ptr); 
   }
   void put_value(val_t value, size_t idx) {
@@ -51,7 +51,7 @@ class clk_api: public dat_api_base {
 public:
   clk_api(clk_t* new_clk): dat_api_base(1), clk_ptr(new_clk) { }
   std::string get_value() { return itos(clk_ptr->len); }
-  bool put_value(std::string value) { return false; }
+  bool put_value(std::string &value) { return false; }
   void put_value(val_t value, size_t idx /* not used */) {
     clk_ptr->len = (size_t) value;
     clk_ptr->cnt = (size_t) value;
@@ -75,12 +75,10 @@ protected:
   mod_t* module;
 
 private:
-  virtual void put_value(dat_api_base* &sig) {
-    for (ssize_t k = sig->get_num_words() - 1 ; k >= 0 ; k--) {
-      val_t value;
-      std::cin >> std::hex >> value;
-      sig->put_value(value, k);
-    }
+  virtual void put_value(dat_api_base* &sig, bool force = false) {
+    std::string value;
+    std::cin >> value;
+    sig->put_value(value);
   }
 
   virtual void get_value(dat_api_base* &sig) {
