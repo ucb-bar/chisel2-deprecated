@@ -90,9 +90,9 @@ trait FileSystemUtilities {
   }
 }
 
-abstract class Backend extends FileSystemUtilities{
+class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: Set[String]
+  val keywords = VerilogBackend.keywords
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
@@ -160,9 +160,7 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
-  def asValidName( name: String ): String = {
-    if (keywords contains name) name + "_" else name;
-  }
+  def asValidName( name: String ): String = if (keywords(name)) name + "_" else name
 
   def nameAll() {
     // Helper classes to get unique names for everything
@@ -178,7 +176,8 @@ abstract class Backend extends FileSystemUtilities{
           } yield new_cand).head // only use the first one
         } else candidate
       }
-      def reserveName(name: String): Unit = assert(name == getUniqueName(name))
+      // Ignore attempts to reserve an empty ("") name - pr499, issue 459
+      def reserveName(name: String): Unit = if (name != "") assert(name == getUniqueName(name), "name " + name + " cannot be reserved")
       def getUniqueName(candidate: String): String = {
         val unique_name = ensureUnique(candidate)
         namespace += unique_name.toLowerCase
@@ -218,7 +217,7 @@ abstract class Backend extends FileSystemUtilities{
       children.foreach(c => c.name = namespace.getUniqueName(c.name))
       // Then, check all other nodes in the design
       comp dfs { 
-        case reg: Reg =>
+        case reg: Reg => 
           reg setName namespace.getUniqueName(reg.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary
@@ -438,8 +437,8 @@ abstract class Backend extends FileSystemUtilities{
       case x: Delay =>
         val clock = x.clock getOrElse x.component._clock.get
         val reset =
-          if (x.component.hasExplicitReset) x.component._reset.get
-          else if (x.clock != None) x.clock.get.getReset
+          if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.component.hasExplicitClock) x.component._clock.get.getReset
           else x.component._reset.get
         x.assignReset(x.component addResetPin reset)
@@ -559,15 +558,13 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def computeMemPorts(mod: Module) {
-    if (Driver.hasMem) {
-      Driver.bfs { 
-        case memacc: MemAccess => memacc.referenced = true
-        case _ =>
-      }
-      Driver.bfs { 
-        case mem: Mem[_] => mem.computePorts
-        case _ =>
-      }
+    Driver.bfs {
+      case memacc: MemAccess => memacc.referenced = true
+      case _ =>
+    }
+    Driver.bfs {
+      case mem: Mem[_] => mem.computePorts
+      case _ =>
     }
   }
 

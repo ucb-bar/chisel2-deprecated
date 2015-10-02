@@ -1621,6 +1621,8 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
     last_digit--;
   }
 
+  size_t rem = w % 64;
+  val_t mask = (rem) ? (1L << rem) - 1 : -1L;
   // Convert the hex data to a dat_t, from right to left.
   int digit_val;
   val_t word_accum = 0;
@@ -1631,16 +1633,16 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
       word_accum |= ((val_t)digit_val) << bit;
       bit += 4;
       if (bit == 64) {
-	res.values[w_index] = word_accum;
+        if (w_index == res.n_words - 1) word_accum &= mask;
+	res.values[w_index++] = word_accum;
 	word_accum = 0L;
 	bit = 0;
-	w_index++;
       }
     }
   }
   if (bit != 0) {
-    res.values[w_index] = word_accum;
-    w_index++;
+    if (w_index == res.n_words - 1) word_accum &= mask;
+    res.values[w_index++] = word_accum;
   }
   while(w_index < res.n_words) res.values[w_index++] = 0L;
   if (neg) res = res - 1;
