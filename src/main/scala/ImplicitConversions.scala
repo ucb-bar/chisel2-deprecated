@@ -33,6 +33,7 @@ package Chisel
 object ImplicitConversions {
 
   implicit def intToUInt(x: Int): UInt = UInt(x)
+  @deprecated("It is not advisable to use implicit conversion between Boolean and Bool", "3")
   implicit def booleanToBool(x: Boolean): Bool = Bool(x)
 
   // These ones for the lazy programmer.

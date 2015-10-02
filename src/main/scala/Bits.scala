@@ -360,8 +360,10 @@ abstract class Bits extends Data with proc {
   def orR(): Bool            = newLogicalOp(UInt(0), "!=")
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
-  /** not equal to */
+  @deprecated("Use !== rather than != for chisel comparison", "3")
   def != (b: Bits): Bool     = newLogicalOp(b, "!=");
+  /** not equal to */
+  def !== (b: Bits): Bool     = newLogicalOp(b, "!=");
   /** Bitwise and */
   def & (b: Bits): this.type = newBinaryOp(b, "&");
   /** Bitwise or */
@@ -496,7 +498,9 @@ abstract class Bits extends Data with proc {
   }
 
   def === (that: BitPat): Bool = that === this
-  def != (that: BitPat): Bool = that != this
+  @deprecated("Use !== rather than != for chisel comparison", "3")
+  def != (that: BitPat): Bool = that !== this
+  def !== (that: BitPat): Bool = that !== this
 
   /** Cat bits together to into a single data object with the width of both combined */
   override def ##[T <: Data](right: T): this.type = {

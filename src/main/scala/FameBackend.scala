@@ -198,7 +198,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
   }
   io.full := tail_pointer === UInt(num_tgt_cycles)
   io.empty := tail_pointer === UInt(0)
-  io.entry_avail := aregs(0) != UInt(0)
+  io.entry_avail := ( aregs(0) !== UInt(0) )
 }
 
 class RegIO[T <: Data](data: T) extends Bundle

@@ -307,7 +307,7 @@ object Op {
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val quo = absA / absB
-          Mux(signA != signB, -quo, quo)
+          Mux(signA !== signB, -quo, quo)
         case "s%s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
