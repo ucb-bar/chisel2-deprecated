@@ -56,7 +56,6 @@ trait AdvTests extends Tests {
 class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Tester[T](dut, isTrace) {
   val defaultMaxCycles = 1024
   var cycles = 0
-  var pass = true
 
   // List of scala objects that need to be processed along with the test benches, like sinks and sources
   val preprocessors = new ArrayBuffer[Processable]()
@@ -126,7 +125,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Test
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    pass &= expr
+    ok &= expr
+    failureTime = cycles
     if(!expr && errMsg != "") { println("ASSERT FAILED: " + errMsg) }
     expr
   }
