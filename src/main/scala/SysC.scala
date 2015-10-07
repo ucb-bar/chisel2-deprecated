@@ -31,42 +31,42 @@
 package Chisel
 
 class SysCBackend extends CppBackend {
-    def bool_fun (name: String, bool: Bool): CEntry = {
+    def bool_fun (name: String, bool: Bool, ready: String, valid: String): CEntry = {
       val is_input = bool.dir == INPUT
       val vtype = "bool"; var tcast = ""
       if (is_input) { tcast = "" }
       else { tcast = ".to_ulong()" }
       val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name, "ready", "valid")
+      val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name, ready, valid)
       entry
     }
-    def sint_fun (name: String, sint: SInt): CEntry = {
+    def sint_fun (name: String, sint: SInt, ready: String, valid: String): CEntry = {
       val is_input = sint.dir == INPUT
       val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
       if (is_input) { tcast = ".to_uint64()" }
       else { tcast = ".to_ulong()" }
       val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name, "ready", "valid")
+      val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name, ready, valid)
       entry
     }
     // UInt: Bits is a virtual UInt class
-    def uint_fun (name: String, uint: UInt): CEntry = {
+    def uint_fun (name: String, uint: UInt, ready: String, valid: String): CEntry = {
       val is_input = uint.dir == INPUT
       val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
       if (is_input) { tcast = ".to_uint64()" }
       else { tcast = ".to_ulong()" }
       val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name, "ready", "valid")
+      val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name, ready, valid)
       entry
     }
-    // Used for Decoupled type
-    def bits_fun (name: String, bits: Bits, ready_name: String, valid_name: String): CEntry = {
+    // Used for Decoupled and Valid types
+    def bits_fun (name: String, bits: Bits, ready: String, valid: String): CEntry = {
       val is_input = bits.dir == INPUT
       val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
       if (is_input) { tcast = ".to_uint64()" }
       else { tcast = ".to_ulong()" }
       val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name, ready_name, valid_name)
+      val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name, ready, valid)
       entry
     }
 
@@ -83,28 +83,24 @@ class SysCBackend extends CppBackend {
     for ((name, elt) <- top_bundle.elements) {
       elt match {
         case bool: Bool => {
-          val entry = bool_fun(name, bool)
+          val entry = bool_fun(name, bool, "", "")
           cdef.entries += (entry)
-          cdef.valid_ready = 0
         }
         case sint: SInt => {
-          val entry = sint_fun(name, sint)
+          val entry = sint_fun(name, sint, "", "")
           cdef.entries += (entry)
-          cdef.valid_ready = 0
         }
         // UInt & Bits
         case uint: UInt => {
-          val entry = uint_fun(name, uint)
+          val entry = uint_fun(name, uint, "", "")
           cdef.entries += (entry)
-          cdef.valid_ready = 0
         }
 
         case velt:ValidIO[_] => {
           velt.bits match {
             case bits: Bits => {
-              val entry = bits_fun(name, bits, "ready", velt.valid.name)
+              val entry = bits_fun(name, bits, "", velt.valid.name)
               cdef.entries += (entry)
-              cdef.valid_ready = 1
             }
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
@@ -113,20 +109,17 @@ class SysCBackend extends CppBackend {
                 for (in <- inputs) {
                   in._2 match {
                     case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
+                      val entry = bool_fun(name, inBool, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                     case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
+                      val entry = sint_fun(name, inSInt, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                     //Also used for Bits
                     case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
+                      val entry = uint_fun(name, inUInt, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                   }
                 }
@@ -136,20 +129,17 @@ class SysCBackend extends CppBackend {
                 for (out <- outputs) {
                    out._2 match {
                     case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
+                      val entry = bool_fun(name, inBool, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                     case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
+                      val entry = sint_fun(name, inSInt, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                     //Also used for Bits
                     case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
+                      val entry = uint_fun(name, inUInt, "", velt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 1
                     }
                   }
                 }
@@ -164,7 +154,6 @@ class SysCBackend extends CppBackend {
             case bits: Bits => {
               val entry = bits_fun(name, bits, delt.ready.name, delt.valid.name)
               cdef.entries += (entry)
-              cdef.valid_ready = 2
             }
             case aggregate: Aggregate => {
               // Collect all the inputs and outputs.
@@ -173,20 +162,17 @@ class SysCBackend extends CppBackend {
                 for (in <- inputs) {
                   in._2 match {
                     case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
+                      val entry = bool_fun(name, inBool, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                     case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
+                      val entry = sint_fun(name, inSInt, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                     //Also used for Bits
                     case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
+                      val entry = uint_fun(name, inUInt, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                   }
                 }
@@ -196,20 +182,17 @@ class SysCBackend extends CppBackend {
                 for (out <- outputs) {
                    out._2 match {
                     case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
+                      val entry = bool_fun(name, inBool, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                     case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
+                      val entry = sint_fun(name, inSInt, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                     //Also used for Bits
                     case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
+                      val entry = uint_fun(name, inUInt, delt.ready.name, delt.valid.name)
                       cdef.entries += (entry)
-                      cdef.valid_ready = 2
                     }
                   }
                 }
@@ -224,28 +207,24 @@ class SysCBackend extends CppBackend {
           for ((hname, helt) <- htif_bundle.elements){
             helt match{
               case bool: Bool => {
-                val entry = bool_fun(hname, bool)
+                val entry = bool_fun(hname, bool, "", "")
                 cdef.entries += (entry)
-                cdef.valid_ready = 0
               }
               case sint: SInt => {
-                val entry = sint_fun(hname, sint)
+                val entry = sint_fun(hname, sint, "", "")
                 cdef.entries += (entry)
-                cdef.valid_ready = 0
               }
               // UInt & Bits
               case uint: UInt => {
-                val entry = uint_fun(hname, uint)
+                val entry = uint_fun(hname, uint, "", "")
                 cdef.entries += (entry)
-                cdef.valid_ready = 0
               }
 
               case velt:ValidIO[_] => {
                 velt.bits match {
                   case bits: Bits => {
-                    val entry = bits_fun(hname, bits, "ready", velt.valid.name)
+                    val entry = bits_fun(hname, bits, "", velt.valid.name)
                     cdef.entries += (entry)
-                    cdef.valid_ready = 1
                   }
                   case aggregate: Aggregate => {
                     // Collect all the inputs and outputs.
@@ -254,20 +233,17 @@ class SysCBackend extends CppBackend {
                       for (in <- inputs) {
                         in._2 match {
                           case inBool: Bool => {
-                            val entry = bool_fun(hname, inBool)
+                            val entry = bool_fun(hname, inBool, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                           case inSInt: SInt => {
-                            val entry = sint_fun(hname, inSInt)
+                            val entry = sint_fun(hname, inSInt, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                           //Also used for Bits
                           case inUInt: UInt => {
-                            val entry = uint_fun(hname, inUInt)
+                            val entry = uint_fun(hname, inUInt, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                         }
                       }
@@ -277,20 +253,17 @@ class SysCBackend extends CppBackend {
                       for (out <- outputs) {
                          out._2 match {
                           case inBool: Bool => {
-                            val entry = bool_fun(hname, inBool)
+                            val entry = bool_fun(hname, inBool, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                           case inSInt: SInt => {
-                            val entry = sint_fun(hname, inSInt)
+                            val entry = sint_fun(hname, inSInt, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                           //Also used for Bits
                           case inUInt: UInt => {
-                            val entry = uint_fun(hname, inUInt)
+                            val entry = uint_fun(hname, inUInt, "", velt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 1
                           }
                         }
                       }
@@ -305,7 +278,6 @@ class SysCBackend extends CppBackend {
                   case bits: Bits => {
                     val entry = bits_fun(hname, bits, delt.ready.name, delt.valid.name)
                     cdef.entries += (entry)
-                    cdef.valid_ready = 2
                   }
                   case aggregate: Aggregate => {
                     // Collect all the inputs and outputs.
@@ -314,20 +286,17 @@ class SysCBackend extends CppBackend {
                       for (in <- inputs) {
                         in._2 match {
                           case inBool: Bool => {
-                            val entry = bool_fun(hname, inBool)
+                            val entry = bool_fun(hname, inBool, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                           case inSInt: SInt => {
-                            val entry = sint_fun(hname, inSInt)
+                            val entry = sint_fun(hname, inSInt, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                           //Also used for Bits
                           case inUInt: UInt => {
-                            val entry = uint_fun(hname, inUInt)
+                            val entry = uint_fun(hname, inUInt, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                         }
                       }
@@ -337,20 +306,17 @@ class SysCBackend extends CppBackend {
                       for (out <- outputs) {
                          out._2 match {
                           case inBool: Bool => {
-                            val entry = bool_fun(hname, inBool)
+                            val entry = bool_fun(hname, inBool, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                           case inSInt: SInt => {
-                            val entry = sint_fun(hname, inSInt)
+                            val entry = sint_fun(hname, inSInt, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                           //Also used for Bits
                           case inUInt: UInt => {
-                            val entry = uint_fun(hname, inUInt)
+                            val entry = uint_fun(hname, inUInt, delt.ready.name, delt.valid.name)
                             cdef.entries += (entry)
-                            cdef.valid_ready = 2
                           }
                         }
                       }
