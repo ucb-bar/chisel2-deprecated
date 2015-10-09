@@ -202,7 +202,7 @@ class SysCBackend extends CppBackend {
           }
         }
 
-        case belt: HTIFIO => {
+        case belt: Bundle => {
           val htif_bundle = belt.asInstanceOf[Bundle]
           for ((hname, helt) <- htif_bundle.elements){
             helt match{

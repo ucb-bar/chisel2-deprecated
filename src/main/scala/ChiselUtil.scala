@@ -32,35 +32,6 @@ package Chisel
 import scala.math.{ceil, floor, log}
 import scala.collection.mutable.ArrayBuffer
 
-//-------------------------------------------------------------------------[byCAP
-// Moved from riscv-sodor/src/common/htif.scala
-// is it a good idea? not, but for now ...
-// the best way is creating Interfaces
-class CSRReq(addr_width: Int) extends Bundle
-{
-   val rw = Bool()
-   val addr = Bits(width = addr_width)
-   val data = Bits(width = 64)
-   override def clone = { new CSRReq(addr_width).asInstanceOf[this.type] }
-}
-
-class HTIFIO() extends Bundle
-{
-   val reset = Bool(INPUT)
-   val debug_stats_csr = Bool(OUTPUT)
-   val id = UInt(INPUT, 1)
-   val csr_req = Decoupled(new CSRReq(addr_width = 12)).flip
-   val csr_rep = Decoupled(Bits(width = 64))
-   // inter-processor interrupts. Not really necessary for Sodor.
-   val ipi_req = Decoupled(Bits(width = 1))
-   val ipi_rep = Decoupled(Bool()).flip
-   
-   val mem_req = Decoupled(new CSRReq(addr_width = 64)).flip
-   val mem_rep = Valid(Bits(width = 64))
-}
-//-------------------------------------------------------------------------byCAP]
-
-
 /** Compute the log2 rounded up with min value of 1 */
 object log2Up
 {
