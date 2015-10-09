@@ -433,7 +433,7 @@ abstract class Node extends Nameable {
   private[Chisel] def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
       /* By construction we should not end-up with null inputs. */
-      assert(i != null, ChiselError.error("input " + off
+      assert(i != null, ChiselError.error("Internal Error: input " + off
         + " of " + inputs.length + " for node " + this + " is null"))
       i.consumers += this
     }
