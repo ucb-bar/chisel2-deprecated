@@ -54,15 +54,15 @@ object SCWrapper {
 
   def example_component_def(): ComponentDef = {
     val cdef = new ComponentDef("GCD_t", "GCD")
-    cdef.entries += new CEntry("a", true, "dat_t<1>", "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
-    cdef.entries += new CEntry("z", false, "dat_t<1>", "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
+    cdef.entries += new CEntry("a", true, "dat_t<1>", "dat_t<1>", 1, "GCD__io_a")
+    cdef.entries += new CEntry("z", false, "dat_t<1>", "dat_t<1>", 1, "GCD__io_z")
     cdef
   }
 
   def example_component_def2(): ComponentDef = {
     val cdef = new ComponentDef("AddFilter_t", "AddFilter")
-    cdef.entries += new CEntry("a", true, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
-    cdef.entries += new CEntry("b", false, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
+    cdef.entries += new CEntry("a", true, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_a")
+    cdef.entries += new CEntry("b", false, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_b")
     cdef
   }
 
@@ -132,7 +132,7 @@ object SCWrapper {
           output_thread += thread_out
         }
         // Generate ready and valid signals when necessary
-        if (e.name != fname){
+/*        if (e.name != fname){
           fname = e.name
           if (e.valid != ""){
 		        sctor_list += ", %s(\"%s\")\n  ".format(e.valid, e.valid)
@@ -154,7 +154,7 @@ object SCWrapper {
               }
             }
           }
-        }
+        } */
       }
 
       replacements += (("input_ports", input_ports))
@@ -204,8 +204,8 @@ object SCWrapper {
         val filled = fvar(i)
         val in = ports(i).name
         val in_data = ports(i).data
-        val ready = ports(i).ready
-        val valid = ports(i).valid
+        val ready = "ready"     //ports(i).ready
+        val valid = "valid"     //ports(i).valid
         init += "%s %s;\n    ".format(ctype, data)
         init += "int %s = 0;\n    ".format(filled)
         fill += "if(!%s){%s = %s->nb_read(%s);}\n      "format(filled, filled, in, data)
@@ -239,9 +239,9 @@ object SCWrapper {
       var valid_output = "";
       for(i <- 0 until ports.size) {
         val ctype = ports(i).ctype
-        val valid = ports(i).valid
+        val valid = "valid"     //ports(i).valid
         val data = ports(i).data
-        val ready = ports(i).ready
+        val ready = "ready"     //ports(i).ready
         val out = ports(i).name
         check += "c->%s = LIT<1>(%s->num_free() > 0);\n      "format(ready, out)
         // Is this a structured data-type?
@@ -353,15 +353,13 @@ object SCWrapper {
   }
 }
 
-class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
+class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_width: Int, a_data: String) {
   val name = a_name
   val is_input = input
   val ctype = a_type
   val ccast = a_cast
   val cwidth = a_width
   val data = a_data
-  val ready = a_ready
-  val valid = a_valid
 
   override def toString(): String = {
     name + " " +
@@ -369,9 +367,7 @@ class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_w
     ctype + " " +
     ccast + " " +
     cwidth + " " +
-    data + " " +
-    ready + " " +
-    valid
+    data
   }
 }
 
