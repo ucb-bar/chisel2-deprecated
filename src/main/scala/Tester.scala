@@ -97,8 +97,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
   val _logs = ScalaQueue[String]()
-  def testOutputString = {
-    if(_logs.isEmpty) "" else _logs.dequeue
+  // Return any accumulated printf output.
+  def testOutputString: String = {
+    val result = _logs.mkString("\n")
+    _logs.clear
+    result
   }
 
   /** Valid commands to send to the Simulator
@@ -334,6 +337,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     delta += calcDelta
     readOutputs
     dumpLogs
+    println(testOutputString)
     isStale = false
   }
 
