@@ -58,7 +58,7 @@ class FlushPrintfOutput extends TestSuite {
         for (i <- 0 until 4) {
           step(1)
           // Fetch the output printed on stdout by the test.
-          val printfOutput = testOutputString
+          val printfOutput = accumulatedTestOutput.last
           val expectedString = m.counterString.format(i)
           assertTrue("incorrect output - %s".format(printfOutput), eliminateWhiteSpace(printfOutput) == eliminateWhiteSpace(expectedString))
         }
