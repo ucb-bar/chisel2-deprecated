@@ -191,8 +191,17 @@ abstract class Node extends Nameable {
   }
   private[Chisel] def widthW: Width = {
     val selfresult = if (Driver.isInGetWidth) inferWidth(this) else width_
-    if(!selfresult.isKnown && isTypeNode && !inputs.isEmpty) getNode.widthW
-    else selfresult
+    if(!selfresult.isKnown && isTypeNode && !inputs.isEmpty) {
+      val gNode = getNode
+      if (gNode == this) {
+        ChiselError.error("unknown width cannot be inferred for node %s".format(gNode))
+        selfresult
+      } else {
+        gNode.widthW
+      }
+    } else {
+      selfresult
+    }
   }
 
   /** Sets the width of a Node. */
@@ -433,7 +442,7 @@ abstract class Node extends Nameable {
   private[Chisel] def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
       /* By construction we should not end-up with null inputs. */
-      assert(i != null, ChiselError.error("input " + off
+      assert(i != null, ChiselError.error("Internal Error: input " + off
         + " of " + inputs.length + " for node " + this + " is null"))
       i.consumers += this
     }

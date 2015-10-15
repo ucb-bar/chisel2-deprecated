@@ -69,7 +69,7 @@ trait Tests {
   def expect (data: Bits, expected: Long): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
-  def testOutputString: String
+  def accumulatedTestOutput: Array[String]
   def run(s: String): Boolean
 }
 
@@ -96,9 +96,15 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _clockCnts = HashMap(_clocks:_*)
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
-  val _logs = ScalaQueue[String]()
-  def testOutputString = {
-    if(_logs.isEmpty) "" else _logs.dequeue
+  private val _logs = ArrayBuffer[String]()
+  // All the accumulated test output.
+  def accumulatedTestOutput = _logs.toArray
+  // Return any accumulated module printf output since the last call.
+  private var _lastLogIndex = 0
+  private def newTestOutputString: String = {
+    val result = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
+    _lastLogIndex = _logs.length
+    result
   }
 
   /** Valid commands to send to the Simulator
@@ -126,7 +132,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   private def dumpLogs = {
     while (_logger.ready) {
-      _logs enqueue _logger.readLine
+      _logs += _logger.readLine
     }
   }
 
@@ -134,8 +140,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     Option(_reader.readLine) match {
       case None =>
         dumpLogs
-        while (!_logs.isEmpty)
-          println(testOutputString)
+        println(newTestOutputString)
         throw new RuntimeException("Errors occurred in simulation")
       case Some(ln) => ln
     }
@@ -334,6 +339,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     delta += calcDelta
     readOutputs
     dumpLogs
+    println(newTestOutputString)
     isStale = false
   }
 
