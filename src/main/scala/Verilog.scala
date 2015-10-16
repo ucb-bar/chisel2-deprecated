@@ -205,6 +205,10 @@ class VerilogBackend extends Backend {
             portDec append emitRef(consumer)
         }
       }
+      // emit tsbs
+      for ( tsb <- c.tsbs ) {
+
+      }
       portDec append " )"
       portDecs += portDec
     }
@@ -255,6 +259,11 @@ class VerilogBackend extends Backend {
           else if (gotWidth > 1) List("[", emitRef(node.inputs(1)) , ":", emitRef(node.inputs(2)), "]").mkString
           else "",
         ";\n").mkString
+
+      case x: TSB => {
+        val highZ = x.out.needWidth + "'b" + (0 until x.out.needWidth).map(w => "z").mkString
+        x.getWriters.map(w => {"  assign " + emitRef(x) + " = (" + emitRef(w.write) + ") ? " + emitRef(w.data) + " : " + highZ + ";\n"}).mkString
+      }
 
       case m: Mem[_] if !m.isInline => 
         def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
@@ -321,6 +330,9 @@ class VerilogBackend extends Backend {
 
       case _: Reg =>
         emitDecReg(node)
+
+      case _: TSB if _.componentOf.tsbs contains _ =>
+        ""
 
       case _: Sprintf =>
         emitDecReg(node)
@@ -508,7 +520,7 @@ class VerilogBackend extends Backend {
   }
 
   def emitPrintf(p: Printf): String = {
-    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
+    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002"
     (List(if_not_synthesis,
     "`ifdef PRINTF_COND\n",
     "    if (`PRINTF_COND)\n",
@@ -518,7 +530,7 @@ class VerilogBackend extends Backend {
     endif_not_synthesis) addString (new StringBuilder)).result
   }
   def emitAssert(a: Assert): String = {
-    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
+    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002"
     (List(if_not_synthesis,
     "  if(", emitRef(a.reset), ") ", emitRef(a), " <= 1'b1;\n",
     "  if(!", emitRef(a.cond), " && ", emitRef(a), " && !", emitRef(a.reset), ") begin\n",
@@ -576,13 +588,14 @@ class VerilogBackend extends Backend {
   }
 
   def emitModuleText(c: Module): StringBuilder = c match {
-    case _: BlackBox => new StringBuilder 
+    case _: BlackBox => new StringBuilder
     case _ =>
-
     val res = new StringBuilder()
     var first = true
     (c.clocks ++ c.resets.values.toList) map ("input " + emitRef(_)) addString (res, ", ")
     val ports = ArrayBuffer[StringBuilder]()
+    for ( tsb <- c.tsbs )
+      ports += List("    ", "inout", emitWidth(tsb), " ", emitRef(tsb)) addString (new StringBuilder)
     for ((n, io) <- c.wires) {
       val prune = if (io.prune && c != topMod) "//" else ""
       io.dir match {
