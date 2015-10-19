@@ -106,6 +106,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     _lastLogIndex = _logs.length
     result
   }
+  private var isDead = false  // The remote process has terminated.
+  private var errorString = ""  // The error text.
 
   /** Valid commands to send to the Simulator
     * @todo make private? */
@@ -125,9 +127,20 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def writeln(str: String) {
-    _writer write str
-    _writer.newLine
-    _writer.flush
+    if (!isDead) {
+      try {
+        _writer write str
+        _writer.newLine
+        _writer.flush
+      }
+      catch {
+        case ioe: java.io.IOException => {
+          // Is the process dead? Unfortunately, we currently (Scala 2.11) cannot determine this, so assume the worst.
+          isDead = true
+          fail()
+        }
+      }
+    }
   }
 
   private def dumpLogs = {
@@ -137,12 +150,24 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def readln: String = {
-    Option(_reader.readLine) match {
-      case None =>
-        dumpLogs
-        println(newTestOutputString)
-        throw new RuntimeException("Errors occurred in simulation")
-      case Some(ln) => ln
+    try {
+      Option(_reader.readLine) match {
+        case None =>
+          dumpLogs
+          println(newTestOutputString)
+          throw new RuntimeException("Errors occurred in simulation - " + errorString)
+        case Some(ln) => {
+          ln
+        }
+      }
+    }
+    catch {
+      case ioe: java.io.IOException => {
+        // Is the process dead? Unfortunately, we currently (Scala 2.11) cannot determine this, so assume the worst.
+        isDead = true
+        fail()
+        ""
+      }
     }
   }
 
@@ -184,7 +209,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private def peek(id: Int) = {
     sendCmd(SIM_CMD.PEEK)
     writeln(id.toString)
-    try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) }
+    readHex()
   }
   /** Peek at the value of a node based on the path
     */
@@ -300,9 +325,28 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
   }
 
+  /** Try to read the next input line as a hex number. */
+  private def readHex(): BigInt = {
+    val line = readln
+    try {
+      BigInt(line, 16)
+    }
+    catch {
+      // If the exception was due to format, see if the line is non-blank.
+      case e: java.lang.NumberFormatException => {
+        if (line != "") {
+          // If all the character are printable ASCII, assume it's an error message of some kind.
+          errorString += line
+          _logs += line
+        }
+        BigInt(0)
+      }
+    }
+  }
+
   private def readOutputs {
     _peekMap.clear
-    _outputs foreach (x => _peekMap(x) = try { BigInt(readln, 16) } catch { case e: Throwable => BigInt(0) })
+    _outputs foreach (x => _peekMap(x) = readHex())
   }
 
   private def writeInputs {
@@ -371,6 +415,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   var ok = true
   var failureTime = -1
 
+  /** Indicate a failure has occurred.  */
+  def fail() {
+    ok = false
+    if (failureTime == -1) {
+      failureTime = t
+    }
+  }
+
   /** Expect a value to be true printing a message if it passes or fails
     * @param good If the test passed or not
     * @param msg The message to print out
@@ -378,7 +430,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def expect (good: Boolean, msg: String): Boolean = {
     if (isTrace)
       println(msg + " " + (if (good) "PASS" else "FAIL"))
-    if (!good) { ok = false; if (failureTime == -1) failureTime = t; }
+    if (!good) {
+      fail()
+    }
     good
   }
 
@@ -486,10 +540,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   /** Complete the simulation and inspect all tests */
   def finish {
-    sendCmd(SIM_CMD.FIN)
-    _testIn match { case Some(in) => in.close case None => }
-    _testErr match { case Some(err) => err.close case None => }
-    _testOut match { case Some(out) => { out.flush ; out.close } case None => }
+    if (!isDead) {
+      sendCmd(SIM_CMD.FIN)
+      _testIn match { case Some(in) => in.close case None => }
+      _testErr match { case Some(err) => err.close case None => }
+      _testOut match { case Some(out) => { out.flush ; out.close } case None => }
+    }
     process.destroy()
     println("RAN " + t + " CYCLES " + (if (ok) "PASSED" else "FAILED FIRST AT CYCLE " + failureTime))
     if(!ok) throwException("Module under test FAILED at least one test vector.")
