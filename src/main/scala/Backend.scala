@@ -715,7 +715,7 @@ class Backend extends FileSystemUtilities{
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
-  protected def genIndent(x: Int): String = (0 until x) map ("    ") mkString ""
+  protected def genIndent(x: Int): String = (for (i <- 0 until x) yield "    ").mkString
   protected def printStack {
     ChiselError.info(Driver.printStackStruct map {
       case (i, c) => "%s%s %s\n".format(genIndent(i), c.moduleName, c.name)
