@@ -428,8 +428,8 @@ class LargeNumberSuite extends TestSuite {
         val z_s = Bool(OUTPUT)
         val z_u = Bool(OUTPUT)
       }
-      io.z_s := io.x_s != io.y_s
-      io.z_u := io.x_u != io.y_u
+      io.z_s := ( io.x_s !== io.y_s )
+      io.z_u := ( io.x_u !== io.y_u )
     }
 
     class NeqTests(c : Neq) extends Tester(c) {
