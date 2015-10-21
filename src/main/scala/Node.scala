@@ -149,8 +149,8 @@ object Node {
   output to input) and forward (from input to output).
   */
 abstract class Node extends Nameable {
-  private[Chisel] var sccIndex = -1
-  private[Chisel] var sccLowlink = -1
+  private[Chisel] var sccIndex: Option[Int] = None
+  private[Chisel] var sccLowlink: Option[Int] = None
   private[Chisel] var depth = 0
   var prune = false
   var driveRand = false
@@ -282,7 +282,6 @@ abstract class Node extends Nameable {
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
   /** @return this node is a Register */
-  def isReg: Boolean = false
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
   // TODO: should be private[Chisel]?
@@ -341,12 +340,12 @@ abstract class Node extends Nameable {
 
   private[Chisel] lazy val isInObject =
     (isIo && (Driver.isIoDebug || component == Module.topMod)) || 
-    (component.debugs contains this) || (Driver.backend isInObject this) ||
-    isReg || isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
+    component.debugs(this) || (Driver.backend isInObject this) ||
+    isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
   private[Chisel] lazy val isInVCD = Driver.isVCD && name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
-     ((isIo && isInObject) || isReg || Driver.isDebug)
+     ((isIo && isInObject) || (this match {case _: Delay => true case _ => false}) || Driver.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain depth level
     * This method is purely used for debugging */
@@ -366,8 +365,8 @@ abstract class Node extends Nameable {
       }
       case any => writer.println(indent + this)
     }
-    writer.println("sccIndex: " + sccIndex)
-    writer.println("sccLowlink: " + sccLowlink)
+    writer.println("sccIndex: " + (sccIndex getOrElse -1))
+    writer.println("sccLowlink: " + (sccLowlink getOrElse -1))
     writer.println("component: " + component)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)

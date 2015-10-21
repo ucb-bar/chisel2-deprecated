@@ -217,9 +217,8 @@ class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def getPortType: String = "cread"
 }
 
-class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
+class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) with Delay {
   val addrReg = addri.asInstanceOf[Reg]
-  override def isReg = true
   override def addr = if (inputs.length > 2) inputs(2) else null
   override def cond = if (inputs.length > 3) inputs(3) else null
 
