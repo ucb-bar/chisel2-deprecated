@@ -109,7 +109,7 @@ class Backend extends FileSystemUtilities{
   private[Chisel] def assertUnique(uniqueStr : String, msg : String) {
     // Multiple empty strings are allowed
     if (uniqueStr != "") {
-      if ( uniqueSet.contains(uniqueStr))
+      if (uniqueSet(uniqueStr))
         ChiselError.warning("[BUG] Internal error: " + msg)
       else
         uniqueSet += uniqueStr
@@ -340,7 +340,7 @@ class Backend extends FileSystemUtilities{
         case _: Literal => // Skip the below check for Literals, which can safely be static
         //tmp fix, what happens if multiple componenets reference static nodes?
         case input: Node => input.compOpt match {
-          case Some(p) if compSet contains p =>
+          case Some(p) if compSet(p) =>
           case _ => assert(input.component == nextComp, 
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
@@ -444,10 +444,6 @@ class Backend extends FileSystemUtilities{
         x.assignReset(x.component addResetPin reset)
         x.assignClock(clock)
         x.component.addClock(clock)
-      case x: Printf =>
-        val clock = x.clock getOrElse x.component._clock.get
-        x.assignClock(clock)
-        x.component.addClock(clock)
       case _ =>
     }
   }
@@ -463,7 +459,7 @@ class Backend extends FileSystemUtilities{
       for (reset <- child.resets.keys) {
         // create a reset pin in parent if reset does not originate in parent and
         // if reset is not an output from one of parent's children
-        if (reset.component != parent && !(childSet contains reset.component))
+        if (reset.component != parent && !childSet(reset.component))
           parent addResetPin reset
         // special case for implicit reset
         if (reset == Driver.implicitReset && parent == topMod) 
@@ -497,7 +493,7 @@ class Backend extends FileSystemUtilities{
     val clock = root.clock getOrElse (throwException("Reg should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-      node.consumers filterNot (walked contains _) foreach {
+      node.consumers filterNot walked foreach {
         case _: Delay =>
         case consumer => consumer.clock match {
           case Some(clk) if clk != clock =>
@@ -592,7 +588,7 @@ class Backend extends FileSystemUtilities{
       Driver.bfs { x =>
         for (i <- 0 until x.inputs.length) x.inputs(i) match {
           case op: Op =>
-            if (needsLowering contains op.op)
+            if (needsLowering(op.op))
             x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
           case _ =>
         }
@@ -656,7 +652,7 @@ class Backend extends FileSystemUtilities{
   def nameBindings {
     for (comp <- Driver.sortedComps ; bind <- comp.bindings) {
       var genName = bind.targetComponent.name + "_" + bind.targetNode.name
-      if (nameSpace contains genName) genName += ("_" + bind.emitIndex)
+      if (nameSpace(genName)) genName += ("_" + bind.emitIndex)
       bind.name = asValidName(genName) // Not using nameIt to avoid override
       bind.named = true
     }
@@ -664,54 +660,52 @@ class Backend extends FileSystemUtilities{
 
   def findCombLoop {
     // Tarjan's strongly connected components algorithm to find loops
-    var sccIndex = 0
-    val stack = new Stack[Node]
-    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+    var index = 0
+    val stack = Stack[Node]()
+    val onStack = HashSet[Node]()
+    val sccs = ArrayBuffer[List[Node]]()
 
-    def tarjanSCC(n: Node): Unit = {
-      if (n.isInstanceOf[Delay]) throwException("trying to DFS on a register")
+    def tarjanSCC(node: Node): Unit = node match {
+      case _: Delay => throwException("trying to DFS on a register")
+      case _ =>
 
-      n.sccIndex = sccIndex
-      n.sccLowlink = sccIndex
-      sccIndex += 1
-      stack.push(n)
+      node.sccIndex = Some(index)
+      node.sccLowlink = Some(index)
+      index += 1
+      stack.push(node)
+      onStack += node
 
-      n.inputs foreach {
+      node.inputs foreach {
         case _: Delay =>
-        case i if i.isReg =>
-        case i if i.sccIndex == -1 =>
-          tarjanSCC(i)
-          n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
-        case i =>
-          n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
+        case input if input.sccIndex == None =>
+          tarjanSCC(input)
+          node.sccLowlink = Some(math.min(node.sccLowlink getOrElse -1, input.sccLowlink getOrElse -1))
+        case input if onStack(input) =>
+          node.sccLowlink = Some(math.min(node.sccLowlink getOrElse -1, input.sccIndex getOrElse -1))
+        case _ =>
       }
 
-      if (n.sccLowlink == n.sccIndex) {
-        val scc = new ArrayBuffer[Node]
+      if (node.sccLowlink == node.sccIndex) {
+        val scc = ArrayBuffer[Node]()
         do {
           scc += stack.pop
-        } while (!(n == scc.last))
-        sccList += scc
+          onStack -= scc.last
+        } while (node ne scc.last)
+        sccs += scc.toList
       }
     }
 
     Driver.bfs { 
       case _: Delay =>
-      case node if node.isReg || node.sccIndex == -1 =>
-      case node => tarjanSCC(node)
+      case node if node.sccIndex == None => tarjanSCC(node)
+      case _ =>
     }
 
     // check for combinational loops
-    var containsCombPath = false
-    for (nodelist <- sccList) {
-      if (nodelist.length > 1) {
-        containsCombPath = true
-        ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for ((node, ind) <- nodelist zip nodelist.indices) {
-          ChiselError.error("  (" + ind +  ")", node.line)
-        }
-      }
-    }
+    sccs filter (_.size > 1) foreach {scc => 
+      ChiselError.error("FOUND COMBINATIONAL PATH!")
+      scc.zipWithIndex foreach { case (node, i) =>
+        ChiselError.error(s"  (${i})", node.line) }}
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
@@ -748,7 +742,7 @@ class Backend extends FileSystemUtilities{
         case (node, None) => Driver.orderedNodes += node
         case (node, Some(depth)) => { 
           node.depth = math.max(node.depth, depth)
-          if (!(walked contains node)) {
+          if (!walked(node)) {
             walked += node
             stack push ((node, None))
             node.inputs foreach {

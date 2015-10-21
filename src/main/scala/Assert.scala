@@ -46,7 +46,7 @@ class BitsInObject(x: Node) extends UInt {
   override lazy val isInObject: Boolean = true
 }
 
-class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
+class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Delay {
   inputs ++= argsIn.map(a => new BitsInObject(a))
   def args = inputs 
   override lazy val isInObject: Boolean = true
@@ -99,7 +99,6 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Node {
   }}
   inferWidth = argWidth
 
-  override def isReg: Boolean = true
   override lazy val isInVCD: Boolean = false
 }
 
@@ -110,5 +109,4 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   override def args = inputs.init // : ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
   def cond_=(x: Bool) { inputs(inputs.size-1) = x } 
-  def assignClock(clk: Clock) { clock = Some(clk) }
 }
