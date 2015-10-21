@@ -36,6 +36,7 @@ class Assert(condIn: Bool, resetIn: Bool, val message: String) extends Delay {
   inputs += condIn || resetIn
   inputs += resetIn
   def cond: Node = inputs(0)
+  def cond_=(x: Bool) { inputs(0) = x }
   def reset: Node = inputs(1)
 }
 
@@ -108,5 +109,6 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   inputs += condIn
   override def args = inputs.init // : ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
+  def cond_=(x: Bool) { inputs(inputs.size-1) = x } 
   def assignClock(clk: Clock) { clock = Some(clk) }
 }
