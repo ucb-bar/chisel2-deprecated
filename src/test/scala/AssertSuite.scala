@@ -65,7 +65,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
       }
     
       io.dataOut := OHToUInt(io.dataIn)
-      assert(io.dataIn != UInt(8), assertMessage)
+      assert(io.dataIn =/= UInt(8), assertMessage)
     }
     
     class TBAssert(c: mkAssert) extends Tester(c) {
