@@ -1605,7 +1605,7 @@ static int  char_to_hex[] = {
 //   Success: returns next character offset
 //   Fail:    0
 template <int w>
-size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
+size_t dat_from_hex(std::string& hex_line, dat_t<w>& res, size_t offset = 0) {
   size_t first_digit, last_digit, comment;
 
   // Scan for the hex data bounds.

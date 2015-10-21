@@ -1,7 +1,3 @@
-ReleaseNotes for Chisel v2.2.29
+ReleaseNotes for Chisel v2.2.30
 
-In addition to many bug fixes, this release of Chisel adds tester
-support for gate-level simulation, to facilitate energy modeling and
-fault injection.
-
-See the associated Changelog for issues resolved with this release.
+In addition to several bug fixes, this release of Chisel contains a significant change to tester communications. See the associated Changelog for issues resolved with this release.

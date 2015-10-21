@@ -106,7 +106,7 @@ class CppBackend extends Backend {
 
   // Emit the value of a literal, instead of a reference to it.
   protected[this] def emitLitVal(n: Node, w: Int): String = {
-    assert(isLit(n))
+    assert(isLit(n), ChiselError.error("Internal Error: Trying to emitLitVal for non-literal %s".format(n)))
     val l = n.asInstanceOf[Literal]
     val lit = l.value
     val value = if (lit < 0) (BigInt(1) << l.needWidth()) + lit else lit
@@ -142,7 +142,7 @@ class CppBackend extends Backend {
           emitLitVal(l, w)
         } else {
           // Otherwise, we'd better have multiwordLiteralInObject so we can return a reference to the specific word.
-          assert(multiwordLiteralInObject)
+          assert(multiwordLiteralInObject, ChiselError.error("Internal Error: multiword literal reference without object to refer to"))
           wordMangle(x, w.toString)
         }
       case _ => 
@@ -335,7 +335,7 @@ class CppBackend extends Backend {
           else if (o.op == "PriEnc" || o.op == "OHToUInt")
             emitLog2(o, true)
           else {
-            assert(false, "operator " + o.op + " unsupported")
+            assert(false, ChiselError.error("operator " + o.op + " unsupported"))
             ""
           })
         } else if (o.op == "+" || o.op == "-") {
@@ -494,7 +494,7 @@ class CppBackend extends Backend {
         } else if (o.op == "d>=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
-          assert(false, "operator " + o.op + " unsupported")
+          assert(false, ChiselError.error("operator " + o.op + " unsupported"))
           ""
         })
       }
@@ -582,7 +582,7 @@ class CppBackend extends Backend {
 	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
-          next.isReg
+          next match { case _: Delay => true case _ => false }
         }
         if (useShadow) {
           emitRef(reg) + "__shadow"
@@ -678,11 +678,12 @@ class CppBackend extends Backend {
     node match {
       case reg: Reg => {
         regWritten += node
-        if (reg.next.isReg) {
-          needShadow += node
+        reg.next match {
+          case _: Delay => needShadow += node
+          case _ =>
         }
       }
-      case _ => {}
+      case _ => 
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
@@ -823,7 +824,7 @@ class CppBackend extends Backend {
         cc(dir, n + "-emulator", allFlags)
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
-          "no unoptmized files to compile for '--compileMultipleCppFiles'")
+          ChiselError.error("Internal Error: no unoptmized files to compile for '--compileMultipleCppFiles'"))
         // Compile the O0 files.
         onceOnlyFiles.map(cc(dir, _, allFlags + " " + optim0))
 
@@ -1509,7 +1510,7 @@ class CppBackend extends Backend {
             writeCppFile(clockIHi.head + clockIHi.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
             // code have effectively the same signature and tail.
-            assert(clockIHi.tail == clockXHi.tail)
+            assert(clockIHi.tail == clockXHi.tail, ChiselError.error("Internal Error: clockIHi.tail != clockXHi.tail"))
             writeCppFile(clockXHi.body.result + clockXHi.tail)
           }
         } else {

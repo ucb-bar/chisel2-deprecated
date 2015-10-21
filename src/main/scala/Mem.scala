@@ -133,9 +133,19 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     }
   }
 
-  def write(addr: UInt, data: T, wmask: UInt): Unit =
+  def write(addr: UInt, data: T, wmask: UInt): Unit = {
+    if (Driver.minimumCompatibility > "2")
+      throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+
     if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
     else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), None)
+  }
+
+  def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+    val bitmask = FillInterleaved(gen().asInstanceOf[Vec[Data]].head.getWidth, mask)
+    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, bitmask)
+    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & bitmask | read(addr).toBits & ~bitmask), None)
+  }
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)
@@ -207,9 +217,8 @@ class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def getPortType: String = "cread"
 }
 
-class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
+class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) with Delay {
   val addrReg = addri.asInstanceOf[Reg]
-  override def isReg = true
   override def addr = if (inputs.length > 2) inputs(2) else null
   override def cond = if (inputs.length > 3) inputs(3) else null
 
@@ -295,7 +304,7 @@ class SeqMem[T <: Data](n: Int, out: T) extends Mem[T](() => out, n, true, false
   override def read(addr: UInt): T = super.read(Reg(next = addr))
   def read(addr: UInt, enable: Bool): T = super.read(RegEnable(addr, enable))
 
-  def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+  override def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
     val bitmask = FillInterleaved(out.asInstanceOf[Vec[Data]].head.getWidth, mask)
     if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, bitmask)
     else doWrite(addr, Module.current.whenCond, out.fromBits(data.toBits & bitmask | super.read(addr).toBits & ~bitmask), None)

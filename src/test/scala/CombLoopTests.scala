@@ -28,42 +28,44 @@
  MODIFICATIONS.
 */
 
-package Chisel
-import Literal._
+import Chisel._
+import org.junit.Assert._
+import org.junit.Test
+import org.junit.Ignore
 
-/** A bit pattern object to enable representation of dont cares */
-object BitPat {
-  /** Get a bit pattern from a string
-    * @param n a string with format b---- eg) b1?01
-    * @note legal characters are 0, 1, ? and must be base 2*/
-  def apply(n: String): BitPat = {
-    require(n(0) == 'b', "BINARY BitPats ONLY")
-    val (bits, mask, swidth) = parseLit(n.substring(1))
-    new BitPat(toLitVal(bits, 2), toLitVal(mask, 2), swidth)
+class CombLoopSuite extends TestSuite {
+  @Test def testCombLoopFirst() {
+    println("\ntestCombLoop ...")
+   
+    class CombLoopModule extends Module {
+      val io = new Bundle {
+        val in = Decoupled(UInt(width=16)).flip
+        val out = Decoupled(UInt(width=16))
+      }
+      io.in <> io.out
+    }
+
+    class CombLoopWrapper extends Module {
+      val io = new Bundle {
+        val out = Decoupled(UInt(width=16))
+      }
+      val mod1 = Module(new CombLoopModule)
+      val mod2 = Module(new CombLoopModule)
+      val mod3 = Module(new CombLoopModule)
+      mod1.io.out <> mod2.io.in
+      mod2.io.out <> mod3.io.in
+      mod3.io.out <> mod1.io.in
+      io.out.bits := mod3.io.out.bits
+      io.out.valid := mod3.io.out.valid
+      mod3.io.out.ready := io.out.ready
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since we don't use a Wire wrapper
+      chiselMain(testArgs, () => Module(new CombLoopWrapper))
+    }
+    assertTrue(ChiselError.hasErrors)
   }
-
-  /** Get a bit pattern of don't cares with a specified width */
-  def DC(width: Int): BitPat = BitPat("b" + ("?" * width))
-
-  // BitPat <-> UInt
-  /** enable conversion of a bit pattern to a UInt */
-  implicit def BitPatToUInt(x: BitPat): UInt = {
-    require(x.mask == (BigInt(1) << x.getWidth)-1)
-    UInt(x.value, x.getWidth)
-  }
-  /** create a bit pattern from a UInt */
-  implicit def apply(x: UInt): BitPat = {
-    require(x.isLit)
-    BitPat("b" + x.litValue().toString(2))
-  }
-}
-
-/** A class to create bit patterns
-  * Use the [[Chisel.BitPat$ BitPat]] object instead of this class directly */
-class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
-  def getWidth: Int = width
-  def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))
-  @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (other: Bits): Bool = !(this === other)
-  def =/= (other: Bits): Bool = !(this === other)
 }

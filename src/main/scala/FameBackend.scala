@@ -198,7 +198,7 @@ class FameQueueTracker(num_tgt_entries: Int, num_tgt_cycles: Int) extends Module
   }
   io.full := tail_pointer === UInt(num_tgt_cycles)
   io.empty := tail_pointer === UInt(0)
-  io.entry_avail := aregs(0) != UInt(0)
+  io.entry_avail := ( aregs(0) =/= UInt(0) )
 }
 
 class RegIO[T <: Data](data: T) extends Bundle
@@ -219,7 +219,7 @@ class Fame1Wrapper(f: => Module) extends Module {
     module.addPin(isFire, "is_fire")
     Fame1Transform.fireSignals(module) = isFire
     if(!isTop){
-      Predef.assert(Fame1Transform.fireSignals(parent) != null)
+      Predef.assert(Fame1Transform.fireSignals(parent) != null, ChiselError.error("Internal Error: Fame1Transform"))
       isFire := Fame1Transform.fireSignals(parent)
     }
     for(submodule <- module.children){
@@ -290,7 +290,7 @@ class Fame1Wrapper(f: => Module) extends Module {
       }
       case _ => {
         if (name != "is_fire") {
-          Predef.assert(ioNode.isInstanceOf[Bits])
+          Predef.assert(ioNode.isInstanceOf[Bits], ChiselError.error("ioNode isn't is_fire or instance of Bits"))
           val elementClone = Wire(ioNode.cloneType)
           elementClone.isIo = true
           elementClone.setName(name)

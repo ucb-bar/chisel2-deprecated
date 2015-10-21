@@ -508,7 +508,7 @@ class Queue[T <: Data](gen: T, val entries: Int,
   when (do_deq) {
     deq_ptr.inc()
   }
-  when (do_enq != do_deq) {
+  when (do_enq =/= do_deq) {
     maybe_full := do_enq
   }
 
@@ -721,7 +721,7 @@ object DelayBetween {
       if (!visited.contains(node)) {
         if (node._id == end._id) {
           val completePath : List[Node] = visited :+ node
-          paths += completePath.filter(_.isReg).length
+          paths += completePath.filter({case _: Delay => true case _ => false}).length
         } else {
           val nextPath = visited :+ node
           paths ++= nodePathDepthSearch(nextPath, end, new ArrayBuffer[Int])
@@ -743,7 +743,7 @@ object DelayBetween {
       val node = que.dequeue()
       val currentPath = paths.dequeue()
       if (node._id == end._id) {
-        completePaths.append(currentPath.filter(_.isReg).length)
+        completePaths.append(currentPath.filter({case _: Delay => true case _ => false}).length)
         visited = visited diff List(node._id)
       } else {
         node.inputs.foreach(l => if(!visited.contains(l._id)) {
@@ -787,7 +787,7 @@ object DelayBetween {
   private def nodeFindRegOrEnd(visited : List[Node], end : Node, nodes : ArrayBuffer[Node]) : ArrayBuffer[Node] = {
     visited.last.inputs.toList.map(node => {
         if (!visited.contains(node)) {
-          if (node._id == end._id || node.isReg) {
+          if (node._id == end._id || (node match {case _: Delay => true case _ => false})) {
             nodes += node
           } else {
             val nextPath = visited :+ node

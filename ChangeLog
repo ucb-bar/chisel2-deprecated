@@ -1,38 +1,12 @@
-ChangeLog for Chisel v2.2.29
+ChangeLog for Chisel v2.2.30
 
-#545 Avoid java.lang.UnsupportedOperationException: empty.init when no uncommented ports
-#471 An explicit clock for a node should override the explicit reset for a component.
-#459 Don't reserve empty names. Slight change to pr499 - ignore attempts to reserve empty names.
- Fix error message; remove unused code (that triggers deprecation warning).
- Fix a bug in obj id construction
- Pass vcd & vpd filenames as arguments
- Allow comparison of Node with null.
- Fix vpi_put_value timing
- Change nameable to Nameable, move setName to Nameable, scope changes
- Fix typo (spelling).
- Comments and slight modifications to ChiselUtil
- Replace gen: T with gen: => T in Vec and Mem constructors and factories. This seems more general and removes the need for a cloneType method on Bundles. Update internal Vec/Mem usage to eliminate deprecation warnings (incomplete - Mem() -> SeqMem() doesn't work since SeqMem() doesn't support an apply() method).
- Make sure bfs & dfs visit each node only once
- Backend is not abstract now, so NullBackend is not needed
- Consistent naming for keywords
- Support force to put values on nets in verilog sim
- Incorporate Chris's Queue flow and pipe definitions.
- Move static class definitions into a class object to placate Scala compiler.
- addNode: api for module resolution in custom transforms
- Correct error in Queue documentation
- Provide a template to reuse tester transactions
- Swapped arguments (out,n) in Vec and Mem.
- Queue example was not for the object but for class Queue
- Make poke(id, v), peek(id) private
- Mask the value in dat_from_hex to get the correct value
- Disallow Chisel2-style masked writes for SeqMem
- Pass reference for put_value
- Fix vcd recording for mem
- Fix poke bug for long data
- Allow for SeqMems to be named via reflection
- Remove hasMem flag
- Add Chisel3-compatible SeqMem masked writes
- Error checking for shift register, negitive number resulted in stack overflow
- Fixed vcdMem regression introduced in v28.
- Replace overridden setName in seqMem with a working setMemName method
- Change nameable to Nameable, move setName to Nameable, scope changes
+#563 Update combinational loop analysis.
+#559 Deal with exceptions in the test application.
+#530 Avoid java.lang.StackOverflowError trying to get widthW().
+#528 Generate ChiselError for asserts().
+#395 - Deprecate '!=' in favour of '=/='.
+ Ensure testKeywordsNull() has an application to execute. (Testing)
+ Update Mem write interface. (Chisel3 compatibility)
+ Fix spurious Chisel3 Vec compatibility warning. (Chisel3 compatibility)
+ Fix printf output collection to pass FlushPrintfOutput test. (Testing)
+ Major overhaul of Tester implementation - use memory mapped files for tester communication. (Testing performance)

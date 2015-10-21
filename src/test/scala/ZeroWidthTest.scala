@@ -198,8 +198,8 @@ class ZeroWidthTest extends TestSuite {
       // ===(b: UInt): Bool
       val v = io.x === io.y
 
-      // != (b: UInt): Bool
-      val w = io.x != io.y
+      // =/= (b: UInt): Bool
+      val w = io.x =/= io.y
 
       // >  (b: UInt): Bool
       val x = io.x > io.y
