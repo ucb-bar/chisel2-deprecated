@@ -254,7 +254,7 @@ class DotBackend extends Backend {
       out_d.write(innercrossings)
     } else {
       Predef.assert(innercrossings.length == 0,
-        {println("length:" + innercrossings.length + ", " + innercrossings)})
+        ChiselError.error("Internal Error: length:" + innercrossings.length + ", " + innercrossings))
     }
     out_d.write("}")
     out_d.close()

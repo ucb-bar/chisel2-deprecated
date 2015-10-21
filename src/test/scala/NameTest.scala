@@ -597,6 +597,9 @@ class NameSuite extends TestSuite {
 
   @Test def testKeywordsNull() {
     println("testKeywordsNull:")
+    // Make sure we actually have a test to execute (the order of test runs is not defined,
+    //  so testKeywordsCpp or testKeywordsVerilog may not have run yet.
+    chiselMain(Array[String]("--backend", "c", "--genHarness", "--compile", "--targetDir", dir.getPath.toString()), () => Module(new KeywordsModule()))
     launchTester("null", (c: KeywordsModule) => new KeywordsModuleNullTests(c),
       Some((args: Array[String]) => args ++ Array("--testCommand", dir.getPath.toString() + "/NameSuite_KeywordsModule", "-q")))
   }

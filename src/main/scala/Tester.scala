@@ -36,6 +36,8 @@ import java.nio.channels.FileChannel
 import java.lang.Double.{longBitsToDouble, doubleToLongBits}
 import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessLogger}
+import scala.concurrent.ops.spawn
+import scala.concurrent.SyncVar
 
 // Provides a template to define tester transactions
 trait Tests {
@@ -91,9 +93,40 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _clockCnts = HashMap(_clocks:_*)
   val (_inputs: ListSet[Bits], _outputs: ListSet[Bits]) = ListSet(c.wires.unzip._2: _*) partition (_.dir == INPUT)
   private var isStale = false
+  // Return any accumulated module printf output since the last call.
+  private var _lastLogIndex = 0
+  private def newTestOutputString: String = {
+    val result = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
+    _lastLogIndex = _logs.length
+    result
+  }
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
+  final class SyncronizedRef[T](initial:T) {
+    @volatile private var current = initial
+  
+    def get:T = current
+  
+    def update(n:T) {
+      this synchronized {
+        current = n
+      }
+    }
+  }
 
+  private var isDead = new SyncronizedRef(false)
+  private var exitValue = 0
+  private def mwhile(block: => Boolean)(loop: => Unit) {
+    while (!isDead.get && block) {
+      loop
+    }
+    if (isDead.get && true) {
+      // We assume the error string is the last log entry.
+      val errorString = _logs.last
+      println(newTestOutputString)
+      throw new RuntimeException("Errors occurred in simulation - " + errorString)
+    }
+  }
   private object SIM_CMD extends Enumeration { 
     val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN = Value }
   implicit def cmdToId(cmd: SIM_CMD.Value) = cmd.id
@@ -136,9 +169,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def setClock(clk: Clock, len: Int) {
     _clockLens(clk) = len
     _clockCnts(clk) = len
-    while(!sendCmd(SIM_CMD.SETCLK)) { }
-    while(!sendCmd(clk.name)) { }
-    while(!sendValue(len, 1)) { }
+    mwhile(!sendCmd(SIM_CMD.SETCLK)) { }
+    mwhile(!sendCmd(clk.name)) { }
+    mwhile(!sendValue(len, 1)) { }
   }
 
   def setClocks(clocks: Iterable[(Clock, Int)]) {
@@ -156,13 +189,17 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   private def peek(id: Int, chunk: Int) = {
-    while(!sendCmd(SIM_CMD.PEEK)) { }
-    while(!sendCmd(id)) { }
-    (for {
-      _ <- Stream.from(1)
-      data = recvValue(chunk)
-      if data != None
-    } yield data.get).head
+    mwhile(!sendCmd(SIM_CMD.PEEK)) { }
+    mwhile(!sendCmd(id)) { }
+    if (isDead.get) {
+      BigInt(0)
+    } else {
+      (for {
+        _ <- Stream.from(1)
+        data = recvValue(chunk)
+        if data != None
+      } yield data.get).head
+    }
   }
   /** Peek at the value of a node based on the path
     */
@@ -212,9 +249,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
     val cmd = if (!force) SIM_CMD.POKE else SIM_CMD.FORCE
-    while(!sendCmd(cmd)) { }
-    while(!sendCmd(id)) { }
-    while(!sendValue(v, chunk)) { }
+    mwhile(!sendCmd(cmd)) { }
+    mwhile(!sendCmd(id)) { }
+    mwhile(!sendValue(v, chunk)) { }
   }
   /** set the value of a node with its path
     * @param path The unique path of the node to set
@@ -376,15 +413,15 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def reset(n: Int = 1) {
     if (isTrace) println(s"RESET ${n}")
     for (i <- 0 until n) {
-      while(!sendCmd(SIM_CMD.RESET)) { }
-      while(!recvOutputs) { }
+      mwhile(!sendCmd(SIM_CMD.RESET)) { }
+      mwhile(!recvOutputs) { }
     }
   }
 
   protected def update {
-    while(!sendCmd(SIM_CMD.UPDATE)) { }
-    while(!sendInputs) { }
-    while(!recvOutputs) { }
+    mwhile(!sendCmd(SIM_CMD.UPDATE)) { }
+    mwhile(!sendInputs) { }
+    mwhile(!recvOutputs) { }
     isStale = false
   }
 
@@ -396,32 +433,41 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   protected def takeStep {
-    while(!sendCmd(SIM_CMD.STEP)) { }
-    while(!sendInputs) { }
+    mwhile(!sendCmd(SIM_CMD.STEP)) { }
+    mwhile(!sendInputs) { }
     delta += calcDelta
-    while(!recvOutputs) { }
+    mwhile(!recvOutputs) { }
     // dumpLogs
+    println(newTestOutputString)
     isStale = false
   }
 
   protected def getId(path: String) = {
-    while(!sendCmd(SIM_CMD.GETID)) { }
-    while(!sendCmd(path)) { }
-    (for {
-      _ <- Stream.from(1)
-      data = recvResp
-      if data != None
-    } yield data.get).head
+    mwhile(!sendCmd(SIM_CMD.GETID)) { }
+    mwhile(!sendCmd(path)) { }
+    if (isDead.get) {
+      0
+    } else {
+      (for {
+        _ <- Stream.from(1)
+        data = recvResp
+        if data != None
+      } yield data.get).head
+    }
   }
 
   protected def getChunk(id: Int) = {
-    while(!sendCmd(SIM_CMD.GETCHK)) { }
-    while(!sendCmd(id)) { }
-    (for {
-      _ <- Stream.from(1)
-      data = recvResp
-      if data != None
-    } yield data.get).head
+    mwhile(!sendCmd(SIM_CMD.GETCHK)) { }
+    mwhile(!sendCmd(id)) { }
+    if (isDead.get){
+      0
+    } else {
+      (for {
+        _ <- Stream.from(1)
+        data = recvResp
+        if data != None
+      } yield data.get).head
+    }
   }
 
   /** Step time by the smallest amount to the next rising clock edge
@@ -446,13 +492,21 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   var ok = true
   var failureTime = -1
 
+  /** Indicate a failure has occurred.  */
+  def fail() {
+    ok = false
+    if (failureTime == -1) {
+      failureTime = t
+    }
+  }
+
   /** Expect a value to be true printing a message if it passes or fails
     * @param good If the test passed or not
     * @param msg The message to print out
     */
   def expect (good: Boolean, msg: => String): Boolean = {
     if (isTrace) println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
-    if (!good) { ok = false; if (failureTime == -1) failureTime = t; }
+    if (!good) { fail() }
     good
   }
 
@@ -569,21 +623,24 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     outChannel.release
     cmdChannel.release
     t = 0
-    while(!recvOutputs) { }
+    mwhile(!recvOutputs) { }
     // reset(5)
     for (i <- 0 until 5) {
-      while(!sendCmd(SIM_CMD.RESET)) { }
-      while(!recvOutputs) { }
+      mwhile(!sendCmd(SIM_CMD.RESET)) { }
+      mwhile(!recvOutputs) { }
     }
+    spawn { exitValue = process.exitValue(); isDead.update(true) }
     process
   }
 
   /** Complete the simulation and inspect all tests */
   def finish {
-    while(!sendCmd(SIM_CMD.FIN)) { }
+    mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    println(newTestOutputString)
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")
     process.destroy
+    while(!isDead.get) { Thread.`yield` }
     _logs.clear
     inChannel.close
     outChannel.close

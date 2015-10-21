@@ -197,7 +197,7 @@ class Backend extends FileSystemUtilities{
       if(comp.name.isEmpty) comp.name = extractClassName(comp)
         // ensure this component has a name
       val children = childrenOfParent.getOrElse(comp, Seq.empty)
-      assert(children.filter(_.name.isEmpty).isEmpty, "Chisel Internal Error: Unnamed Children")
+      assert(children.filter(_.name.isEmpty).isEmpty, ChiselError.error("Internal Error: Unnamed Children"))
         // since sortedComps, all children should have names due to check above
       
       // ensure all nodes in the design has SOME name
@@ -344,10 +344,10 @@ class Backend extends FileSystemUtilities{
           case _ => assert(input.component == nextComp, 
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
-            (if (!input.name.isEmpty) input.name else "?") +
+            ChiselError.error("Internal Error: " + (if (!input.name.isEmpty) input.name else "?") +
             "[" + input.getClass.getName + "] has no match between component " +
             ((input.compOpt map (_.toString)) getOrElse "(null)") +
-            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?"))
+            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?")))
         }
       }
       comps ++= node.inputs map (_ -> nextComp)
