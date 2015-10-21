@@ -136,7 +136,7 @@ class BitsSuite extends TestSuite {
   @Test def testNeq() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5) != Bits(4)
+      val res = Bits(5) =/= Bits(4)
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
