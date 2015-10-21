@@ -243,8 +243,8 @@ abstract class BlackBox extends Module {
 }
 
 
-class Delay extends Node {
-  override def isReg: Boolean = true
+trait Delay extends Node {
+  override lazy val isInObject: Boolean = true
   def assignReset(rst: => Bool): Boolean = false
   def assignClock(clk: Clock) { clock = Some(clk) }
 }
