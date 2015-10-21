@@ -630,7 +630,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Complete the simulation and inspect all tests */
   def finish {
     mwhile(!sendCmd(SIM_CMD.FIN)) { }
-    println(newTestOutputString)
+    if (isTrace) println(newTestOutputString)
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")
     process.destroy
