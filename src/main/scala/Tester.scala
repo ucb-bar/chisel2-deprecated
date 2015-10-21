@@ -36,8 +36,9 @@ import java.nio.channels.FileChannel
 import java.lang.Double.{longBitsToDouble, doubleToLongBits}
 import java.lang.Float.{intBitsToFloat, floatToIntBits}
 import scala.sys.process.{Process, ProcessLogger}
-import scala.concurrent.ops.spawn
-import scala.concurrent.SyncVar
+import scala.concurrent._
+import scala.concurrent.duration._
+import ExecutionContext.Implicits.global
 
 // Provides a template to define tester transactions
 trait Tests {
@@ -75,6 +76,8 @@ trait Tests {
   def run(s: String): Boolean
 }
 
+case class TestApplicationException(exitVal: Int, lastMessage: String) extends RuntimeException(lastMessage)
+
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
@@ -102,29 +105,18 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
-  final class SyncronizedRef[T](initial:T) {
-    @volatile private var current = initial
-  
-    def get:T = current
-  
-    def update(n:T) {
-      this synchronized {
-        current = n
-      }
-    }
-  }
 
-  private var isDead = new SyncronizedRef(false)
-  private var exitValue = 0
+  // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
   private def mwhile(block: => Boolean)(loop: => Unit) {
-    while (!isDead.get && block) {
+    while (!exitValue.isCompleted && block) {
       loop
     }
-    if (isDead.get && true) {
+    // If the test application died, throw a run-time error.
+    if (exitValue.isCompleted) {
       // We assume the error string is the last log entry.
       val errorString = _logs.last
       println(newTestOutputString)
-      throw new RuntimeException("Errors occurred in simulation - " + errorString)
+      throw new TestApplicationException(Await.result(exitValue, Duration(-1, SECONDS)), errorString)
     }
   }
   private object SIM_CMD extends Enumeration { 
@@ -191,7 +183,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private def peek(id: Int, chunk: Int) = {
     mwhile(!sendCmd(SIM_CMD.PEEK)) { }
     mwhile(!sendCmd(id)) { }
-    if (isDead.get) {
+    if (exitValue.isCompleted) {
       BigInt(0)
     } else {
       (for {
@@ -445,7 +437,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   protected def getId(path: String) = {
     mwhile(!sendCmd(SIM_CMD.GETID)) { }
     mwhile(!sendCmd(path)) { }
-    if (isDead.get) {
+    if (exitValue.isCompleted) {
       0
     } else {
       (for {
@@ -459,7 +451,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   protected def getChunk(id: Int) = {
     mwhile(!sendCmd(SIM_CMD.GETCHK)) { }
     mwhile(!sendCmd(id)) { }
-    if (isDead.get){
+    if (exitValue.isCompleted){
       0
     } else {
       (for {
@@ -622,6 +614,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     inChannel.release
     outChannel.release
     cmdChannel.release
+    process
+  }
+
+  private def start {
     t = 0
     mwhile(!recvOutputs) { }
     // reset(5)
@@ -629,8 +625,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       mwhile(!sendCmd(SIM_CMD.RESET)) { }
       mwhile(!recvOutputs) { }
     }
-    spawn { exitValue = process.exitValue(); isDead.update(true) }
-    process
   }
 
   /** Complete the simulation and inspect all tests */
@@ -640,13 +634,22 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")
     process.destroy
-    while(!isDead.get) { Thread.`yield` }
     _logs.clear
     inChannel.close
     outChannel.close
     cmdChannel.close
     if(!ok) throwException("Module under test FAILED at least one test vector.")
   }
+
+  // Set up a Future to wait for (and signal) the test process exit.
+  private val exitValue: Future[Int] = Future {
+    blocking {
+      process.exitValue
+    }
+  }
+
+  // Once everything has been prepared, we can start the communications.
+  start
 }
 
 /** A tester to check a node graph from INPUTs to OUTPUTs directly */
