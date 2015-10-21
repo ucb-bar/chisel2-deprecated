@@ -53,17 +53,14 @@ class FlushPrintfOutput extends TestSuite {
       printf(counterString, counter);
     }
 
-    // TODO: better way to check logs? logging is lower than tests, so it sometimes fails...
     trait FlushPrintfOutputTests extends Tests {
-      val expectedOutputs = collection.mutable.ArrayBuffer[String]()
       def tests(m: PrintfModule) {
         for (i <- 0 until 4) {
           step(1)
-          expectedOutputs += m.counterString.format(i)
-        }
-        (printfs zip expectedOutputs) foreach {case (printf, expected) =>
-          assertTrue("incorrect output - %s".format(printf), 
-            eliminateWhiteSpace(printf) == eliminateWhiteSpace(expected))
+          // Fetch the output printed on stdout by the test.
+          val printfOutput = accumulatedTestOutput.last
+          val expectedString = m.counterString.format(i)
+          assertTrue("incorrect output - %s".format(printfOutput), eliminateWhiteSpace(printfOutput) == eliminateWhiteSpace(expectedString))
         }
       }
     }

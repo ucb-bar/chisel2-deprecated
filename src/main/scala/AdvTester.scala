@@ -36,26 +36,10 @@ package Chisel.AdvTester // May eventually add this to the base Chisel package
 import Chisel._
 import scala.collection.mutable.ArrayBuffer
 
-trait AdvTests extends Tests {
-  def cycles: Int
-  def wire_poke(port: Bits,      target: Boolean):       Unit
-  def wire_poke(port: Bits,      target: Int):           Unit
-  def wire_poke(port: Bits,      target: Long):          Unit
-  def wire_poke(port: Bits,      target: BigInt):        Unit
-  def wire_poke(port: Aggregate, target: Array[BigInt]): Unit
-  def reg_poke(port: Bits,       target: BigInt):        Unit
-  def reg_poke(port: Aggregate,  target: Array[BigInt]): Unit
-  def takestep(work: => Unit = {}): Unit
-  def takesteps(n: Int)(work: =>Unit = {}): Unit
-  def until(pred: =>Boolean, maxCycles: Int = 0)(work: =>Unit): Boolean
-  def eventually(pred: =>Boolean, maxCycles: Int = 0): Boolean
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = 0): Boolean 
-
-}
-
 class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Tester[T](dut, isTrace) {
   val defaultMaxCycles = 1024
   var cycles = 0
+  var pass = true
 
   // List of scala objects that need to be processed along with the test benches, like sinks and sources
   val preprocessors = new ArrayBuffer[Processable]()
@@ -76,10 +60,10 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Test
   override def poke(port: Bits, target: BigInt) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
   override def poke(port: Aggregate, target: Array[BigInt]) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
 
-  private val registered_bits_updates = new scala.collection.mutable.HashMap[Bits,BigInt]()
-  private val registered_aggr_updates = new scala.collection.mutable.HashMap[Aggregate,Array[BigInt]]()
+  val registered_bits_updates = new scala.collection.mutable.HashMap[Bits,BigInt]()
+  val registered_aggr_updates = new scala.collection.mutable.HashMap[Aggregate,Array[BigInt]]()
 
-  private def do_registered_updates() = {
+  def do_registered_updates() = {
     registered_bits_updates.foreach( kv => wire_poke(kv._1,kv._2) )
     registered_aggr_updates.foreach( kv => wire_poke(kv._1,kv._2) )
 
@@ -125,11 +109,11 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Test
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    ok &= expr
-    failureTime = cycles
+    pass &= expr
     if(!expr && errMsg != "") { println("ASSERT FAILED: " + errMsg) }
     expr
   }
+
 
   class DecoupledSink[T <: Data, R]( socket: DecoupledIO[T], cvt: T=>R ) extends Processable
   {
@@ -230,6 +214,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Test
   object ValidSource {
     def apply[T<:Bits](socket: ValidIO[T]) = new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
+
 }
 
 trait Processable {
