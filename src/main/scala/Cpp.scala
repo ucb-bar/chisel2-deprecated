@@ -582,7 +582,7 @@ class CppBackend extends Backend {
 	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
-          next.isReg
+          next match { case _: Delay => true case _ => false }
         }
         if (useShadow) {
           emitRef(reg) + "__shadow"
@@ -678,11 +678,12 @@ class CppBackend extends Backend {
     node match {
       case reg: Reg => {
         regWritten += node
-        if (reg.next.isReg) {
-          needShadow += node
+        reg.next match {
+          case _: Delay => needShadow += node
+          case _ =>
         }
       }
-      case _ => {}
+      case _ => 
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
