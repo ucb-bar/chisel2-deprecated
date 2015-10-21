@@ -71,6 +71,11 @@ abstract class Data extends Node {
       + " and " + right.getClass)
   }
 
+  def =/=[T <: Data](right: T): Bool = {
+    throwException("=/= not defined on " + this.getClass
+      + " and " + right.getClass)
+  }
+
   /** Try to convert this data to a Bool
     * @throws ChiselException if the width is not 1*/
   def toBool(): Bool = {
