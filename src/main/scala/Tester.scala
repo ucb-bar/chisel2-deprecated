@@ -430,7 +430,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    println(newTestOutputString)
+    if (isTrace) println(newTestOutputString)
     isStale = false
   }
 
