@@ -65,7 +65,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
       }
     
       io.dataOut := OHToUInt(io.dataIn)
-      assert(io.dataIn != UInt(8), assertMessage)
+      assert(io.dataIn =/= UInt(8), assertMessage)
     }
     
     class TBAssert(c: mkAssert) extends Tester(c) {
@@ -88,7 +88,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
 
     "sw" match {
       case "sw" => {
-        val ex = intercept[RuntimeException] {
+        val ex = intercept[TestApplicationException] {
           chiselMainTest(swArgs, () => Module(new mkAssert)){ c => new TBAssert(c)}
         }
         // Verify the exception message contains our assertion message.

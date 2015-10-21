@@ -1,5 +1,5 @@
 #ifndef __VPI_H
-#define __VPI_h
+#define __VPI_H
 
 #include "vpi_user.h"
 #include "sim_api.h"
@@ -9,6 +9,9 @@ PLI_INT32 tick_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
+  vpi_api_t() { }
+  ~vpi_api_t() { }
+
   virtual void tick() {
     while(!forces.empty()) {
       vpi_put_value(forces.front(), NULL, NULL, vpiReleaseFlag);
@@ -63,10 +66,10 @@ public:
 private:
   vpiHandle top_handle;
   std::queue<vpiHandle> forces;
+  std::map<vpiHandle, size_t> sizes;
+  std::map<vpiHandle, size_t> chunks;
 
-  void put_value(vpiHandle& sig, bool force = false) {
-    std::string value;
-    std::cin >> value;
+  void put_value(vpiHandle& sig, std::string& value, bool force=false) {
     s_vpi_value value_s;
     value_s.format    = vpiHexStrVal;
     value_s.value.str = (PLI_BYTE8*) value.c_str();
@@ -74,11 +77,52 @@ private:
     if (force) forces.push(sig); 
   }
 
-  void get_value(vpiHandle& sig) {
+  size_t put_value(vpiHandle& sig, uint64_t* data, bool force=false) {
+    size_t chunk = get_chunk(sig);
+    s_vpi_value  value_s;
+    s_vpi_vecval vecval_s[2*chunk];
+    value_s.format       = vpiVectorVal;
+    value_s.value.vector = vecval_s; 
+    for (size_t i = 0 ; i < chunk ; i++) {
+      value_s.value.vector[2*i].aval = (int)data[i]; 
+      value_s.value.vector[2*i+1].aval = (int)(data[i]>>32);
+      value_s.value.vector[2*i].bval = 0;
+      value_s.value.vector[2*i+1].bval = 0;
+    }
+    vpi_put_value(sig, &value_s, NULL, force ? vpiForceFlag : vpiNoDelay);
+    if (force) forces.push(sig); 
+    return chunk;
+  }
+
+  inline std::string get_value(vpiHandle& sig) {
     s_vpi_value value_s;
     value_s.format = vpiHexStrVal;
     vpi_get_value(sig, &value_s);
-    std::cerr << value_s.value.str << std::endl;
+    return value_s.value.str;
+  }
+
+  size_t get_value(vpiHandle& sig, uint64_t* data) {
+    size_t size = get_size(sig);
+    s_vpi_value  value_s;
+    s_vpi_vecval vecval_s[size];
+    value_s.format       = vpiVectorVal;
+    value_s.value.vector = vecval_s;
+    vpi_get_value(sig, &value_s);
+    for (size_t i = 0 ; i < size ; i += 2) {
+      data[i>>1] = (uint64_t)value_s.value.vector[i].aval;
+    }
+    for (size_t i = 1 ; i < size ; i += 2) {
+      data[i>>1] |= (uint64_t)value_s.value.vector[i].aval << 32;
+    }
+    return ((size-1)>>1)+1;
+  }
+
+  inline size_t get_size(vpiHandle &sig) {
+    return (size_t) (((vpi_get(vpiSize, sig)-1) >> 5) + 1);
+  }
+
+  inline size_t get_chunk(vpiHandle &sig) {
+    return (size_t) (((vpi_get(vpiSize, sig)-1) >> 6) + 1);
   }
 
   virtual void reset() {
@@ -114,7 +158,7 @@ private:
     data_s.obj       = NULL;
     data_s.time      = &time_s;
     data_s.value     = NULL;
-    data_s.user_data = NULL;
+    data_s.user_data = (PLI_BYTE8*) this;
     vpi_free_object(vpi_register_cb(&data_s));
   }
 
