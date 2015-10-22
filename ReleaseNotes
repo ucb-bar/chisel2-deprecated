@@ -1,3 +1,5 @@
 ReleaseNotes for Chisel v2.2.30
 
 In addition to several bug fixes, this release of Chisel contains a significant change to tester communications. See the associated Changelog for issues resolved with this release.
+
+We will be reducing support for Scala 2.10 in future Chisel releases. Please verify your code compiles and runs correctly under Scala 2.11.
