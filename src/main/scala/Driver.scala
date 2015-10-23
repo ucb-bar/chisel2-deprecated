@@ -380,6 +380,7 @@ object Driver extends FileSystemUtilities{
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
         //Jackhammer Flags
+        case "--configName" =>  chiselConfigClassName = Some(args(i + 1)); i += 1
         case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
         case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
