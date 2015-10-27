@@ -361,7 +361,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val value = if (!valid) None else {
       outChannel.consume
       Some(((0 until chunk) foldLeft BigInt(0))(
-        (res, i) => res | (BigInt(outChannel(i)) << (64*i))))
+        (res, i) => res | (int(outChannel(i)) << (64*i))))
     }
     outChannel.release
     value
@@ -481,15 +481,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Convert Bits to BigInt */
   def int(x: Bits):    BigInt = x.litValue()
 
-  var ok = true
-  var failureTime = -1
-
   /** Indicate a failure has occurred.  */
-  def fail() {
+  var failureTime = -1
+  var ok = true
+  def fail {
+    if (failureTime == -1) failureTime = t
     ok = false
-    if (failureTime == -1) {
-      failureTime = t
-    }
   }
 
   /** Expect a value to be true printing a message if it passes or fails
@@ -498,7 +495,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     */
   def expect (good: Boolean, msg: => String): Boolean = {
     if (isTrace) println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
-    if (!good) { fail() }
+    if (!good) fail
     good
   }
 

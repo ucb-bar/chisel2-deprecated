@@ -490,7 +490,7 @@ class Backend extends FileSystemUtilities{
     val dfsStack = Stack[Node]()
     walked += root
     dfsStack.push(root)
-    val clock = root.clock getOrElse (throwException("Reg should have its own clock"))
+    val clock = root.clock getOrElse (throwException(s"Reg(${root.name} in ${extractClassName(root.component)}) should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
       node.consumers filterNot walked foreach {
@@ -551,6 +551,13 @@ class Backend extends FileSystemUtilities{
 
   def forceMatchingWidths {
     Driver.idfs (_.forceMatchingWidths)
+  }
+
+  def convertMaskedWrites(mod: Module) {
+    Driver.bfs {
+      case mem: Mem[_] => mem.convertMaskedWrites
+      case _ =>
+    }
   }
 
   def computeMemPorts(mod: Module) {
@@ -829,6 +836,9 @@ class Backend extends FileSystemUtilities{
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
     ChiselError.checkpoint()
+
+    ChiselError.info("convert masked writes of inline mems")
+    convertMaskedWrites(c)
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules
