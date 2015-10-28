@@ -235,4 +235,9 @@ abstract class Data extends Node {
       case _ => super.isTypeOnly
     }
   }
+  
+  /** Identify this class as a Chisel data class - to help identify valid Aggregate data elements. */
+  protected[Chisel] def _chiselAddBundleElement(elements: Bundle.Elements): Data = {
+    this
+  }
 }

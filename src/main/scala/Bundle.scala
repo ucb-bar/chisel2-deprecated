@@ -30,13 +30,10 @@
 
 package Chisel
 import scala.collection.mutable.{HashSet, LinkedHashMap}
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.api.{Symbols, Types}
 
 object Bundle {
-  val keywords = Set("elements", "flip", "toString",
-    "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
-    "unary_$bang", "unary_$minus", "clone", "cloneType", "toUInt", "toBits",
-    "toBool", "toSInt", "asDirectionless")
-
   def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
     Driver.parStack.push(p.push)
     val res = b
@@ -48,6 +45,9 @@ object Bundle {
     apply(b)(q)
   }
   private def params = if(Driver.parStack.isEmpty) Parameters.empty else Driver.parStack.top
+  
+  type Elements = LinkedHashMap[String, Data]
+  val reflectMirror = ru.runtimeMirror(getClass.getClassLoader)
 }
 
 /** Defines a collection of datum of different types into a single coherent
@@ -57,9 +57,11 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
   private def calcElements(view: Seq[String]) = {
     val c      = getClass
-    var elts   = LinkedHashMap[String, Data]() 
+    val im     = Bundle.reflectMirror.reflect(this)
+    val mySymbol = im.symbol
+    var elts   = new Bundle.Elements 
     val seen   = HashSet[Object]()
-    for (m <- c.getMethods.sortWith(
+    for (m <- c.getMethods.filter(m => !(m.getName() contains '$')).sortWith(
       (x, y) => (x.getName < y.getName)
     )) {
       val name = m.getName
@@ -70,17 +72,39 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
       val isInterface = classOf[Data].isAssignableFrom(rtype)
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
+      // Simple tests first
+      // Is this something that Data could be assigned to?
       if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers) 
-        && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
-        && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
-        // Fetch the actual object
-        val obj = m invoke this
-        if(!(seen contains obj)) {
-          obj match {
-            case d: Data => elts(name) = d
-            case any =>
+        && isInterface && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
+        val s = mySymbol.typeSignature.member(ru.stringToTermName(name))
+        // It should be public and a "Term" (not a "Type")
+        val maybeValidMember = if (s.isPublic && s.isTerm) {
+          // Is this a method or a val/var?
+          if (s.isMethod) {
+            val rTypeSignature = s.asTerm.typeSignature
+            // Is this a generator?
+            rTypeSignature match {
+              case ru.NullaryMethodType(restpe) => true // A def: UInt, or gen.cloneType 
+              case _ => (s.asMethod.isConstructor || s.asMethod.isByNameParam)
+            }
+          } else {
+            s.asTerm.isVal || s.asTerm.isVar
           }
-          seen += obj
+        } else {
+          false
+        }
+        if (maybeValidMember) {
+          // Does it have the "special" method?
+          if (rtype.getMethods().exists(m => m.getName() == "_chiselAddBundleElement")) {
+            val obj = m invoke this
+            if(!(seen contains obj)) {
+              obj match {
+                case d: Data => elts(name) = d._chiselAddBundleElement(elts)
+                case any =>
+              }
+              seen += obj
+            }
+          }
         }
       }
     }
@@ -88,7 +112,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
     if (Driver.minimumCompatibility > "2") {
       val methodNames = c.getDeclaredMethods.map(_.getName())
       if (methodNames.contains("clone") && !methodNames.contains("cloneType")) {
-        // Use the line number for the bunde definition (if we have it).
+        // Use the line number for the bundle definition (if we have it).
         val errorLine = if (line != null) {
           line
         } else {
