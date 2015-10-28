@@ -38,8 +38,11 @@ import Chisel._
 /** This testsuite checks the SystemC backend implementation.
 */
 class SystemCSuite extends TestSuite {
-  // Test top-level IOs are decoupled.
-  @Test def testTopLevelIO() {
+
+  val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath, "--backend", "sysc")
+
+   // Test top-level IOs are decoupled.
+  @Test def testTopLevelIOGood() {
 
     class SystemCModuleGood extends Module {
        val io = new Bundle {
@@ -52,6 +55,11 @@ class SystemCSuite extends TestSuite {
        io.b.valid := io.a.valid
     }
 
+    chiselMain(testArgs.toArray, () => Module(new SystemCModuleGood()))
+    assertFalse(ChiselError.hasErrors)
+  }
+
+  @Test def testTopLevelIOOk() {
     class SystemCModuleBad extends Module {
        val io = new Bundle {
          val a = UInt(INPUT, width = 16)
@@ -61,12 +69,7 @@ class SystemCSuite extends TestSuite {
        io.b := io.a + UInt(10)
     }
 
-    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath, "--backend", "sysc")
-
-    chiselMain(testArgs.toArray, () => Module(new SystemCModuleGood()))
-    assertFalse(ChiselError.hasErrors)
-
     chiselMain(testArgs.toArray, () => Module(new SystemCModuleBad()))
-    assertTrue(ChiselError.hasErrors)
+    assertFalse(ChiselError.hasErrors)
   }
 }
