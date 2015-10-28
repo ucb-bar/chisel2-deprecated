@@ -51,7 +51,7 @@ object MuxCase {
   /** @param default the default value if none are enabled
     * @param mapping a set of data values with associated enables
     * @return the first value in mapping that is enabled */
-  def apply[T <: Bits] (default: T, mapping: Seq[(Bool, T)]): T = {
+  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
