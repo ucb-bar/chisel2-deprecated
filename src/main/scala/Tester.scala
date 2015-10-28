@@ -106,6 +106,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
 
+  // The initial startup message
+  var simStartupMessage = "<no startup message>"
   // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
   private def mwhile(block: => Boolean)(loop: => Unit) {
     while (!exitValue.isCompleted && block) {
@@ -114,7 +116,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     // If the test application died, throw a run-time error.
     if (exitValue.isCompleted) {
       // We assume the error string is the last log entry.
-      val errorString = _logs.last
+      val errorString = if (_logs.size > 0) {
+        _logs.last
+      } else {
+        ""
+      }
       println(newTestOutputString)
       throw new TestApplicationException(Await.result(exitValue, Duration(-1, SECONDS)), errorString)
     }
@@ -582,39 +588,51 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   // Always use a specific seed so results (whenever) are reproducible.
   val rnd = new Random(Driver.testerSeed)
-  val process: Process = {
-    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val target = s"${Driver.targetDir}/${n}"
-    // If the caller has provided a specific command to execute, use it.
-    val cmd = Driver.testCommand match {
-      case Some(cmd) => cmd
-      case None => Driver.backend match {
-        case b: FloBackend =>
-          val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
-          if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
-          if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
-          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
-          command.mkString(" ")
-        case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
-          if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
-          if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
-        case _ => target
-      }
+  val targetSubDir = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+  val target = s"${Driver.targetDir}/${targetSubDir}"
+  // If the caller has provided a specific command to execute, use it.
+  val cmd = Driver.testCommand match {
+    case Some(cmd) => cmd
+    case None => Driver.backend match {
+      case b: FloBackend =>
+        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
+        if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+        if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
+        command ++= ArrayBuffer(":target-dir", Driver.targetDir)
+        command.mkString(" ")
+      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
+        if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
+        if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
+      case _ => target
     }
+  }
+
+  val (process: Process, exitValue: Future[Int]) = {
     val processBuilder = Process(cmd) 
     val processLogger = ProcessLogger(_logs += _)
     val process = processBuilder run processLogger
+
+    // Set up a Future to wait for (and signal) the test process exit.
+    val exitValue: Future[Int] = Future {
+      blocking {
+        process.exitValue
+      }
+    }
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
-    while(!new java.io.File("sim.start").exists) Thread.sleep(100)
-    new java.io.File("sim.start").delete 
+    // Wait for the start-up message
+    while(_logs.size == 0 && !exitValue.isCompleted) { Thread.sleep(100) }
+    if (_logs.size > 0) {
+      simStartupMessage = _logs.remove(0)
+    }
+    println(simStartupMessage)
     // Init channels
     inChannel.consume
     cmdChannel.consume
     inChannel.release
     outChannel.release
     cmdChannel.release
-    process
+    (process, exitValue)
   }
 
   private def start {
@@ -639,13 +657,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     outChannel.close
     cmdChannel.close
     if(!ok) throwException("Module under test FAILED at least one test vector.")
-  }
-
-  // Set up a Future to wait for (and signal) the test process exit.
-  private val exitValue: Future[Int] = Future {
-    blocking {
-      process.exitValue
-    }
   }
 
   // Once everything has been prepared, we can start the communications.

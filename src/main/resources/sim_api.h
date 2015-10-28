@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <time.h>
 
 enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN };
 
@@ -74,10 +75,18 @@ public:
     in_channel.release();
     out_channel.release();
     cmd_channel.release();
-    // FIXME: Inform the tester simulation is ready
-    int fd = open("sim.start", O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600);
-    assert(fd != -1);
-    close(fd);
+    // Inform the tester that the simulation is ready
+    char hostName[256];
+    const char *hostNamep = NULL;
+    if (gethostname(hostName, sizeof(hostName) - 1) == 0) {
+      hostNamep = hostName;
+    } else {
+      hostNamep = "<unknown>";
+    }
+    time_t now;
+    time(&now);
+    // NOTE: ctime() generates a trailing '\n'.
+    std::cerr << "sim start on " << hostNamep << " at " << ctime(&now);
   }
   ~sim_api_t() { }
   virtual void tick() {
