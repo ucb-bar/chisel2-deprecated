@@ -27,7 +27,7 @@ To start working on a circuit with Chisel, create simple build.sbt
 and scala source file containing your Chisel code as follow.
 
     $ cat build.sbt
-    scalaVersion := "2.10.4"
+    scalaVersion := "2.11.7"
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
 
