@@ -620,9 +620,16 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
-    // Wait for the start-up message
-    while(_logs.size == 0 && !exitValue.isCompleted) { Thread.sleep(100) }
-    if (_logs.size > 0) {
+    // Wait for the startup message
+    // NOTE: There may be several messages before we see our startup message.
+    val simStartupMessageStart = "sim start on "
+    while(! _logs.exists(s => s.startsWith(simStartupMessageStart)) && !exitValue.isCompleted) { Thread.sleep(100) }
+    val simStartupMessageIndex = _logs.indexWhere(s => s.startsWith(simStartupMessageStart))
+    // Remove the startup message (and any precursors).
+    if (simStartupMessageIndex >= 0) {
+      if (simStartupMessageIndex > 0) {
+        _logs.remove(0, simStartupMessageIndex)
+      }
       simStartupMessage = _logs.remove(0)
     }
     println(simStartupMessage)
