@@ -627,8 +627,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val simStartupMessageIndex = _logs.indexWhere(s => s.startsWith(simStartupMessageStart))
     // Remove the startup message (and any precursors).
     if (simStartupMessageIndex >= 0) {
-      if (simStartupMessageIndex > 0) {
-        _logs.remove(0, simStartupMessageIndex)
+      for (i <- 0 until simStartupMessageIndex - 1) {
+        println(_logs.remove(0))
       }
       simStartupMessage = _logs.remove(0)
     }
