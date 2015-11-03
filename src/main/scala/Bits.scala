@@ -71,6 +71,7 @@ abstract class Bits extends Data with proc {
     this assign node ; setIsTypeNode ; this
   }
 
+  def getLit( x : BigInt ) : Bits = { Lit(x, getWidth()) { UInt() } }
   def fromInt(x: Int): this.type
   def toSInt(): SInt = chiselCast(this){SInt()}
   def toUInt(): UInt = chiselCast(this){UInt()}
