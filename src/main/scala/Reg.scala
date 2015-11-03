@@ -155,6 +155,11 @@ class Reg extends Delay with proc {
 
   override def usesInClockHi(n: Node) = n eq next
 
+  override def doProcAssign(src: Node, cond: Bool) {
+    if (procAssigned || isEnable) inputs(0) = Multiplex(cond, src, inputs(0))
+    else super.doProcAssign(src, cond)
+  }
+
   // these are used to infer read enables on Mems
   // also useful for custom transforms
   def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2).getNode eq this)
