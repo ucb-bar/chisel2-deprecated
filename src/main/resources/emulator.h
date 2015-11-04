@@ -1331,13 +1331,13 @@ static __inline__ int flo_digits(int m, int e) {
 template <int w>
 int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
   char buf[1000];
-  int n_digs = (w == 32) ? flo_digits(32, 8) : flo_digits(52, 11);
+  int n_digs = (w == 32) ? flo_digits(23, 8) : flo_digits(52, 11);
   double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
   // sprintf(buf, "%d %d%*e", w, n_digs, n_digs, val);
   sprintf(buf, "%*e", n_digs, val);
-  assert(strlen(buf) <= n_digs);
+  assert(strlen(buf) == n_digs);
   for (int i = 0; i < n_digs; i++)
-    s[i] = (i < strlen(buf)) ? buf[i] : pad;
+    s[i] = buf[i];
   s[n_digs] = 0;
   // printf("N-DIGS = %d BUF %lu PAD %lu\n", n_digs, strlen(buf), n_digs-strlen(buf));
   // return strlen(buf);

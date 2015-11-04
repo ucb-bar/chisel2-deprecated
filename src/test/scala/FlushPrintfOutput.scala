@@ -73,4 +73,36 @@ class FlushPrintfOutput extends TestSuite {
     }
     launchCppTester((m: PrintfModule) => new FlushPrintfOutputTester(m))
   }
+
+  @Test def testFloat() {
+
+    class PrintfModule extends Module {
+      val io = new DecoupledUIntIO
+      val counter = Reg(Flo(), init = Flo(0))
+      val counterString = "counter = %e\n"
+      counter := counter + Flo(1)
+      printf(counterString, counter);
+    }
+
+    trait FlushPrintfOutputTests extends Tests {
+      val expectedOutputs = collection.mutable.ArrayBuffer[String]()
+      def tests(m: PrintfModule) {
+        for (i <- 0 until 4) {
+          step(1)
+          expectedOutputs += m.counterString.format(i.toFloat)
+        }
+        assertTrue("Not enough printf outputs", printfs.length == expectedOutputs.length)
+        (printfs zip expectedOutputs) foreach {case (printf, expected) =>
+          assertTrue("incorrect output - %s".format(printf),
+            eliminateWhiteSpace(printf) == eliminateWhiteSpace(expected))
+        }
+      }
+    }
+
+    class FlushPrintfOutputTester(m: PrintfModule) extends Tester(m) with FlushPrintfOutputTests {
+      tests(m)
+    }
+    launchCppTester((m: PrintfModule) => new FlushPrintfOutputTester(m))
+  }
+
 }
