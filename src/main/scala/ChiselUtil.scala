@@ -327,12 +327,12 @@ object ArbiterCtrl
   }
 }
 
-abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
+abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false) extends Module {
   require(isPow2(count))
   def grant: Seq[Bool]
   val io = new ArbiterIO(gen, n)
-  val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
-  val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
+  val locked  = if(count > 1 || needsHold) Reg(init=Bool(false)) else Bool(false)
+  val lockIdx = if(count > 1 || needsHold) Reg(init=UInt(n-1)) else UInt(n-1)
   val chosen = Wire(UInt(width = log2Up(n)))
 
   for ((g, i) <- grant.zipWithIndex)
@@ -341,25 +341,48 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   io.out.bits := io.in(chosen).bits
   io.chosen := chosen
 
-  if(count > 1){
+  if(count == 1 && needsHold) {
+    when(io.out.valid) {
+      locked := !io.out.ready
+      when(!locked) {
+        lockIdx := chosen
+      }
+    }
+  }
+
+  if(count > 1) {
     val cnt = Reg(init=UInt(0, width = log2Up(count)))
     val cnt_next = cnt + UInt(1)
-    when(io.out.fire()) {
-      when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
-        cnt := cnt_next
+    when(io.out.valid) {
+      if(needsHold) {  // lock the chosen port if need hold
         when(!locked) {
-          locked := Bool(true)
-          lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          lockIdx := chosen
+          locked := !io.out.ready
         }
       }
-      when(cnt_next === UInt(0)) {
-        locked := Bool(false)
+      when(io.out.ready) {
+        when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
+          cnt := cnt_next
+          locked := !(cnt_next === UInt(0))
+          when(!locked) {
+            lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          }
+        }.otherwise {
+          locked := Bool(false)
+        }
       }
     }
   }
 }
 
-class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   lazy val last_grant = Reg(init=UInt(0, log2Up(n)))
   override def grant: Seq[Bool] = {
     val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
@@ -376,7 +399,14 @@ class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   def grant: Seq[Bool] = ArbiterCtrl(io.in.map(_.valid))
 
   var choose = UInt(n-1)
@@ -389,12 +419,15 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 /** Hardware module that is used to sequence n producers into 1 consumer.
   Producers are chosen in round robin order.
   @example
-    {{{ val arb = new RRArbiter(2, UInt())
+    {{{ val arb = new Module(RRArbiter(2, UInt())
     arb.io.in(0) <> producer0.io.out
     arb.io.in(1) <> producer1.io.out
     consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
   */
-class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
+class RRArbiter[T <: Data](gen:T, n: Int, needsHold: Boolean = false) extends LockingRRArbiter[T](gen, n, 1, None, needsHold)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
  Priority is given to lower producer
@@ -403,8 +436,11 @@ class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
    arb.io.in(0) <> producer0.io.out
    arb.io.in(1) <> producer1.io.out
    consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
  */
-class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
+class Arbiter[T <: Data](gen: T, n: Int, needsHold: Boolean = false) extends LockingArbiter[T](gen, n, 1, None, needsHold)
 
 
 object FillInterleaved
