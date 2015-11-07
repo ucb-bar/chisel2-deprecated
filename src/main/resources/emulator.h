@@ -203,7 +203,7 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
   int n_shift_words    = amount / val_n_bits();
   unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
-  int msb              = s0[nw-1] >> (w - nw*val_n_bits() - 1);
+  int msb              = s0[nw-1] >> (w - (nw-1)*val_n_bits() - 1);
   val_t carry = 0;
 
   n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
@@ -230,7 +230,7 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
       d[i] = val_all_ones();
     } else {
       d[i] = d[i] | (val_all_ones() << (boundary - idx));
-      d[nw-1] = d[nw-1] & (val_all_ones() >> ((nw-1)*val_n_bits() - w));
+      d[nw-1] = d[nw-1] & (val_all_ones() >> (w - (nw-1)*val_n_bits()));
       return;
     }
   }
