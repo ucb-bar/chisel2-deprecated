@@ -197,15 +197,24 @@ static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
   }
 }
 
+/** Right shift with sign extension
+ * d is where to store the result
+ * s0 is the number to be shifted
+ * amount is by how much it is to be shifted
+ * nw is the number of val_n_bits() bit words in the source
+ * w is the total number of bits in s0
+ */
 static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, const unsigned int nw, const unsigned int w) {
 
   unsigned int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
   unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
+  // get the msb which is total bits (w) - bits in non most sig word - 1 to have 1 bit remaining
   int msb              = s0[nw-1] >> (w - (nw-1)*val_n_bits() - 1);
   val_t carry = 0;
 
+  // Limit the right shift to be a positive number and no more than nw in the source ie. cant shift beyond zero width
   n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
   n_shift_words = (n_shift_words > nw) ? nw : n_shift_words;
 
@@ -218,10 +227,12 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
     carry  = is_zero_carry ? 0 : val << n_rev_shift_bits;
   }
 
+  // If don't need sign extension return
   if (msb == 0) {
     return;
   }
 
+  // Where sign extension begins
   int boundary = (w - amount);
 
   for (int i = nw-1; i >= 0; i--) {
@@ -229,7 +240,9 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
     if (idx  > boundary) {
       d[i] = val_all_ones();
     } else {
+      // set the sign extended part of this word
       d[i] = d[i] | (val_all_ones() << (boundary - idx));
+      // set the bits above w to zero as they are beyond the length of s0
       d[nw-1] = d[nw-1] & (val_all_ones() >> (w - (nw-1)*val_n_bits()));
       return;
     }
