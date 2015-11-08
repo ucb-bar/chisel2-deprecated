@@ -377,7 +377,6 @@ class VerilogBackend extends Backend {
       harness write "  integer min = 1 << 31 - 1;\n\n"
       clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
     }
-    if (resets.isEmpty) harness write "`define RESET_EXISTS\n"
     harness write "  reg vcdon = 0;\n"
     harness write "  reg [1023:0] vcdfile = 0;\n"
     harness write "  reg [1023:0] vpdfile = 0;\n"
@@ -429,31 +428,31 @@ class VerilogBackend extends Backend {
       clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
       harness write "    #min $tick();\n"
-      harness write "`ifdef RESET_EXISTS\n"
-      harness write "    if (vcdfile && reset) begin\n"
-      harness write "      $dumpoff;\n"
-      harness write "      vcdon = 0;\n"
-      harness write "    end\n"
-      harness write "    else if (vcdfile && !vcdon) begin\n"
-      harness write "      $dumpon;\n"
-      harness write "      vcdon = 1;\n"
-      harness write "    end\n"
-      harness write "`endif\n"
+      if (!resets.isEmpty) {
+        harness write s"""    if (vcdfile && (${resets map (_.name) mkString " || "})) begin\n"""
+        harness write "      $dumpoff;\n"
+        harness write "      vcdon = 0;\n"
+        harness write "    end\n"
+        harness write "    else if (vcdfile && !vcdon) begin\n"
+        harness write "      $dumpon;\n"
+        harness write "      vcdon = 1;\n"
+        harness write "    end\n"
+      }
       harness write "    #min ;\n"    
       harness write "  end\n"
     } else {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
       harness write "    $tick();\n".format(mainClk.name)
-      harness write "`ifdef RESET_EXISTS\n"
-      harness write "    if (vcdfile && reset) begin\n"
-      harness write "      $dumpoff;\n"
-      harness write "      vcdon = 0;\n"
-      harness write "    end\n"
-      harness write "    else if (vcdfile && !vcdon) begin\n"
-      harness write "      $dumpon;\n"
-      harness write "      vcdon = 1;\n"
-      harness write "    end\n"
-      harness write "`endif\n"
+      if (!resets.isEmpty) {
+        harness write s"""    if (vcdfile && (${resets map (_.name) mkString " || "})) begin\n"""
+        harness write "      $dumpoff;\n"
+        harness write "      vcdon = 0;\n"
+        harness write "    end\n"
+        harness write "    else if (vcdfile && !vcdon) begin\n"
+        harness write "      $dumpon;\n"
+        harness write "      vcdon = 1;\n"
+        harness write "    end\n"
+      }
       harness write "  end\n\n"
     }
     harness write "endmodule\n"
