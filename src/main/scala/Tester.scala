@@ -72,6 +72,7 @@ trait Tests {
   def expect (data: Bits, expected: Long): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
+  def newTestOutputString: String
   def printfs: Vector[String]
   def run(s: String): Boolean
 }
@@ -98,7 +99,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private var isStale = false
   // Return any accumulated module printf output since the last call.
   private var _lastLogIndex = 0
-  private def newTestOutputString: String = {
+  def newTestOutputString: String = {
     val result = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
     _lastLogIndex = _logs.length
     result
