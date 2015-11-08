@@ -202,9 +202,11 @@ class Backend extends FileSystemUtilities{
       
       // ensure all nodes in the design has SOME name
       comp dfs { 
-        case reg: Reg if reg.name == "" =>
+        case reg: Reg if reg.name.isEmpty =>
           reg setName "R" + reg.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
+        case mem: Mem[_] if mem.name.isEmpty =>
+          mem setName "T" + mem.component.nextIndex
+        case node: Node if !node.isTypeNode && node.name.isEmpty && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       }
@@ -219,6 +221,8 @@ class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg => 
           reg setName namespace.getUniqueName(reg.name)
+        case mem: Mem[_] => 
+          mem setName namespace.getUniqueName(mem.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary
           // the isIo check is also strange and happens because parents see child io in the DFS
