@@ -132,7 +132,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private class Channel(name: String) {
     private lazy val file = new java.io.RandomAccessFile(name, "rw")
     private lazy val channel = file.getChannel
-    private lazy val buffer = channel map (FileChannel.MapMode.READ_WRITE, 0, channel.size)
+    @volatile private lazy val buffer = channel map (FileChannel.MapMode.READ_WRITE, 0, channel.size)
     implicit def intToByte(i: Int) = i.toByte
     def aquire {
       buffer put (0, 1)
