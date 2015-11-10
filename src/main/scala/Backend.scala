@@ -716,7 +716,7 @@ class Backend extends FileSystemUtilities{
     sccs filter (_.size > 1) foreach {scc => 
       ChiselError.error("FOUND COMBINATIONAL PATH!")
       scc.zipWithIndex foreach { case (node, i) =>
-        ChiselError.error(s"  (${i})", node.line) }}
+        ChiselError.error(s"  (${i}: ${node.component.getPathName(".")}.${node.name})", node.line) }}
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
