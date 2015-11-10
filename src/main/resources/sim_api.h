@@ -139,7 +139,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     while(!recv_value(obj, force));
   }
@@ -151,7 +151,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     while(!send_value(obj));
   }
@@ -165,9 +165,8 @@ private:
     } else {
       int id = search(path);
       if (id < 0) {
+    	// Issue warning message but don't exit here.
         std::cerr << "Cannot find the object, " << path << std::endl;
-        finish();
-        exit(0);
       }
       while(!send_resp(id));
     }
@@ -180,7 +179,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     size_t chunk = get_chunk(obj);
     while(!send_resp(chunk));
@@ -290,7 +289,7 @@ protected:
     if (!file) {
       std::cerr << "Cannot open " << filename << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     } 
     std::string line;
     size_t id = 0;
