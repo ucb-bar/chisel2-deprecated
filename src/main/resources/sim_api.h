@@ -35,7 +35,7 @@ public:
   }
   ~channel_t() {
     uintptr_t pgsize = sysconf(_SC_PAGESIZE);
-    munmap(channel, pgsize);
+    munmap((void *)channel, pgsize);
     close(fd);
   }
   inline void aquire() {
@@ -49,7 +49,7 @@ public:
   inline bool ready() { return channel[3] == 0; }
   inline bool valid() { return channel[3] == 1; }
   inline uint64_t* data() { return (uint64_t*)(channel+4); }
-  inline char* str() { return (channel+4); }
+  inline char* str() { return ((char *)channel+4); }
   inline uint64_t& operator[](int i) { return data()[i*sizeof(uint64_t)]; }
 private:
   // Dekker's alg for sync
@@ -58,7 +58,7 @@ private:
   // channel[2] -> turn
   // channel[3] -> flag
   // channel[4:] -> data
-  char* channel;
+  char volatile * channel;
   const int fd;
 };
 
