@@ -195,9 +195,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   /** Peek at the value of a node based on the path
     */
-  def peekPath(path: String) = {
+  def peekPath(path: String): BigInt = {
     val id = _signalMap getOrElseUpdate (path, getId(path))
-    peek(id, _chunks getOrElseUpdate (path, getChunk(id)))
+    if (id == -1) {
+      println("Can't find id for '%s'".format(path))
+      id
+    } else {
+      peek(id, _chunks getOrElseUpdate (path, getChunk(id)))
+    }
   }
   /** Peek at the value of a node
     * @param node Node to peek at
@@ -252,7 +257,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     */
   def pokePath(path: String, v: BigInt, force: Boolean = false) {
     val id = _signalMap getOrElseUpdate (path, getId(path)) 
-    poke(id, _chunks getOrElseUpdate (path, getChunk(id)), v, force)
+    if (id == -1) {
+      println("Can't find id for '%s'".format(path))
+    } else {
+      poke(id, _chunks getOrElseUpdate (path, getChunk(id)), v, force)
+    }
   }
   /** set the value of a node
     * @param node The node to set
