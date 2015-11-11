@@ -569,9 +569,7 @@ class Queue[T <: Data](gen: T, val entries: Int,
   from the inputs.
 
   @example
-     {{{ val q = Queue(Decoupled(UInt()), 16)
-     q.io.enq <> producer.io.out
-     consumer.io.in <> q.io.deq }}}
+     {{{ consumer.io.in := Queue(producer.io.out, 16) }}}
   */
 object Queue
 {
@@ -645,7 +643,15 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-/** Similar to a shift register but with handshaking at start */
+/** A hardware module that delays data coming down the pipeline
+  by the number of cycles set by the latency parameter. Functionality
+  is similar to ShiftRegister but this exposes a Pipe interface.
+
+  @example {{{
+    val pipe = new Pipe(UInt())
+    pipe.io.enq <> produce.io.out
+    consumer.io.in <> pipe.io.deq }}}
+  */
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
@@ -656,14 +662,10 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
   io.deq <> Pipe(io.enq, latency)
 }
 
-/** A hardware module that delays data coming down the pipeline
-  by the number of cycles set by the latency parameter. Functionality
-  is similar to ShiftRegister but this exposes a Pipe interface.
+/** Similar to a shift register but with handshaking at start
 
-  @example {{{
-    val pipe = new Pipe(UInt())
-    pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq }}}
+  @example
+    {{{ consumer.io.in := Pipe(producer.io.out, 2) }}}
   */
 object Pipe
 {
