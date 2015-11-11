@@ -321,11 +321,13 @@ abstract class Bits extends Data with proc {
     Bool(OUTPUT).asTypeFor(ReductionOp(this, opName))
   }
 
-  /** Assignment operator */
-  override protected def colonEquals(that: Bits) {
+  def equalsBits( that : Bits ) {
     checkCompatibility(that)
     (comp match { case None => this case Some(p) => p}) procAssign that
   }
+
+  /** Assignment operator */
+  override protected def colonEquals(that: Bits) { equalsBits(that) }
 
   // bitwise operators
   // =================
