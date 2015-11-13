@@ -788,6 +788,8 @@ class CppBackend extends Backend {
     }
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    // Ensure onceOnlyFiles count as unoptimized.
+    unoptimizedFiles ++= onceOnlyFiles
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
@@ -1655,7 +1657,9 @@ class CppBackend extends Backend {
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
       genInitSimDataMethod(c) 
-    } else 0
+    } else {
+      0
+    }
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)
