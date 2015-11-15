@@ -51,6 +51,11 @@ trait Tests {
   def peek(data: Flo): Float
   def peek(data: Dbl): Double
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt
+  def peekSlt(data: Bits, silent : Boolean): BigInt
+  def peekSlt(data: Aggregate, silent : Boolean): Array[BigInt]
+  def peekSlt(data: Flo, silent : Boolean): Float
+  def peekSlt(data: Dbl, silent : Boolean): Double
+  def peekAtSlt[T <: Bits](data: Mem[T], off: Int, silent : Boolean): BigInt
   def poke(data: Bits, x: Boolean): Unit
   def poke(data: Bits, x: Int): Unit
   def poke(data: Bits, x: Long): Unit
@@ -59,9 +64,18 @@ trait Tests {
   def poke(data: Flo, x: Float): Unit 
   def poke(data: Dbl, x: Double): Unit
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
+  def pokeSlt(data: Bits, x: Boolean, silent : Boolean): Unit
+  def pokeSlt(data: Bits, x: Int, silent : Boolean): Unit
+  def pokeSlt(data: Bits, x: Long, silent : Boolean): Unit
+  def pokeSlt(data: Bits, x: BigInt, silent : Boolean): Unit
+  def pokeSlt(data: Aggregate, x: Array[BigInt], silent : Boolean): Unit
+  def pokeSlt(data: Flo, x: Float, silent : Boolean): Unit
+  def pokeSlt(data: Dbl, x: Double, silent : Boolean): Unit
+  def pokeAtSlt[T <: Bits](data: Mem[T], value: BigInt, off: Int, silent : Boolean): Unit
   def reset(n: Int = 1): Unit
   def step(n: Int): Unit
-  def int(x: Boolean): BigInt 
+  def stepSlt(n: Int, silent : Boolean): Unit
+  def int(x: Boolean): BigInt
   def int(x: Int):     BigInt 
   def int(x: Long):    BigInt 
   def int(x: Bits):    BigInt 
@@ -214,36 +228,48 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Peek at the value of some memory at an index
     * @param data Memory to inspect
     * @param off Offset in memory to look at */
-  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
+  def peekAtSlt[T <: Bits](data: Mem[T], off: Int, silent : Boolean): BigInt = {
     val value = peekNode(data, Some(off))
-    if (isTrace) println("  PEEK %s[%d] -> %x".format(dumpName(data), off, value))
+    if (isTrace && !silent) println("  PEEK %s[%d] -> %x".format(dumpName(data), off, value))
     value
   }
+  def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = { peekAtSlt[T](data, off, false) }
   /** Peek at the value of some bits
     * @return a BigInt representation of the bits */
-  def peek(data: Bits): BigInt = {
+  def peekSlt(data: Bits, silent : Boolean): BigInt = {
     if (isStale) update
     val value = 
       if (data.isLit) data.litValue()
       else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
-    if (isTrace) println("  PEEK %s -> %x".format(dumpName(data), value))
+    if (isTrace && !silent) println("  PEEK %s -> %x".format(dumpName(data), value))
     value
+  }
+  def peek(data: Bits): BigInt = {
+    peekSlt(data, false)
   }
   /** Peek at Aggregate data
     * @return an Array of BigInts representing the data */
+  def peekSlt(data: Aggregate, silent : Boolean): Array[BigInt] = {
+    data.flatten.map(x => x._2) map (peekSlt(_, silent))
+  }
   def peek(data: Aggregate): Array[BigInt] = {
-    data.flatten.map(x => x._2) map (peek(_))
+    peekSlt(data, false)
   }
   /** Interpret data as a single precision float */
+  def peekSlt(data: Flo, silent : Boolean): Float = {
+    intBitsToFloat(peekSlt(data.asInstanceOf[Bits], silent).toInt)
+  }
   def peek(data: Flo): Float = {
-    intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
+    peekSlt(data, false)
   }
   /** Interpret the data as a double precision float */
-  def peek(data: Dbl): Double = {
-    longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
+  def peekSlt(data: Dbl, silent : Boolean): Double = {
+    longBitsToDouble(peekSlt(data.asInstanceOf[Bits], silent).toLong)
   }
-
+  def peek(data: Dbl): Double = {
+    peekSlt(data, false)
+  }
   private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
     val cmd = if (!force) SIM_CMD.POKE else SIM_CMD.FORCE
     mwhile(!sendCmd(cmd)) { }
@@ -277,48 +303,58 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param value The BigInt representing the bits to set
     * @param off The offset representing the index to write to memory
     */
-  def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
-    if (isTrace) println("  POKE %s[%d] <- %x".format(dumpName(data), off, value))
+  def pokeAtSlt[T <: Bits](data: Mem[T], value: BigInt, off: Int, silent : Boolean): Unit = {
+    if (isTrace && !silent) println("  POKE %s[%d] <- %x".format(dumpName(data), off, value))
     pokeNode(data, value, Some(off))
   }
+  def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
+    pokeAtSlt[T](data, value, off, false)
+  }
   /** Set the value of some 'data' Node */
-  def poke(data: Bits, x: Boolean) { this.poke(data, int(x)) }
+  def pokeSlt(data: Bits, x: Boolean, silent : Boolean) { pokeSlt(data, int(x), silent) }
+  def poke(data: Bits, x: Boolean) { pokeSlt(data, x, false) }
   /** Set the value of some 'data' Node */
-  def poke(data: Bits, x: Int)     { this.poke(data, int(x)) }
+  def pokeSlt(data: Bits, x: Int, silent : Boolean)     { pokeSlt(data, int(x), silent) }
+  def poke(data: Bits, x: Int)     { pokeSlt(data, x, false) }
   /** Set the value of some 'data' Node */
-  def poke(data: Bits, x: Long)    { this.poke(data, int(x)) }
+  def pokeSlt(data: Bits, x: Long, silent : Boolean)    { pokeSlt(data, int(x), silent) }
+  def poke(data: Bits, x: Long)    { pokeSlt(data, x, false) }
   /** Set the value of some 'data' Node */
-  def poke(data: Bits, x: BigInt)  {
+  def pokeSlt(data: Bits, x: BigInt, silent : Boolean)  {
     val value = if (x >= 0) x else {
       val cnt = (data.needWidth() - 1) >> 6
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
     data.getNode match {
       case _: Delay =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace && !silent) println("  POKE %s <- %x".format(dumpName(data), value))
         pokeNode(data.getNode, value)
         isStale = true
       case _ if data.isTopLevelIO && data.dir == INPUT =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace && !silent) println("  POKE %s <- %x".format(dumpName(data), value))
         _pokeMap(data) = value
         isStale = true
       case _ =>
-        if (isTrace) println(s"  NOT ALLOWED POKE ${dumpName(data)}")
+        if (isTrace && !silent) println(s"  NOT ALLOWED POKE ${dumpName(data)}")
     }
   }
+  def poke(data: Bits, x: BigInt)  { pokeSlt( data, x, false )  }
   /** Set the value of Aggregate data */
-  def poke(data: Aggregate, x: Array[BigInt]): Unit = {
+  def pokeSlt(data: Aggregate, x: Array[BigInt], silent : Boolean): Unit = {
     val kv = (data.flatten.map(x => x._2), x.reverse).zipped
-    for ((x, y) <- kv) poke(x, y)
+    for ((x, y) <- kv) pokeSlt(x, y, silent)
   }
+  def poke(data: Aggregate, x: Array[BigInt]): Unit = { pokeSlt(data, x, false) }
   /** Set the value of a hardware single precision floating point representation */
-  def poke(data: Flo, x: Float): Unit = {
-    poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
+  def pokeSlt(data: Flo, x: Float, silent : Boolean): Unit = {
+    pokeSlt(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)), silent)
   }
+  def poke(data: Flo, x: Float): Unit = {  pokeSlt(data, x, false) }
   /** Set the value of a hardware double precision floating point representation */
-  def poke(data: Dbl, x: Double): Unit = {
-    poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
+  def pokeSlt(data: Dbl, x: Double, silent : Boolean): Unit = {
+    pokeSlt(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)), silent)
   }
+  def poke(data: Dbl, x: Double): Unit = { pokeSlt(data, x, false) }
 
   private def sendCmd(data: Int) = {
     cmdChannel.aquire
@@ -475,11 +511,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @note this is defined based on the period of the clock
     * See [[Chisel.Clock$ Clock]]
     */
-  def step(n: Int) {
-    if (isTrace) println(s"STEP ${n} -> ${t+n}")
+  def stepSlt(n: Int, silent : Boolean) {
+    if (isTrace && !silent) println(s"STEP ${n} -> ${t+n}")
     (0 until n) foreach (_ => takeStep)
     t += n
   }
+  def step(n: Int) { stepSlt(n, false) }
 
   /** Convert a Boolean to BigInt */
   def int(x: Boolean): BigInt = if (x) 1 else 0
