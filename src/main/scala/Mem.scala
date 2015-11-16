@@ -85,6 +85,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   val reads = ArrayBuffer[MemRead]()
   val readwrites = ArrayBuffer[MemReadWrite]()
   val data = gen().toNode
+  def dataType = gen()
 
   inferWidth = Node.fixWidth(data.getWidth)
 
