@@ -131,6 +131,8 @@ class UInt extends Bits with Num[UInt] {
 
   override def toBits: UInt = this
 
+  override def getLit( x : BigInt ) : UInt = { Lit(x, getWidth()) { UInt() } }
+
   // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")
 

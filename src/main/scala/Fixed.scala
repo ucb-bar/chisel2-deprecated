@@ -131,6 +131,8 @@ class Fixed(var fractionalWidth : Int = 0) extends Bits with Num[Fixed] {
       case _ => illegalAssignment(that)
     }
 
+    override def getLit( x : BigInt ) : Fixed = { Fixed(x, getWidth(), getFractionalWidth()) }
+
     def getFractionalWidth() : Int = this.fractionalWidth
 
     private def truncate(f : Fixed, truncateAmount : Int) : Fixed = fromSInt(f.toSInt >> UInt(truncateAmount))
