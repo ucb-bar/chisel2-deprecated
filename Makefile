@@ -12,7 +12,7 @@ SYSCTESTS ?= $(addsuffix .sysctest,$(notdir $(basename $(wildcard $(SRC_DIR)/src
 CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
 TEST_OUTPUT_DIR ?= ./test-outputs
 
-.PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test compile
+.PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test compile style
 
 SMOKE_TESTS ?= StdlibSuite
 
@@ -26,6 +26,9 @@ publish-local:
 
 smoke:
 	$(SBT) $(SBT_FLAGS) "testOnly $(SMOKE_TESTS)"
+
+style:
+	$(SBT) $(SBT_FLAGS) scalastyle
 
 check test:
 	$(SBT) $(SBT_FLAGS) test
