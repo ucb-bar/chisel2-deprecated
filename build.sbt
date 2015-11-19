@@ -76,6 +76,6 @@ lazy val chisel = (project in file(".")).
   settings(chiselBuildSettings: _*).
   settings(
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
-    // We should really be using name.vale, but currently, the package is "Chisel" (uppercase first letter)
+    // We should really be using name.value, but currently, the package is "Chisel" (uppercase first letter)
     buildInfoPackage := /* name.value */ "Chisel"
   )
