@@ -72,10 +72,15 @@ lazy val chiselBuildSettings = Seq (
  )
 
 lazy val chisel = (project in file(".")).
+  enablePlugins(GitVersioning).
   enablePlugins(BuildInfoPlugin).
   settings(chiselBuildSettings: _*).
   settings(
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoOptions += BuildInfoOption.BuildTime,
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion,
+      "gitDescription" -> git.gitDescribedVersion.value,
+      "branch" -> git.gitCurrentBranch.value
+    ),
     // We should really be using name.value, but currently, the package is "Chisel" (uppercase first letter)
     buildInfoPackage := /* name.value */ "Chisel"
   )

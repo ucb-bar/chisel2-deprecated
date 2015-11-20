@@ -409,7 +409,6 @@ object Driver extends FileSystemUtilities{
         }
         case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
         case "--wError" => wError = true
-        case "--version" => println(version)
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -493,6 +492,13 @@ object Driver extends FileSystemUtilities{
   var chiselConfigDump: Boolean = false
   var startTime = 0L
   val version = BuildInfo.version
+  // If we aren't at a tag matching version, incorporate the output of `git describe`
+  val gitDescription = BuildInfo.gitDescription match {
+    case Some(s: String) if s != version => s
+    case _ => ""
+  }
+  val chiselVersionString = Array[String]("Chisel", version, BuildInfo.branch, gitDescription).filter(_ != "").mkString(" ") + ", " + BuildInfo.builtAtString
+  println(chiselVersionString)
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0
