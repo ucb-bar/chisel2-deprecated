@@ -72,6 +72,11 @@ trait Tests {
   def expect (data: Bits, expected: Long): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
+  def expect (data: Bits, expected: BigInt, msg: => String): Boolean
+  def expect (data: Bits, expected: Int, msg: => String): Boolean
+  def expect (data: Bits, expected: Long, msg: => String): Boolean
+  def expect (data: Flo, expected: Float, msg: => String): Boolean
+  def expect (data: Dbl, expected: Double, msg: => String): Boolean
   def printfs: Vector[String]
   def run(s: String): Boolean
 }
@@ -506,6 +511,15 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
+  // Prepend an optional string - issue #534
+  private def prependOptionalString(preString: String, postString: String): String = {
+    if (preString.length() > 0) {
+      preString + " " + postString
+    } else {
+      postString
+    }
+  }
+
   /** Expect a value to be true printing a message if it passes or fails
     * @param good If the test passed or not
     * @param msg The message to print out
@@ -517,11 +531,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
 
   /** Expect the value of data to have the same bits as a BigInt */
-  def expect (data: Bits, expected: BigInt): Boolean = {
+  def expect (data: Bits, expected: BigInt, msg: => String): Boolean = {
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
     val exp = expected & mask
-    expect(got == exp, "EXPECT %s <- %x == %x".format(dumpName(data), got, exp))
+    expect(got == exp, prependOptionalString(msg, "EXPECT %s <- %x == %x".format(dumpName(data), got, exp)))
+  }
+  def expect (data: Bits, expected: BigInt): Boolean = {
+    expect(data, expected, "")
   }
 
   /** Expect the value of Aggregate data to be have the values as passed in with the array */
@@ -535,27 +552,41 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
-  def expect (data: Bits, expected: Int): Boolean = {
-    expect(data, int(expected))
+  def expect (data: Bits, expected: Int, msg: => String): Boolean = {
+    expect(data, int(expected), msg)
   }
+  def expect (data: Bits, expected: Int): Boolean = {
+    expect(data, expected, "")
+  }
+
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
+  def expect (data: Bits, expected: Long, msg: => String): Boolean = {
+    expect(data, int(expected), msg)
+  }
   def expect (data: Bits, expected: Long): Boolean = {
-    expect(data, int(expected))
+    expect(data, expected, "")
   }
   /* We need the following so scala doesn't use our "tolerant" Float version of expect.
    */
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
-  def expect (data: Flo, expected: Float): Boolean = {
+  def expect (data: Flo, expected: Float, msg: => String): Boolean = {
     val got = peek(data)
-    expect(got == expected, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected))
+    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
   }
+  def expect (data: Flo, expected: Float): Boolean = {
+    expect(data, expected, "")
+  }
+
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
-  def expect (data: Dbl, expected: Double): Boolean = {
+  def expect (data: Dbl, expected: Double, msg: => String): Boolean = {
     val got = peek(data)
-    expect(got == expected, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected))
+    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
+  }
+  def expect (data: Dbl, expected: Double): Boolean = {
+    expect(data, expected, "")
   }
 
   /* Compare the floating point value of a node with an expected floating point value.
@@ -563,7 +594,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
    */
   /** A tolerant expect for Float
     * Allows for a single least significant bit error in the floating point representation */
-  def expect (data: Bits, expected: Float): Boolean = {
+  def expect (data: Bits, expected: Float, msg: => String): Boolean = {
     val gotBits = peek(data).toInt
     val expectedBits = java.lang.Float.floatToIntBits(expected)
     var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
@@ -575,7 +606,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         expectedFloat = gotFLoat
       }
     }
-    expect(gotFLoat == expectedFloat, "EXPECT %s <- %s == %s".format(dumpName(data), gotFLoat, expectedFloat))
+    expect(gotFLoat == expectedFloat, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), gotFLoat, expectedFloat)))
+  }
+  def expect (data: Bits, expected: Float): Boolean = {
+    expect(data, expected, "")
   }
 
   _signalMap ++= Driver.signalMap flatMap {
