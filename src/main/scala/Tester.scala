@@ -113,10 +113,15 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
     // If the test application died, throw a run-time error.
     if (exitValue.isCompleted) {
+      val exitCode = Await.result(exitValue, Duration(-1, SECONDS))
       // We assume the error string is the last log entry.
-      val errorString = _logs.last
+      val errorString = if (_logs.size > 0) {
+         _logs.last
+      } else {
+        "test application exit"
+      } + " - exit code %d".format(exitCode)
       println(newTestOutputString)
-      throw new TestApplicationException(Await.result(exitValue, Duration(-1, SECONDS)), errorString)
+      throw new TestApplicationException(exitCode, errorString)
     }
   }
   private object SIM_CMD extends Enumeration { 
