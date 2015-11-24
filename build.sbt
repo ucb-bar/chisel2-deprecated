@@ -72,8 +72,7 @@ lazy val chiselBuildSettings = Seq (
  )
 
 lazy val chisel = (project in file(".")).
-  enablePlugins(GitVersioning).
-  enablePlugins(BuildInfoPlugin).
+  enablePlugins(BuildInfoPlugin, GitVersioning).
   settings(chiselBuildSettings: _*).
   settings(
     buildInfoOptions += BuildInfoOption.BuildTime,
