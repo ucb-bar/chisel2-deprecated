@@ -317,6 +317,7 @@ class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
   val in  = Vec(n,  Decoupled(gen) ).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
+  override def cloneType: this.type = new ArbiterIO(gen, n).asInstanceOf[this.type]
 }
 
 /** Arbiter Control determining which producer has access */
