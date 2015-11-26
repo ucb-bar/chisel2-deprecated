@@ -500,6 +500,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
   val deq   = Decoupled(gen.cloneType)
   /** The current amount of data in the queue */
   val count = UInt(OUTPUT, log2Up(entries + 1))
+  override def cloneType: this.type = new QueueIO(gen, entries).asInstanceOf[this.type]
 }
 
 /** A hardware module implementing a Queue
