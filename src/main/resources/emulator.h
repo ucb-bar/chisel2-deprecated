@@ -1344,13 +1344,13 @@ static __inline__ int flo_digits(int m, int e) {
 template <int w>
 int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
   char buf[1000];
-  int n_digs = (w == 32) ? flo_digits(32, 8) : flo_digits(52, 11);
+  int n_digs = (w == 32) ? flo_digits(23, 8) : flo_digits(52, 11);
   double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
   // sprintf(buf, "%d %d%*e", w, n_digs, n_digs, val);
   sprintf(buf, "%*e", n_digs, val);
-  assert(strlen(buf) <= n_digs);
+  assert(strlen(buf) == n_digs);
   for (int i = 0; i < n_digs; i++)
-    s[i] = (i < strlen(buf)) ? buf[i] : pad;
+    s[i] = buf[i];
   s[n_digs] = 0;
   // printf("N-DIGS = %d BUF %lu PAD %lu\n", n_digs, strlen(buf), n_digs-strlen(buf));
   // return strlen(buf);
@@ -1382,6 +1382,8 @@ static void __attribute__((unused)) dat_format(char* s, const char* fmt)
       abort();
     *s++ = c;
   }
+  // Ensure the string is null terminated.
+  *s = '\0';
 }
 
 template <typename T, typename... Args>
@@ -1403,7 +1405,8 @@ static void dat_format(char* s, const char* fmt, T value, Args... args)
       *s++ = *fmt++;
     }
   }
-  abort();
+  // Ensure the string is null terminated.
+  *s = '\0';
 }
 
 template <int w, typename... Args>
@@ -1412,8 +1415,10 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 #if BYTE_ORDER != LITTLE_ENDIAN
 # error dat_format assumes a little-endian architecture
 #endif
+  // This makes so many assumptions it can't possibly work in the general case.
   char str[w/8+1];
   dat_format(str, fmt, args...);
+  assert(strlen(str) < sizeof(str));
 
   dat_t<w> res;
   res.values[res.n_words-1] = 0;
@@ -1425,18 +1430,25 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 template <int w, typename... Args>
 static ssize_t dat_fprintf(FILE *f, const char* fmt, Args... args)
 {
-  char str[w/8+1];
+  // Be generous. It doesn't really cost us anything.
+  char str[w*2+1];
   dat_format(str, fmt, args...);
-  return fwrite(str, 1, w/8, f);
+  ssize_t len = strlen(str);
+  assert(len < sizeof(str));
+  return fwrite(str, 1, len, f);
 }
 
 template <int w, typename... Args>
 static ssize_t dat_prints(std::ostream& s, const char* fmt, Args... args)
 {
-  char str[w/8+1];
+  // This failed silently trying to print Flo's when the size was w/8+1.
+  // Be generous. It doesn't really cost us anything.
+  char str[w*2+1];
   dat_format(str, fmt, args...);
-  s.write(str, w/8);
-  ssize_t ret = s.good() ? w/8 : -1;
+  ssize_t len = strlen(str);
+  assert(len < sizeof(str));
+  s.write(str, len);
+  ssize_t ret = s.good() ? len : -1;
   return ret;
 }
 #endif /* C++11 */
