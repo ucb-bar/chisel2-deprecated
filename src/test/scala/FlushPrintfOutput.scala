@@ -61,6 +61,8 @@ class FlushPrintfOutput extends TestSuite {
           step(1)
           expectedOutputs += m.counterString.format(i)
         }
+        // Wait for any delayed output to accumulate
+        Thread.sleep(200)
         (printfs zip expectedOutputs) foreach {case (printf, expected) =>
           assertTrue("incorrect output - %s".format(printf), 
             eliminateWhiteSpace(printf) == eliminateWhiteSpace(expected))

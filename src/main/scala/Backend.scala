@@ -823,11 +823,13 @@ class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
+    ChiselError.checkpoint()
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
     markComponents
 
     verifyComponents
+    ChiselError.checkpoint()
 
     // Ensure all conditional assignments have defauts.
     verifyAllMuxes
