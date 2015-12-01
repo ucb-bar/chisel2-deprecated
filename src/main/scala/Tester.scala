@@ -112,8 +112,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
 
-  // The initial startup message
-  var simStartupMessage = "<no startup message>"
   // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
   private def mwhile(block: => Boolean)(loop: => Unit) {
     while (!exitValue.isCompleted && block) {
@@ -665,20 +663,19 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     // Wait for the startup message
     // NOTE: There may be several messages before we see our startup message.
     val simStartupMessageStart = "sim start on "
-    while(! _logs.exists(s => s.startsWith(simStartupMessageStart)) && !exitValue.isCompleted) { Thread.sleep(100) }
-    val simStartupMessageIndex = _logs.indexWhere(s => s.startsWith(simStartupMessageStart))
+    while (!_logs.exists(_ startsWith simStartupMessageStart) && !exitValue.isCompleted) { Thread.sleep(100) }
     // Remove the startup message (and any precursors).
-    if (simStartupMessageIndex >= 0) {
-      for (i <- 0 until simStartupMessageIndex - 1) {
-        println(_logs.remove(0))
-      }
-      simStartupMessage = _logs.remove(0)
+    while (!_logs.isEmpty && !_logs.head.startsWith(simStartupMessageStart)) {
+      println(_logs.remove(0))
     }
-    println(simStartupMessage)
+    if (!_logs.isEmpty) println(_logs.remove(0)) else println("<no startup message>")
     while (_logs.size < 3) { Thread.sleep(100) }
     val in_channel_name = _logs.remove(0)
     val out_channel_name = _logs.remove(0)
     val cmd_channel_name = _logs.remove(0)
+    println(s"inChannelName: ${in_channel_name}")
+    println(s"outChannelName: ${out_channel_name}")
+    println(s"cmdChannelName: ${cmd_channel_name}")
     // Init channels
     (process, exitValue, in_channel_name, out_channel_name, cmd_channel_name)
   }
