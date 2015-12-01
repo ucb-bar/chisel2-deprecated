@@ -91,7 +91,7 @@ class VerilogBackend extends Backend {
 
   def emitWidth(node: Node): String = {
     val w = node.needWidth()
-    if (w == 1) "" else "[" + (w-1) + ":0]"
+    if (w == 1) "" else s"[${w-1}:0]"
   }
 
   override def emitTmp(node: Node): String =
@@ -317,7 +317,7 @@ class VerilogBackend extends Backend {
       case x: Bits if x.isIo => ""
 
       case _: Assert =>
-        List("  reg", "[", (gotWidth-1), ":0] ", emitRef(node), ";\n").mkString
+        emitDecReg(node) 
 
       case _: Reg =>
         emitDecReg(node)
@@ -329,8 +329,8 @@ class VerilogBackend extends Backend {
         emitDecReg(node)
 
       case m: Mem[_] if !m.isInline => ""
-      case m: Mem[_] => 
-        List("  reg [", (m.needWidth()-1), ":0] ", emitRef(m), " [", (m.n-1), ":0];\n").mkString
+      case m: Mem[_] =>
+        s"  reg ${emitWidth(m)} ${emitRef(m)} [${m.n-1}:0];\n"
 
       case x: MemAccess =>
         x.referenced = true

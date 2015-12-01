@@ -4,7 +4,7 @@ module VerifSuite_VerilogAssertComp_1(input clk, input reset,
     output[15:0] io_z
 );
 
-  reg[0:0] T0;
+  reg  T0;
   wire[15:0] T1;
 
 `ifndef SYNTHESIS
