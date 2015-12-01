@@ -162,9 +162,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     new java.io.File(name).delete
   }
 
-  private lazy val inChannel = new Channel("channel.in")
-  private lazy val outChannel = new Channel("channel.out")
-  private lazy val cmdChannel = new Channel("channel.cmd")
+  private lazy val inChannel  = new Channel(inChannelName)  
+  private lazy val outChannel = new Channel(outChannelName)
+  private lazy val cmdChannel = new Channel(cmdChannelName) 
 
   def dumpName(data: Node): String = Driver.backend match {
     case _: FloBackend => data.getNode.name
@@ -649,7 +649,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
   }
 
-  val (process: Process, exitValue: Future[Int]) = {
+  val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
     val processBuilder = Process(cmd) 
     val processLogger = ProcessLogger(_logs += _)
     val process = processBuilder run processLogger
@@ -675,16 +675,20 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       simStartupMessage = _logs.remove(0)
     }
     println(simStartupMessage)
+    while (_logs.size < 3) { Thread.sleep(100) }
+    val in_channel_name = _logs.remove(0)
+    val out_channel_name = _logs.remove(0)
+    val cmd_channel_name = _logs.remove(0)
     // Init channels
+    (process, exitValue, in_channel_name, out_channel_name, cmd_channel_name)
+  }
+
+  private def start {
     inChannel.consume
     cmdChannel.consume
     inChannel.release
     outChannel.release
     cmdChannel.release
-    (process, exitValue)
-  }
-
-  private def start {
     t = 0
     mwhile(!recvOutputs) { }
     // reset(5)
