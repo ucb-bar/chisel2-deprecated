@@ -59,6 +59,10 @@ class SubwordSuite extends TestSuite {
 
   @Test def testSubwordVerilog() {
     println("\ntestSubwordVerilog ...")
-    launchVerilogTester((c: SubwordModule) => new SubwordTester(c))
+    if (!Driver.isVCSAvailable) {
+      assert(true, "vcs unavailable - skipping testSubwordVerilog")
+    } else {
+      launchVerilogTester((c: SubwordModule) => new SubwordTester(c))
+    }
   }
 }
