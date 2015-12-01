@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,22 +28,37 @@
  MODIFICATIONS.
 */
 
-package Chisel
+import Chisel._
+import org.junit.Assert._
+import org.junit.Test
+import org.junit.Ignore
 
-class Insert(tgt: Bits, bit: UInt, length: Int) extends proc {
-  override def procAssign(src: Node): Unit = {
-    tgt.nextOpt match {
-      case None => ChiselError.error("Subword assignment requires a default value to have been assigned")
-      case Some(next) =>
-        val mask = UInt((BigInt(1) << length) - 1, length)
-        val shiftedMask = Cat(UInt(0, 1), (mask << bit)) // zero-extend to tgt.width
-        val fill =
-          if (length == 1) src.asInstanceOf[Bits].toBool.toSInt & shiftedMask
-          else (src.asInstanceOf[Bits] & mask) << bit
-        tgt := UInt(next) & ~shiftedMask | fill
+class SubwordSuite extends TestSuite {
+  class SubwordModule extends Module {
+    val w = 8
+    val io = new Bundle {
+      val in = UInt(INPUT, w)
+      val out = UInt(OUTPUT, w)
+    }
+    io.out := UInt(0)
+    for (i <- 0 until w/2) {
+      io.out(i) := io.in(i)
     }
   }
 
-  // Chisel3 - this node contains data - used for verifying Wire() wrapping
-  override def isTypeOnly = false
+  class SubwordTester(c: SubwordModule) extends Tester(c) {
+    val in = rnd.nextInt(1 << c.w)
+    poke(c.io.in, in)
+    expect(c.io.out, in & ((1 << (c.w/2))-1))
+  }
+
+  @Test def testSubwordCpp() {
+    println("\ntestSubwordCpp ...")
+    launchCppTester((c: SubwordModule) => new SubwordTester(c))
+  }
+
+  @Test def testSubwordVerilog() {
+    println("\ntestSubwordVerilog ...")
+    launchVerilogTester((c: SubwordModule) => new SubwordTester(c))
+  }
 }
