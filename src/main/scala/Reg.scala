@@ -72,7 +72,7 @@ object Reg {
 
   def validateGen[T <: Data](gen: => T) {
     for ((n, i) <- gen.flatten if !i.inputs.isEmpty)
-      throwException("Invalid Type Specifier for Reg")
+      throwException("Invalid Type Specifier for Reg: element \"%s\" has %d inputs (possibly an initial value?)".format(n, i.inputs.size))
   }
 
   /** *type_out* defines the data type of the register when it is read.
