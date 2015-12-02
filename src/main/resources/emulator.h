@@ -1733,7 +1733,7 @@ class mod_t {
   mod_t(): dumpfile(NULL), timestep(0) { }
   virtual ~mod_t() {}
   virtual void init ( val_t rand_init=false ) = 0;
-  virtual void clock_lo ( dat_t<1> reset ) = 0;
+  virtual void clock_lo ( dat_t<1> reset, bool assert_fire=true ) = 0;
   virtual void clock_hi ( dat_t<1> reset ) = 0;
   virtual int  clock ( dat_t<1> reset ) = 0;
   virtual void setClocks ( std::vector< int >& periods ) { };

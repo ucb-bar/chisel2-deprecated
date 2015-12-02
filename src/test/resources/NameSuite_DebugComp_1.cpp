@@ -97,7 +97,7 @@ Z0:
   dat_dump<1>(f, clk, 0x21);
   goto C0;
 }
-void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset ) {
+void NameSuite_DebugComp_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   { NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] = NameSuite_DebugComp_1__io_ctrl_wb_wen.values[0];}
   { NameSuite_DebugComp_1_dpath__wb_wen.values[0] = NameSuite_DebugComp_1_dpath__io_ctrl_wb_wen.values[0] | NameSuite_DebugComp_1_dpath__wb_reg_ll_wb.values[0];}
   val_t T0;

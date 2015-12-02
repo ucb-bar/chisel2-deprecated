@@ -31,7 +31,7 @@ void VerifSuite_CppPrintfComp_1_t::dump_init ( FILE* f ) {
 }
 void VerifSuite_CppPrintfComp_1_t::dump ( FILE* f, int t ) {
 }
-void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset ) {
+void VerifSuite_CppPrintfComp_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0;
   { T0 = VerifSuite_CppPrintfComp_1__io_y.values[0] | VerifSuite_CppPrintfComp_1__io_x.values[0] << 8;}
   { VerifSuite_CppPrintfComp_1__io_z.values[0] = T0;}

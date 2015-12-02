@@ -27,7 +27,7 @@ void DelaySuite_ROMModule_1_t::dump_init ( FILE* f ) {
 }
 void DelaySuite_ROMModule_1_t::dump ( FILE* f, int t ) {
 }
-void DelaySuite_ROMModule_1_t::clock_lo ( dat_t<1> reset ) {
+void DelaySuite_ROMModule_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0;
   { T0 = T1.get(DelaySuite_ROMModule_1__io_addr.values[0], 0);}
   { DelaySuite_ROMModule_1__io_out.values[0] = T0;}
