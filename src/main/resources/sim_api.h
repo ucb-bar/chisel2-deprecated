@@ -67,11 +67,11 @@ private:
 template <class T> class sim_api_t {
 public:
   sim_api_t() {
-    srand(time(NULL));
+    pid_t pid = getpid();
     std::ostringstream in_ch_name, out_ch_name, cmd_ch_name;
-    in_ch_name  << std::hex << std::setw(8) << std::setfill('0') << rand() << rand() << ".in";
-    out_ch_name << std::hex << std::setw(8) << std::setfill('0') << rand() << rand() << ".out";
-    cmd_ch_name << std::hex << std::setw(8) << std::setfill('0') << rand() << rand() << ".cmd";
+    in_ch_name  << std::dec << std::setw(8) << std::setfill('0') << pid << ".in";
+    out_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".out";
+    cmd_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".cmd";
     in_channel  = new channel_t(open(in_ch_name.str().c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
     out_channel = new channel_t(open(out_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
     cmd_channel = new channel_t(open(cmd_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
