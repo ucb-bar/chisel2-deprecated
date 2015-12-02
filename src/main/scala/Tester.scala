@@ -87,10 +87,11 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
+  * @param _base base for prints, default 16 (hex)
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
+class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int = 16) extends FileSystemUtilities {
   var t = 0 // simulation time
   var delta = 0
   private val _pokeMap = HashMap[Bits, BigInt]()
@@ -227,7 +228,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off Offset in memory to look at */
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
     val value = peekNode(data, Some(off))
-    if (isTrace) println("  PEEK %s[%d] -> %x".format(dumpName(data), off, value))
+    if (isTrace) println(s"  PEEK ${dumpName(data)}[${off}] -> ${value.toString(_base)}")
     value
   }
   /** Peek at the value of some bits
@@ -238,21 +239,31 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       if (data.isLit) data.litValue()
       else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
-    if (isTrace) println("  PEEK %s -> %x".format(dumpName(data), value))
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
     value
   }
   /** Peek at Aggregate data
     * @return an Array of BigInts representing the data */
   def peek(data: Aggregate): Array[BigInt] = {
-    data.flatten.map(x => x._2) map (peek(_))
+    data.flatten map (x => peek(x._2))
   }
   /** Interpret data as a single precision float */
   def peek(data: Flo): Float = {
-    intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
+    val _isTrace = isTrace
+    isTrace = false
+    val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
+    isTrace = _isTrace
+    value
   }
   /** Interpret the data as a double precision float */
   def peek(data: Dbl): Double = {
-    longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
+    val _isTrace = isTrace
+    isTrace = false
+    val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
+    isTrace = _isTrace
+    value
   }
 
   private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
@@ -289,7 +300,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off The offset representing the index to write to memory
     */
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
-    if (isTrace) println("  POKE %s[%d] <- %x".format(dumpName(data), off, value))
+    if (isTrace) println(s"  POKE ${dumpName(data)}[${off}] <- ${value.toString(_base)}")
     pokeNode(data, value, Some(off))
   }
   /** Set the value of some 'data' Node */
@@ -306,11 +317,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
     data.getNode match {
       case _: Delay =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         pokeNode(data.getNode, value)
         isStale = true
       case _ if data.isTopLevelIO && data.dir == INPUT =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         _pokeMap(data) = value
         isStale = true
       case _ =>
@@ -324,11 +335,19 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   /** Set the value of a hardware single precision floating point representation */
   def poke(data: Flo, x: Float): Unit = {
+    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
+    val _isTrace = isTrace
+    isTrace = false
     poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
+    isTrace = _isTrace
   }
   /** Set the value of a hardware double precision floating point representation */
   def poke(data: Dbl, x: Double): Unit = {
+    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
+    val _isTrace = isTrace
+    isTrace = false
     poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
+    isTrace = _isTrace
   }
 
   private def sendCmd(data: Int) = {
@@ -530,10 +549,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   /** Expect the value of data to have the same bits as a BigInt */
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
     val exp = expected & mask
-    expect(got == exp, prependOptionalString(msg, "EXPECT %s <- %x == %x".format(dumpName(data), got, exp)))
+    isTrace = _isTrace
+    expect(got == exp, prependOptionalString(msg, 
+      s"  EXPECT ${dumpName(data)} <- ${got.toString(_base)} == ${exp.toString(_base)}"))
   }
   def expect (data: Bits, expected: BigInt): Boolean = {
     expect(data, expected, "")
@@ -542,10 +565,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of Aggregate data to be have the values as passed in with the array */
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
     val kv = (data.flatten.map(x => x._2), expected.reverse).zipped
-    var allGood = true
-    for ((d, e) <- kv)
-      allGood = expect(d, e) && allGood
-    allGood
+    kv forall {case (d, e) => expect(d, e)}
   }
 
   /** Expect the value of 'data' to be 'expected'
@@ -570,8 +590,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Flo, expected: Float, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val got = peek(data)
-    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
+    isTrace = _isTrace
+    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
   }
   def expect (data: Flo, expected: Float): Boolean = {
     expect(data, expected, "")
@@ -580,8 +603,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Dbl, expected: Double, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val got = peek(data)
-    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
+    isTrace = _isTrace
+    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
   }
   def expect (data: Dbl, expected: Double): Boolean = {
     expect(data, expected, "")
@@ -593,6 +619,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** A tolerant expect for Float
     * Allows for a single least significant bit error in the floating point representation */
   def expect (data: Bits, expected: Float, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val gotBits = peek(data).toInt
     val expectedBits = java.lang.Float.floatToIntBits(expected)
     var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
@@ -604,7 +632,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         expectedFloat = gotFLoat
       }
     }
-    expect(gotFLoat == expectedFloat, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), gotFLoat, expectedFloat)))
+    isTrace = _isTrace
+    expect(gotFLoat == expectedFloat, prependOptionalString(msg, 
+      s"  EXPECT ${dumpName(data)} <- ${gotFLoat} == ${expectedFloat}"))
   }
   def expect (data: Bits, expected: Float): Boolean = {
     expect(data, expected, "")
