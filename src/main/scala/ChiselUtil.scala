@@ -733,16 +733,26 @@ object PriorityEncoderOH
   */
 object Wire
 {
-  def apply[T <: Data](t: Option[T] = None, init: Option[T] = None): T = {
+  def apply[T <: Data](t: T = null, init: T = null): T =
+    apply(Option(t), Option(init))
+
+  def apply[T <: Data](t: Option[T], init: Option[T]): T = {
     t match { 
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
     }
-    val res = init match { case Some(p) => val x = p.cloneType ; x := p ; x case None =>
-                 t match { case Some(p) => p.cloneType case None =>
-                   ChiselError.error("cannot infer type of Init.")
-                   UInt().asInstanceOf[T] } }
+    val res = (init, t) match {
+      case (Some(p), _) =>
+        val x = p.cloneType
+        x := p
+        x
+      case (_, Some(p)) =>
+        p.cloneType
+      case _ =>
+        ChiselError.error("cannot infer type of Init.")
+        UInt().asInstanceOf[T]
+    }
     res.setIsWired(true)
     res.asDirectionless
   }
