@@ -497,7 +497,7 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
   /** I/O to enqueue data, is [[Chisel.DecoupledIO]] flipped */
   val enq   = Decoupled(gen.cloneType).flip
-  /** I/O to enqueue data, is [[Chisel.DecoupledIO]]*/
+  /** I/O to dequeue data, is [[Chisel.DecoupledIO]]*/
   val deq   = Decoupled(gen.cloneType)
   /** The current amount of data in the queue */
   val count = UInt(OUTPUT, log2Up(entries + 1))
