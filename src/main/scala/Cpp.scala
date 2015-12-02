@@ -1398,8 +1398,9 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
+        val clockLoArgs = clockArgs :+ CTypedName("bool", "assert_fire")
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs :+ CTypedName("bool", "assert_fire"))
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
         val clockHiName = "clock_hi" + clkName(clock)
         val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
@@ -1419,7 +1420,7 @@ class CppBackend extends Backend {
               islandClkCode += ((islandId, new ClockCodeMethods))
             }
             val clockLoName = "clock_lo" + clkName(clock) + "_I_" + islandId
-            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
+            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
             val clockIHiName = "clock_ihi" + clkName(clock) + "_I_" + islandId
