@@ -29,7 +29,9 @@
 */
 
 import scala.util.matching.Regex
-import org.junit.Assert._
+import scala.reflect.runtime.universe._
+import org.scalatest.Assertions._
+import org.scalatest.junit.JUnitSuite
 import org.junit.Test
 import org.junit.Ignore
 
@@ -42,37 +44,74 @@ object FlushPrintfOutput {
 }
 
 class FlushPrintfOutput extends TestSuite {
-  @Test def testFlushPrintfOutput() {
-    println("\ntestFlushPrintfOutput ...")
 
-    class PrintfModule extends Module {
-      val io = new DecoupledUIntIO
-      val counter = Reg(UInt(width = 8), init = UInt(0))
-      val counterString = "counter = %d\n"
-      counter := counter + UInt(1)
-      printf(counterString, counter);
+  abstract class BasePrintfModule(theWidth: Int = 4) extends Module {
+    val io = new Bundle {
+      val in = Decoupled(UInt(width = theWidth)).flip
+      val out = Decoupled(UInt(width = theWidth))
     }
+    val counterString: String
+    val isFloat: Boolean
+  }
 
-    // TODO: better way to check logs? logging is lower than tests, so it sometimes fails...
-    trait FlushPrintfOutputTests extends Tests {
-      val expectedOutputs = collection.mutable.ArrayBuffer[String]()
-      def tests(m: PrintfModule) {
-        for (i <- 0 until 4) {
-          step(1)
+  class UIntPrintfModule extends BasePrintfModule {
+    val isFloat = false
+    val counterString: String = "counter = %d\n"
+    val counter = Reg(UInt(width = 8), init = UInt(0))
+    counter := counter + UInt(1)
+    printf(counterString, counter);
+  }
+  
+  class FloPrintfModule extends BasePrintfModule {
+    val isFloat = true
+    val counterString = "counter = %e\n"
+    val counter = Reg(Flo(), init = Flo(0))
+    counter := counter + Flo(1)
+    printf(counterString, counter);
+  }
+
+  // TODO: better way to check logs? logging is lower than tests, so it sometimes fails...
+  trait FlushPrintfOutputTests extends Tests {
+    val expectedOutputs = collection.mutable.ArrayBuffer[String]()
+    def tests(m: BasePrintfModule) {
+      for (i <- 0 until 4) {
+        step(1)
+        if (m.isFloat) {
+          expectedOutputs += m.counterString.format(i.toFloat)
+        } else {
           expectedOutputs += m.counterString.format(i)
         }
-        // Wait for any delayed output to accumulate
-        Thread.sleep(200)
-        (printfs zip expectedOutputs) foreach {case (printf, expected) =>
-          assertTrue("incorrect output - %s".format(printf), 
-            eliminateWhiteSpace(printf) == eliminateWhiteSpace(expected))
+      }
+      // Wait for any delayed output to accumulate
+      Thread.sleep(200)
+      val outputs = printfs
+      assertResult(true, "incorrect number of outputs - %s".format(outputs)) {
+        outputs.length == expectedOutputs.length
+      }
+      (outputs zip expectedOutputs) foreach {case (output, expected) =>
+        assertResult(true, "incorrect output - %s".format(output)) {
+          eliminateWhiteSpace(output) == eliminateWhiteSpace(expected)
         }
       }
     }
+  }
 
-    class FlushPrintfOutputTester(m: PrintfModule) extends Tester(m) with FlushPrintfOutputTests {
+  @Test def testFlushUIntPrintfOutput() {
+    println("\ntestFlushUIntPrintfOutput ...")
+
+    class FlushPrintfOutputTester(m: UIntPrintfModule) extends Tester(m) with FlushPrintfOutputTests {
       tests(m)
     }
-    launchCppTester((m: PrintfModule) => new FlushPrintfOutputTester(m))
+    launchCppTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
   }
+
+  @Test def testFlushFlotPrintfOutput() {
+    println("\ntestFlushFloPrintfOutput ...")
+
+    class FlushPrintfOutputTester(m: FloPrintfModule) extends Tester(m) with FlushPrintfOutputTests {
+      tests(m)
+    }
+    launchCppTester((m: FloPrintfModule) => new FlushPrintfOutputTester(m))
+  }
+
 }
