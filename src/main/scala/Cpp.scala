@@ -548,12 +548,12 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = emitLoWordRef(a.cond) +
-          (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
-           else " || " + Driver.implicitReset.name + ".lo_word()")
+        val cond = 
+          if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
+          else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
-        else if (Driver.isAssertWarn) "  WARN(" + cond + ", " + CString(a.message) + ");\n"
-        else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
+        else if (Driver.isAssertWarn) s"  WARN(${cond}, ${CString(a.message)});\n"
+        else s"  ASSERT(${cond}, ${CString(a.message)});\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
@@ -1114,8 +1114,8 @@ class CppBackend extends Backend {
 
       for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
-        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
-        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write(s"  void clock_lo${clockNameStr} ( dat_t<1> reset, bool assert_fire=true );\n")
+        out_h.write(s"  void clock_hi${clockNameStr} ( dat_t<1> reset );\n")
       }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
@@ -1399,7 +1399,7 @@ class CppBackend extends Backend {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs :+ CTypedName("bool", "assert_fire"))
         val clockHiName = "clock_hi" + clkName(clock)
         val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
