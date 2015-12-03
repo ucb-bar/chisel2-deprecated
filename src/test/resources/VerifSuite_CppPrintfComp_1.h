@@ -20,7 +20,7 @@ class VerifSuite_CppPrintfComp_1_t : public mod_t {
   clk_t clk;
 
   void init ( val_t rand_init = 0 );
-  void clock_lo ( dat_t<1> reset );
+  void clock_lo ( dat_t<1> reset, bool assert_fire=true );
   void clock_hi ( dat_t<1> reset );
   int clock ( dat_t<1> reset );
   void print ( FILE* f );

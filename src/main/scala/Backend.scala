@@ -202,9 +202,11 @@ class Backend extends FileSystemUtilities{
       
       // ensure all nodes in the design has SOME name
       comp dfs { 
-        case reg: Reg if reg.name == "" =>
+        case reg: Reg if reg.name.isEmpty =>
           reg setName "R" + reg.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
+        case mem: Mem[_] if mem.name.isEmpty =>
+          mem setName "T" + mem.component.nextIndex
+        case node: Node if !node.isTypeNode && node.name.isEmpty && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       }
@@ -219,6 +221,8 @@ class Backend extends FileSystemUtilities{
       comp dfs { 
         case reg: Reg => 
           reg setName namespace.getUniqueName(reg.name)
+        case mem: Mem[_] => 
+          mem setName namespace.getUniqueName(mem.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary
           // the isIo check is also strange and happens because parents see child io in the DFS
@@ -490,7 +494,7 @@ class Backend extends FileSystemUtilities{
     val dfsStack = Stack[Node]()
     walked += root
     dfsStack.push(root)
-    val clock = root.clock getOrElse (throwException("Reg should have its own clock"))
+    val clock = root.clock getOrElse (throwException(s"Reg(${root.name} in ${extractClassName(root.component)}) should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
       node.consumers filterNot walked foreach {
@@ -551,6 +555,13 @@ class Backend extends FileSystemUtilities{
 
   def forceMatchingWidths {
     Driver.idfs (_.forceMatchingWidths)
+  }
+
+  def convertMaskedWrites(mod: Module) {
+    Driver.bfs {
+      case mem: Mem[_] => mem.convertMaskedWrites
+      case _ =>
+    }
   }
 
   def computeMemPorts(mod: Module) {
@@ -705,7 +716,7 @@ class Backend extends FileSystemUtilities{
     sccs filter (_.size > 1) foreach {scc => 
       ChiselError.error("FOUND COMBINATIONAL PATH!")
       scc.zipWithIndex foreach { case (node, i) =>
-        ChiselError.error(s"  (${i})", node.line) }}
+        ChiselError.error(s"  (${i}: ${node.component.getPathName(".")}.${node.name})", node.line) }}
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
@@ -812,11 +823,13 @@ class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
+    ChiselError.checkpoint()
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
     markComponents
 
     verifyComponents
+    ChiselError.checkpoint()
 
     // Ensure all conditional assignments have defauts.
     verifyAllMuxes
@@ -829,6 +842,9 @@ class Backend extends FileSystemUtilities{
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
     ChiselError.checkpoint()
+
+    ChiselError.info("convert masked writes of inline mems")
+    convertMaskedWrites(c)
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules

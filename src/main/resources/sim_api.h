@@ -2,6 +2,7 @@
 #define __SIM_API_H
 
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -11,6 +12,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <time.h>
 
 enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN };
 
@@ -35,7 +37,7 @@ public:
   }
   ~channel_t() {
     uintptr_t pgsize = sysconf(_SC_PAGESIZE);
-    munmap(channel, pgsize);
+    munmap((void *)channel, pgsize);
     close(fd);
   }
   inline void aquire() {
@@ -49,7 +51,7 @@ public:
   inline bool ready() { return channel[3] == 0; }
   inline bool valid() { return channel[3] == 1; }
   inline uint64_t* data() { return (uint64_t*)(channel+4); }
-  inline char* str() { return (channel+4); }
+  inline char* str() { return ((char *)channel+4); }
   inline uint64_t& operator[](int i) { return data()[i*sizeof(uint64_t)]; }
 private:
   // Dekker's alg for sync
@@ -58,28 +60,48 @@ private:
   // channel[2] -> turn
   // channel[3] -> flag
   // channel[4:] -> data
-  char* channel;
+  char volatile * channel;
   const int fd;
 };
 
 template <class T> class sim_api_t {
 public:
-  sim_api_t():
-    in_channel(channel_t(open("channel.in",  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600))),
-    out_channel(channel_t(open("channel.out", O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600))),
-    cmd_channel(channel_t(open("channel.cmd", O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600)))
-  {
+  sim_api_t() {
+    pid_t pid = getpid();
+    std::ostringstream in_ch_name, out_ch_name, cmd_ch_name;
+    in_ch_name  << std::dec << std::setw(8) << std::setfill('0') << pid << ".in";
+    out_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".out";
+    cmd_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".cmd";
+    in_channel  = new channel_t(open(in_ch_name.str().c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
+    out_channel = new channel_t(open(out_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
+    cmd_channel = new channel_t(open(cmd_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
+    
     // Init channels
-    out_channel.consume();
-    in_channel.release();
-    out_channel.release();
-    cmd_channel.release();
-    // FIXME: Inform the tester simulation is ready
-    int fd = open("sim.start", O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600);
-    assert(fd != -1);
-    close(fd);
+    out_channel->consume();
+    in_channel->release();
+    out_channel->release();
+    cmd_channel->release();
+    // Inform the tester that the simulation is ready
+    char hostName[256];
+    const char *hostNamep = NULL;
+    if (gethostname(hostName, sizeof(hostName) - 1) == 0) {
+      hostNamep = hostName;
+    } else {
+      hostNamep = "<unknown>";
+    }
+    time_t now;
+    time(&now);
+    // NOTE: ctime() generates a trailing '\n'.
+    std::cerr << "sim start on " << hostNamep << " at " << ctime(&now);
+    std::cerr << in_ch_name.str() << std::endl;
+    std::cerr << out_ch_name.str() << std::endl;
+    std::cerr << cmd_ch_name.str() << std::endl;
   }
-  ~sim_api_t() { }
+  virtual ~sim_api_t() {
+    delete in_channel;
+    delete out_channel;
+    delete cmd_channel;
+  }
   virtual void tick() {
     static bool is_reset = false;
     // First, Send output tokens 
@@ -113,9 +135,9 @@ public:
     } while (!exit);
   }
 private:
-  channel_t in_channel;
-  channel_t out_channel;
-  channel_t cmd_channel;
+  channel_t *in_channel;
+  channel_t *out_channel;
+  channel_t *cmd_channel;
 
   virtual void reset() = 0;
   virtual void start() = 0; 
@@ -139,7 +161,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     while(!recv_value(obj, force));
   }
@@ -151,7 +173,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     while(!send_value(obj));
   }
@@ -165,9 +187,8 @@ private:
     } else {
       int id = search(path);
       if (id < 0) {
+    	// Issue warning message but don't exit here.
         std::cerr << "Cannot find the object, " << path << std::endl;
-        finish();
-        exit(0);
       }
       while(!send_resp(id));
     }
@@ -180,7 +201,7 @@ private:
     if (!obj) {
       std::cerr << "Cannot find the object of id = " << id << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     }
     size_t chunk = get_chunk(obj);
     while(!send_resp(chunk));
@@ -197,89 +218,89 @@ private:
   }
 
   bool recv_cmd(size_t& cmd) {
-    cmd_channel.aquire();
-    bool valid = cmd_channel.valid();
+    cmd_channel->aquire();
+    bool valid = cmd_channel->valid();
     if (valid) {
-      cmd = cmd_channel[0];
-      cmd_channel.consume();
+      cmd = (*cmd_channel)[0];
+      cmd_channel->consume();
     }
-    cmd_channel.release();
+    cmd_channel->release();
     return valid;
   }
 
   bool recv_cmd(std::string& path) {
-    cmd_channel.aquire();
-    bool valid = cmd_channel.valid();
+    cmd_channel->aquire();
+    bool valid = cmd_channel->valid();
     if (valid) {
-      path = cmd_channel.str();
-      cmd_channel.consume();
+      path = cmd_channel->str();
+      cmd_channel->consume();
     }
-    cmd_channel.release();
+    cmd_channel->release();
     return valid;
   }
 
   bool send_resp(size_t value) {
-    out_channel.aquire();
-    bool ready = out_channel.ready();
+    out_channel->aquire();
+    bool ready = out_channel->ready();
     if (ready) {
-      out_channel[0] = value;
-      out_channel.produce();
+      (*out_channel)[0] = value;
+      out_channel->produce();
     }
-    out_channel.release();
+    out_channel->release();
     return ready;
   }
 
   bool recv_value(T& obj, bool force = false) {
-    in_channel.aquire();
-    bool valid = in_channel.valid();
+    in_channel->aquire();
+    bool valid = in_channel->valid();
     if (valid) {
-      put_value(obj, in_channel.data(), force);
-      in_channel.consume();
+      put_value(obj, in_channel->data(), force);
+      in_channel->consume();
     }
-    in_channel.release();
+    in_channel->release();
     return valid;
   }
 
   bool send_value(T& obj) {
-    out_channel.aquire();
-    bool ready = out_channel.ready();
+    out_channel->aquire();
+    bool ready = out_channel->ready();
     if (ready) {
-      get_value(obj, out_channel.data());
-      out_channel.produce();
+      get_value(obj, out_channel->data());
+      out_channel->produce();
     }
-    out_channel.release();
+    out_channel->release();
     return ready;
   }
 
   bool recv_tokens() {
-    in_channel.aquire();
-    bool valid = in_channel.valid();
+    in_channel->aquire();
+    bool valid = in_channel->valid();
     if (valid) {
       size_t off = 0;
-      uint64_t *data = in_channel.data();
+      uint64_t *data = in_channel->data();
       for (size_t i = 0 ; i < sim_data.inputs.size() ; i++) {
         T& sig = sim_data.inputs[i];
         off += put_value(sig, data+off);
       }
-      in_channel.consume();
+      in_channel->consume();
     }
-    in_channel.release();
+    in_channel->release();
     return valid;
   }
 
   bool send_tokens() {
-    out_channel.aquire();
-    bool ready = out_channel.ready();
+    out_channel->aquire();
+    bool ready = out_channel->ready();
     if (ready) {
       size_t off = 0;
-      uint64_t *data = out_channel.data();
+      uint64_t *data = out_channel->data();
       for (size_t i = 0 ; i < sim_data.outputs.size() ; i++) {
         T& sig = sim_data.outputs[i];
         off += get_value(sig, data+off);
       }
-      out_channel.produce();
+      out_channel->produce();
     }
-    out_channel.release();
+    out_channel->release();
     return ready;
   }
 protected:
@@ -290,7 +311,7 @@ protected:
     if (!file) {
       std::cerr << "Cannot open " << filename << std::endl;
       finish();
-      exit(0);
+      exit(2);		// Not a normal exit.
     } 
     std::string line;
     size_t id = 0;

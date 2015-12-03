@@ -151,4 +151,83 @@ class VerifSuite extends TestSuite {
       () => Module(new VerilogPrintfNULComp()))
     assertFile("VerifSuite_VerilogPrintfNULComp_1.v")
   }
+
+  class AssertTestModule extends Module {
+    val io = new QueueIO(UInt(width=4), 2)
+    io.deq <> Queue(io.enq, 2)
+    assert(!(io.deq.ready && !io.deq.valid), "pop from an empty queue")
+  }
+
+  trait AssertTesterCommon extends Tests {
+    val values = Vector.fill(2)(rnd.nextInt(1 << 4))
+    def queue(c: AssertTestModule) {
+      for (v <- values) {
+        poke(c.io.enq.bits, v)
+        poke(c.io.enq.valid, 1)
+        step(1)
+      }
+      poke(c.io.enq.valid, 0)
+      expect(c.io.enq.ready, 0)
+      for (v <- values) {
+        expect(c.io.deq.bits, v)
+        expect(c.io.deq.valid, 1)
+        poke(c.io.deq.ready, 1)
+        step(1)
+      }
+      expect(c.io.deq.valid, 0)
+    }
+  }
+
+  class AssertNoFireTester(c: AssertTestModule) extends Tester(c) with AssertTesterCommon {
+    // Asserts shouldn't fire in this test
+    queue(c)
+  }
+
+  class AssertFireTester(c: AssertTestModule) extends Tester(c) with AssertTesterCommon {
+    queue(c)
+    // Asserts should fire here
+    step(1)
+  }
+
+  @Test def testAssertNoFireCpp {
+    println("\ntestAssertNoFireCpp ...")
+    launchCppTester((c: AssertTestModule) => new AssertNoFireTester(c))
+  }
+
+  @Test def testAssertNoFireVerilog {
+    println("\ntestAssertNoFireVerilog ...")
+    if (!Driver.isVCSAvailable) {
+      assert(true, "vcs unavailable - skipping testPokeWide")
+    } else {
+      launchVerilogTester((c: AssertTestModule) => new AssertNoFireTester(c))
+    }
+  }
+
+  @Test def testAssertFireCpp {
+    println("\ntestAssertFireCpp ...")
+    var hasException = false
+    try {
+      launchCppTester((c: AssertTestModule) => new AssertFireTester(c))
+    } catch {
+      case e: TestApplicationException => hasException = true
+      case _: Throwable =>
+    }
+    assertTrue(hasException)
+  }
+
+  @Test def testAssertFireVerilog {
+    println("\ntestAssertFireVerilog ...")
+    if (!Driver.isVCSAvailable) {
+      assert(true, "vcs unavailable - skipping testPokeWide")
+    } else {
+      var hasException = false
+      try {
+        launchVerilogTester((c: AssertTestModule) => new AssertFireTester(c))
+      } catch {
+        case e: TestApplicationException => hasException = true
+        case _: Throwable =>
+      }
+      assertTrue(hasException)
+    }
+  }
 }

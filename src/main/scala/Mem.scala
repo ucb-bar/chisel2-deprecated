@@ -85,6 +85,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   val reads = ArrayBuffer[MemRead]()
   val readwrites = ArrayBuffer[MemReadWrite]()
   val data = gen().toNode
+  def dataType = gen()
 
   inferWidth = Node.fixWidth(data.getWidth)
 
@@ -136,15 +137,12 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   def write(addr: UInt, data: T, wmask: UInt): Unit = {
     if (Driver.minimumCompatibility > "2")
       throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
-
-    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
-    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & wmask | read(addr).toBits & ~wmask), None)
+    doWrite(addr, Module.current.whenCond, data, wmask)
   }
 
   def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
     val bitmask = FillInterleaved(gen().asInstanceOf[Vec[Data]].head.getWidth, mask)
-    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, bitmask)
-    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.toBits & bitmask | read(addr).toBits & ~bitmask), None)
+    doWrite(addr, Module.current.whenCond, data, bitmask)
   }
 
   def apply(addr: UInt): T = {
@@ -166,6 +164,18 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   def cloneType = new Mem(gen, n, seqRead, orderedWrites)
   override def clone = cloneType
+
+  def convertMaskedWrites {
+    if (Driver.isInlineMem) {
+      writes filter (_.isMasked) foreach {write =>
+        val addr = write.addr match {case u: UInt => u}
+        val mask = write.mask match {case u: UInt => u}
+        val data = write.data.asInstanceOf[T]
+        val read = readPortCache getOrElseUpdate (addr, gen().fromNode(new MemRead(this, addr)))
+        write.data = data.toBits & mask | read.toBits & ~mask
+      }
+    } 
+  }
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
@@ -277,6 +287,7 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
     val rp = getProducts(r.addrReg.enableSignal)
     wp.find(wc => rp.exists(rc => rc._isComplementOf(wc)))
   }
+  def data_=(d: Bits) { inputs(2) = d }
   def data = inputs(2)
   def mask = inputs(3)
   def isMasked = inputs.length > 3
@@ -306,8 +317,7 @@ class SeqMem[T <: Data](n: Int, out: T) extends Mem[T](() => out, n, true, false
 
   override def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
     val bitmask = FillInterleaved(out.asInstanceOf[Vec[Data]].head.getWidth, mask)
-    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, bitmask)
-    else doWrite(addr, Module.current.whenCond, out.fromBits(data.toBits & bitmask | super.read(addr).toBits & ~bitmask), None)
+    doWrite(addr, Module.current.whenCond, data, bitmask)
   }
 
   override def write(addr: UInt, data: T, mask: UInt): Unit =

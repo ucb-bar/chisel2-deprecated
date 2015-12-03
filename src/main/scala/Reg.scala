@@ -72,7 +72,7 @@ object Reg {
 
   def validateGen[T <: Data](gen: => T) {
     for ((n, i) <- gen.flatten if !i.inputs.isEmpty)
-      throwException("Invalid Type Specifier for Reg")
+      throwException("Invalid Type Specifier for Reg: element \"%s\" has %d inputs (possibly an initial value?)".format(n, i.inputs.size))
   }
 
   /** *type_out* defines the data type of the register when it is read.
@@ -155,10 +155,16 @@ class Reg extends Delay with proc {
 
   override def usesInClockHi(n: Node) = n eq next
 
+  override def doProcAssign(src: Node, cond: Bool) {
+    if (procAssigned || isEnable) inputs(0) = Multiplex(cond, src, inputs(0))
+    else super.doProcAssign(src, cond)
+  }
+
   // these are used to infer read enables on Mems
-  protected[Chisel] def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2) eq this)
-  protected[Chisel] def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)
-  protected[Chisel] def updateValue: Node = if (isEnable) next.inputs(1) else next
+  // also useful for custom transforms
+  def isEnable: Boolean = next.isInstanceOf[Mux] && (next.inputs(2).getNode eq this)
+  def enableSignal: Node = if (isEnable) next.inputs(0) else Bool(true)
+  def updateValue: Node = if (isEnable) next.inputs(1) else next
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
   override def isTypeOnly = false
 }

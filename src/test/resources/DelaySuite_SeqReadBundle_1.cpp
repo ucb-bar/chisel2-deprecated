@@ -25,7 +25,7 @@ void DelaySuite_SeqReadBundle_1_t::dump_init ( FILE* f ) {
 }
 void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t ) {
 }
-void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset ) {
+void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0[2];
   { T0[0] = DelaySuite_SeqReadBundle_1__mem.get(DelaySuite_SeqReadBundle_1__R9.values[0], 0); T0[1] = DelaySuite_SeqReadBundle_1__mem.get(DelaySuite_SeqReadBundle_1__R9.values[0], 1);}
   val_t T1;
