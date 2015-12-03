@@ -267,6 +267,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     debugs += x.getNode
   }
 
+  def debug(data: Aggregate): Unit = {
+    data.flatten.map(x => debug(x._2))
+  }
+
   /** Adds a printf to the module called each clock cycle
     * @param message A c style sting to print out eg) %d, %x
     * @param args Nodes whos data values should be printed
