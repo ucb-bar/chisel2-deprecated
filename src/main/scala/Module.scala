@@ -296,7 +296,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     val gen = pin.clone
     io match {
       case b: Bundle => {
-        for ((n, io) <- gen.flatten) {
+        for ((n, io) <- gen.flatten if !io.isDirectionless && !io.getNode.isLit) {
           io.compOpt = Some(this)
           io.isIo = true
         }
