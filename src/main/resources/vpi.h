@@ -5,7 +5,9 @@
 #include "sim_api.h"
 #include <queue>
 
-PLI_INT32 tick_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 tick_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 sim_start_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 sim_end_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
@@ -158,7 +160,7 @@ private:
     data_s.obj       = NULL;
     data_s.time      = &time_s;
     data_s.value     = NULL;
-    data_s.user_data = (PLI_BYTE8*) this;
+    data_s.user_data = NULL;
     vpi_free_object(vpi_register_cb(&data_s));
   }
 

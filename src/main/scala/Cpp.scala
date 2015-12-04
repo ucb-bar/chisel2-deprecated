@@ -548,12 +548,12 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = emitLoWordRef(a.cond) +
-          (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
-           else " || " + Driver.implicitReset.name + ".lo_word()")
+        val cond = 
+          if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
+          else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
-        else if (Driver.isAssertWarn) "  WARN(" + cond + ", " + CString(a.message) + ");\n"
-        else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
+        else if (Driver.isAssertWarn) s"  WARN(${cond}, ${CString(a.message)});\n"
+        else s"  ASSERT(${cond}, ${CString(a.message)});\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
@@ -788,6 +788,8 @@ class CppBackend extends Backend {
     }
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    // Ensure onceOnlyFiles count as unoptimized.
+    unoptimizedFiles ++= onceOnlyFiles
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
@@ -1112,8 +1114,8 @@ class CppBackend extends Backend {
 
       for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
-        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
-        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write(s"  void clock_lo${clockNameStr} ( dat_t<1> reset, bool assert_fire=true );\n")
+        out_h.write(s"  void clock_hi${clockNameStr} ( dat_t<1> reset );\n")
       }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
@@ -1396,8 +1398,9 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
+        val clockLoArgs = clockArgs :+ CTypedName("bool", "assert_fire")
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
         val clockHiName = "clock_hi" + clkName(clock)
         val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
@@ -1417,7 +1420,7 @@ class CppBackend extends Backend {
               islandClkCode += ((islandId, new ClockCodeMethods))
             }
             val clockLoName = "clock_lo" + clkName(clock) + "_I_" + islandId
-            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
+            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
             val clockIHiName = "clock_ihi" + clkName(clock) + "_I_" + islandId
@@ -1655,7 +1658,9 @@ class CppBackend extends Backend {
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
       genInitSimDataMethod(c) 
-    } else 0
+    } else {
+      0
+    }
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)

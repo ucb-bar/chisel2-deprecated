@@ -53,7 +53,7 @@ trait AdvTests extends Tests {
 
 }
 
-class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Tester[T](dut, isTrace) {
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16) extends Tester[T](dut, isTrace, _base) {
   val defaultMaxCycles = 1024
   var cycles = 0
 

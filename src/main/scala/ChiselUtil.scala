@@ -317,6 +317,7 @@ class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
   val in  = Vec(n,  Decoupled(gen) ).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
+  override def cloneType: this.type = new ArbiterIO(gen, n).asInstanceOf[this.type]
 }
 
 /** Arbiter Control determining which producer has access */
@@ -327,12 +328,12 @@ object ArbiterCtrl
   }
 }
 
-abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
+abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false) extends Module {
   require(isPow2(count))
   def grant: Seq[Bool]
   val io = new ArbiterIO(gen, n)
-  val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
-  val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
+  val locked  = if(count > 1 || needsHold) Reg(init=Bool(false)) else Bool(false)
+  val lockIdx = if(count > 1 || needsHold) Reg(init=UInt(n-1)) else UInt(n-1)
   val chosen = Wire(UInt(width = log2Up(n)))
 
   for ((g, i) <- grant.zipWithIndex)
@@ -341,25 +342,48 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   io.out.bits := io.in(chosen).bits
   io.chosen := chosen
 
-  if(count > 1){
+  if(count == 1 && needsHold) {
+    when(io.out.valid) {
+      locked := !io.out.ready
+      when(!locked) {
+        lockIdx := chosen
+      }
+    }
+  }
+
+  if(count > 1) {
     val cnt = Reg(init=UInt(0, width = log2Up(count)))
     val cnt_next = cnt + UInt(1)
-    when(io.out.fire()) {
-      when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
-        cnt := cnt_next
+    when(io.out.valid) {
+      if(needsHold) {  // lock the chosen port if need hold
         when(!locked) {
-          locked := Bool(true)
-          lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          lockIdx := chosen
+          locked := !io.out.ready
         }
       }
-      when(cnt_next === UInt(0)) {
-        locked := Bool(false)
+      when(io.out.ready) {
+        when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
+          cnt := cnt_next
+          locked := !(cnt_next === UInt(0))
+          when(!locked) {
+            lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          }
+        }.otherwise {
+          locked := Bool(false)
+        }
       }
     }
   }
 }
 
-class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   lazy val last_grant = Reg(init=UInt(0, log2Up(n)))
   override def grant: Seq[Bool] = {
     val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
@@ -376,7 +400,14 @@ class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   def grant: Seq[Bool] = ArbiterCtrl(io.in.map(_.valid))
 
   var choose = UInt(n-1)
@@ -389,12 +420,15 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 /** Hardware module that is used to sequence n producers into 1 consumer.
   Producers are chosen in round robin order.
   @example
-    {{{ val arb = new RRArbiter(2, UInt())
+    {{{ val arb = new Module(RRArbiter(2, UInt())
     arb.io.in(0) <> producer0.io.out
     arb.io.in(1) <> producer1.io.out
     consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
   */
-class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
+class RRArbiter[T <: Data](gen:T, n: Int, needsHold: Boolean = false) extends LockingRRArbiter[T](gen, n, 1, None, needsHold)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
  Priority is given to lower producer
@@ -403,8 +437,11 @@ class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
    arb.io.in(0) <> producer0.io.out
    arb.io.in(1) <> producer1.io.out
    consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
  */
-class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
+class Arbiter[T <: Data](gen: T, n: Int, needsHold: Boolean = false) extends LockingArbiter[T](gen, n, 1, None, needsHold)
 
 
 object FillInterleaved
@@ -460,10 +497,11 @@ class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
   /** I/O to enqueue data, is [[Chisel.DecoupledIO]] flipped */
   val enq   = Decoupled(gen.cloneType).flip
-  /** I/O to enqueue data, is [[Chisel.DecoupledIO]]*/
+  /** I/O to dequeue data, is [[Chisel.DecoupledIO]]*/
   val deq   = Decoupled(gen.cloneType)
   /** The current amount of data in the queue */
   val count = UInt(OUTPUT, log2Up(entries + 1))
+  override def cloneType: this.type = new QueueIO(gen, entries).asInstanceOf[this.type]
 }
 
 /** A hardware module implementing a Queue
@@ -533,9 +571,7 @@ class Queue[T <: Data](gen: T, val entries: Int,
   from the inputs.
 
   @example
-     {{{ val q = Queue(Decoupled(UInt()), 16)
-     q.io.enq <> producer.io.out
-     consumer.io.in <> q.io.deq }}}
+     {{{ consumer.io.in := Queue(producer.io.out, 16) }}}
   */
 object Queue
 {
@@ -609,7 +645,15 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-/** Similar to a shift register but with handshaking at start */
+/** A hardware module that delays data coming down the pipeline
+  by the number of cycles set by the latency parameter. Functionality
+  is similar to ShiftRegister but this exposes a Pipe interface.
+
+  @example {{{
+    val pipe = new Pipe(UInt())
+    pipe.io.enq <> produce.io.out
+    consumer.io.in <> pipe.io.deq }}}
+  */
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
@@ -620,14 +664,10 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
   io.deq <> Pipe(io.enq, latency)
 }
 
-/** A hardware module that delays data coming down the pipeline
-  by the number of cycles set by the latency parameter. Functionality
-  is similar to ShiftRegister but this exposes a Pipe interface.
+/** Similar to a shift register but with handshaking at start
 
-  @example {{{
-    val pipe = new Pipe(UInt())
-    pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq }}}
+  @example
+    {{{ consumer.io.in := Pipe(producer.io.out, 2) }}}
   */
 object Pipe
 {
@@ -693,16 +733,26 @@ object PriorityEncoderOH
   */
 object Wire
 {
-  def apply[T <: Data](t: Option[T] = None, init: Option[T] = None): T = {
+  def apply[T <: Data](t: T = null, init: T = null): T =
+    apply(Option(t), Option(init))
+
+  def apply[T <: Data](t: Option[T], init: Option[T]): T = {
     t match { 
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
     }
-    val res = init match { case Some(p) => val x = p.cloneType ; x := p ; x case None =>
-                 t match { case Some(p) => p.cloneType case None =>
-                   ChiselError.error("cannot infer type of Init.")
-                   UInt().asInstanceOf[T] } }
+    val res = (init, t) match {
+      case (Some(p), _) =>
+        val x = p.cloneType
+        x := p
+        x
+      case (_, Some(p)) =>
+        p.cloneType
+      case _ =>
+        ChiselError.error("cannot infer type of Init.")
+        UInt().asInstanceOf[T]
+    }
     res.setIsWired(true)
     res.asDirectionless
   }
