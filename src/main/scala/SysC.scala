@@ -31,45 +31,167 @@
 package Chisel
 
 class SysCBackend extends CppBackend {
-    def bool_fun (name: String, bool: Bool): CEntry = {
-      val is_input = bool.dir == INPUT
-      val vtype = "bool"; var tcast = ""
-      if (is_input) { tcast = "" }
-      else { tcast = ".to_ulong()" }
-      val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name)
-      entry
-    }
-    def sint_fun (name: String, sint: SInt): CEntry = {
-      val is_input = sint.dir == INPUT
-      val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
-      if (is_input) { tcast = ".to_uint64()" }
-      else { tcast = ".to_ulong()" }
-      val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name)
-      entry
-    }
-    // UInt: Bits is a virtual UInt class
-    def uint_fun (name: String, uint: UInt): CEntry = {
-      val is_input = uint.dir == INPUT
-      val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
-      if (is_input) { tcast = ".to_uint64()" }
-      else { tcast = ".to_ulong()" }
-      val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name)
-      entry
-    }
-    // Used for Decoupled and Valid types
-    def bits_fun (name: String, bits: Bits): CEntry = {
-      val is_input = bits.dir == INPUT
-      val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
-      if (is_input) { tcast = ".to_uint64()" }
-      else { tcast = ".to_ulong()" }
-      val vcast = tcast
-      val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name)
-      entry
-    }
+  def bool_fun (name: String, bool: Bool): CEntry = {
+    val is_input = bool.dir == INPUT
+    val vtype = "bool"; var tcast = ""
+    if (is_input) { tcast = "" }
+    else { tcast = ".to_ulong()" }
+    val vcast = tcast
+    val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name)
+    entry
+  }
 
+  def sint_fun (name: String, sint: SInt): CEntry = {
+    val is_input = sint.dir == INPUT
+    val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
+    if (is_input) { tcast = ".to_uint64()" }
+    else { tcast = ".to_ulong()" }
+    val vcast = tcast
+    val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name)
+    entry
+  }
+
+  // UInt: Bits is a virtual UInt class
+  def uint_fun (name: String, uint: UInt): CEntry = {
+    val is_input = uint.dir == INPUT
+    val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
+    if (is_input) { tcast = ".to_uint64()" }
+    else { tcast = ".to_ulong()" }
+    val vcast = tcast
+    val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name)
+    entry
+  }
+
+  // Used for Decoupled and Valid types
+  def bits_fun (name: String, bits: Bits): CEntry = {
+    val is_input = bits.dir == INPUT
+    val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
+    if (is_input) { tcast = ".to_uint64()" }
+    else { tcast = ".to_ulong()" }
+    val vcast = tcast
+    val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name)
+    entry
+  }
+
+  def valid_fun (velt: ValidIO[_], cdef: ComponentDef, name: String): Boolean = {
+    var velt_bad = false
+    // Generate Valid signal
+    val ventry = bool_fun(velt.valid.name, velt.valid)
+    cdef.entries += (ventry)
+    velt.bits match {
+      case bits: Bits => {
+        val entry = bits_fun(name, bits)
+        cdef.entries += (entry)
+      }
+      case aggregate: Aggregate => {
+        // Collect all the inputs and outputs.
+        val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+        if (inputs.length > 0) {
+          for (in <- inputs) {
+            in._2 match {
+              case inBool: Bool => {
+                val entry = bool_fun(name, inBool)
+                cdef.entries += (entry)
+              }
+              case inSInt: SInt => {
+                val entry = sint_fun(name, inSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case inUInt: UInt => {
+                val entry = uint_fun(name, inUInt)
+                cdef.entries += (entry)
+              }
+            }
+          }
+        }
+        val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+        if (outputs.length > 0) {
+          for (out <- outputs) {
+             out._2 match {
+              case outBool: Bool => {
+                val entry = bool_fun(name, outBool)
+                cdef.entries += (entry)
+              }
+              case outSInt: SInt => {
+                val entry = sint_fun(name, outSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case outUInt: UInt => {
+                val entry = uint_fun(name, outUInt)
+                cdef.entries += (entry)
+              }
+            }
+          }
+        }
+      }
+      case _ => velt_bad = true
+    }
+    velt_bad
+  }
+
+  def decoupled_fun (delt: DecoupledIO[_], cdef: ComponentDef, name: String): Boolean = {
+    var delt_bad = false
+    // Generate Ready and Valid signals
+    val rentry = bool_fun(delt.ready.name, delt.ready)
+    cdef.entries += (rentry)
+    val ventry = bool_fun(delt.valid.name, delt.valid)
+    cdef.entries += (ventry)
+
+    delt.bits match {
+      case bits: Bits => {
+        val entry = bits_fun(name, bits)
+        cdef.entries += (entry)
+      }
+      case aggregate: Aggregate => {
+        // Collect all the inputs and outputs.
+        val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+        if (inputs.length > 0) {
+          for (in <- inputs) {
+            in._2 match {
+              case inBool: Bool => {
+                val entry = bool_fun(name, inBool)
+                cdef.entries += (entry)
+              }
+              case inSInt: SInt => {
+                val entry = sint_fun(name, inSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case inUInt: UInt => {
+                val entry = uint_fun(name, inUInt)
+                cdef.entries += (entry)
+              }
+            }
+          }
+        }
+        val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+        if (outputs.length > 0) {
+          for (out <- outputs) {
+             out._2 match {
+              case outBool: Bool => {
+                val entry = bool_fun(name, outBool)
+                cdef.entries += (entry)
+              }
+              case outSInt: SInt => {
+                val entry = sint_fun(name, outSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case outUInt: UInt => {
+                val entry = uint_fun(name, outUInt)
+                cdef.entries += (entry)
+              }
+            }
+          }
+        }
+      }
+      case _ => delt_bad = true
+    }
+    delt_bad
+  }
+//==================================================================================
     override def elaborate(c: Module): Unit = {
       super.elaborate(c)
       println(c)
@@ -86,10 +208,12 @@ class SysCBackend extends CppBackend {
           val entry = bool_fun(name, bool)
           cdef.entries += (entry)
         }
+
         case sint: SInt => {
           val entry = sint_fun(name, sint)
           cdef.entries += (entry)
         }
+
         // UInt & Bits
         case uint: UInt => {
           val entry = uint_fun(name, uint)
@@ -97,119 +221,13 @@ class SysCBackend extends CppBackend {
         }
 
         case velt:ValidIO[_] => {
-          { // Generate Valid signal
-            val ventry = bool_fun(velt.valid.name, velt.valid)
-            cdef.entries += (ventry)
-          }
-          velt.bits match {
-            case bits: Bits => {
-              val entry = bits_fun(name, bits)
-              cdef.entries += (entry)
-            }
-            case aggregate: Aggregate => {
-              // Collect all the inputs and outputs.
-              val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
-              if (inputs.length > 0) {
-                for (in <- inputs) {
-                  in._2 match {
-                    case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
-                      cdef.entries += (entry)
-                    }
-                    case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
-                      cdef.entries += (entry)
-                    }
-                    //Also used for Bits
-                    case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
-                      cdef.entries += (entry)
-                    }
-                  }
-                }
-              }
-              val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
-              if (outputs.length > 0) {
-                for (out <- outputs) {
-                   out._2 match {
-                    case outBool: Bool => {
-                      val entry = bool_fun(name, outBool)
-                      cdef.entries += (entry)
-                    }
-                    case outSInt: SInt => {
-                      val entry = sint_fun(name, outSInt)
-                      cdef.entries += (entry)
-                    }
-                    //Also used for Bits
-                    case outUInt: UInt => {
-                      val entry = uint_fun(name, outUInt)
-                      cdef.entries += (entry)
-                    }
-                  }
-                }
-              }
-            }
-            case _ => badElements(name) = velt
-          }
+          val velt_bad = valid_fun(velt, cdef, name)
+          if (velt_bad) badElements(name) = velt
         }
 
         case delt:DecoupledIO[_] => {
-          { // Generate Ready and Valid signals
-            val rentry = bool_fun(delt.ready.name, delt.ready)
-            cdef.entries += (rentry)
-            val ventry = bool_fun(delt.valid.name, delt.valid)
-            cdef.entries += (ventry)
-          }
-          delt.bits match {
-            case bits: Bits => {
-              val entry = bits_fun(name, bits)
-              cdef.entries += (entry)
-            }
-            case aggregate: Aggregate => {
-              // Collect all the inputs and outputs.
-              val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
-              if (inputs.length > 0) {
-                for (in <- inputs) {
-                  in._2 match {
-                    case inBool: Bool => {
-                      val entry = bool_fun(name, inBool)
-                      cdef.entries += (entry)
-                    }
-                    case inSInt: SInt => {
-                      val entry = sint_fun(name, inSInt)
-                      cdef.entries += (entry)
-                    }
-                    //Also used for Bits
-                    case inUInt: UInt => {
-                      val entry = uint_fun(name, inUInt)
-                      cdef.entries += (entry)
-                    }
-                  }
-                }
-              }
-              val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
-              if (outputs.length > 0) {
-                for (out <- outputs) {
-                   out._2 match {
-                    case outBool: Bool => {
-                      val entry = bool_fun(name, outBool)
-                      cdef.entries += (entry)
-                    }
-                    case outSInt: SInt => {
-                      val entry = sint_fun(name, outSInt)
-                      cdef.entries += (entry)
-                    }
-                    //Also used for Bits
-                    case outUInt: UInt => {
-                      val entry = uint_fun(name, outUInt)
-                      cdef.entries += (entry)
-                    }
-                  }
-                }
-              }
-            }
-            case _ => badElements(name) = delt
-          }
+          val delt_bad = decoupled_fun(delt, cdef, name)
+          if (delt_bad) badElements(name) = delt
         }
 
         case belt: Bundle => {
@@ -229,123 +247,70 @@ class SysCBackend extends CppBackend {
                 val entry = uint_fun(hname, buint)
                 cdef.entries += (entry)
               }
-
               case bvelt:ValidIO[_] => {
-                { // Generate Valid signal
-                  val ventry = bool_fun(bvelt.valid.name, bvelt.valid)
-                  cdef.entries += (ventry)
-                }
-                bvelt.bits match {
-                  case bvbits: Bits => {
-                    val entry = bits_fun(hname, bvbits)
-                    cdef.entries += (entry)
-                  }
-                  case bvaggregate: Aggregate => {
-                    // Collect all the inputs and outputs.
-                    val bvinputs = bvaggregate.flatten.filter(_._2.dir == INPUT)
-                    if (bvinputs.length > 0) {
-                      for (bvin <- bvinputs) {
-                        bvin._2 match {
-                          case bvinBool: Bool => {
-                            val entry = bool_fun(hname, bvinBool)
-                            cdef.entries += (entry)
-                          }
-                          case bvinSInt: SInt => {
-                            val entry = sint_fun(hname, bvinSInt)
-                            cdef.entries += (entry)
-                          }
-                          //Also used for Bits
-                          case bvinUInt: UInt => {
-                            val entry = uint_fun(hname, bvinUInt)
-                            cdef.entries += (entry)
-                          }
-                        }
-                      }
-                    }
-                    val bvoutputs = bvaggregate.flatten.filter(_._2.dir == OUTPUT)
-                    if (bvoutputs.length > 0) {
-                      for (bvout <- bvoutputs) {
-                         bvout._2 match {
-                          case bvoutBool: Bool => {
-                            val entry = bool_fun(hname, bvoutBool)
-                            cdef.entries += (entry)
-                          }
-                          case bvoutSInt: SInt => {
-                            val entry = sint_fun(hname, bvoutSInt)
-                            cdef.entries += (entry)
-                          }
-                          //Also used for Bits
-                          case bvoutUInt: UInt => {
-                            val entry = uint_fun(hname, bvoutUInt)
-                            cdef.entries += (entry)
-                          }
-                        }
-                      }
-                    }
-                  }
-                  case _ => badElements(hname) = bvelt
-                }
+                val bvelt_bad = valid_fun(bvelt, cdef, name)
+                if (bvelt_bad) badElements(name) = bvelt
               }
-
               case bdelt:DecoupledIO[_] => {
-                { // Generate Ready and Valid signals
-                  val rentry = bool_fun(bdelt.ready.name, bdelt.ready)
-                  cdef.entries += (rentry)
-                  val ventry = bool_fun(bdelt.valid.name, bdelt.valid)
-                  cdef.entries += (ventry)
-                }
-                bdelt.bits match {
-                  case bdbits: Bits => {
-                    val entry = bits_fun(hname, bdbits)
-                    cdef.entries += (entry)
-                  }
-                  case bdaggregate: Aggregate => {
-                    // Collect all the inputs and outputs.
-                    val bdinputs = bdaggregate.flatten.filter(_._2.dir == INPUT)
-                    if (bdinputs.length > 0) {
-                      for (bdin <- bdinputs) {
-                        bdin._2 match {
-                          case bdinBool: Bool => {
-                            val entry = bool_fun(hname, bdinBool)
-                            cdef.entries += (entry)
-                          }
-                          case bdinSInt: SInt => {
-                            val entry = sint_fun(hname, bdinSInt)
-                            cdef.entries += (entry)
-                          }
-                          //Also used for Bits
-                          case bdinUInt: UInt => {
-                            val entry = uint_fun(hname, bdinUInt)
-                            cdef.entries += (entry)
-                          }
-                        }
-                      }
-                    }
-                    val bdoutputs = bdaggregate.flatten.filter(_._2.dir == OUTPUT)
-                    if (bdoutputs.length > 0) {
-                      for (bdout <- bdoutputs) {
-                         bdout._2 match {
-                          case bdoutBool: Bool => {
-                            val entry = bool_fun(hname, bdoutBool)
-                            cdef.entries += (entry)
-                          }
-                          case bdoutSInt: SInt => {
-                            val entry = sint_fun(hname, bdoutSInt)
-                            cdef.entries += (entry)
-                          }
-                          //Also used for Bits
-                          case bdoutUInt: UInt => {
-                            val entry = uint_fun(hname, bdoutUInt)
-                            cdef.entries += (entry)
-                          }
-                        }
-                      }
-                    }
-                  }
-                  case _ => badElements(hname) = bdelt
-                }
+                val bdelt_bad = decoupled_fun(bdelt, cdef, name)
+                if (bdelt_bad) badElements(name) = bdelt
               }
               case _ => badElements(hname) = helt
+            }
+          }
+        }
+
+        case vecelt: Vec[_] => {
+          val inputs = vecelt.flatten.filter(_._2.dir == INPUT)
+          for (in <- inputs) {
+            in._2 match {
+              case inBool: Bool => {
+                val entry = bool_fun(name, inBool)
+                cdef.entries += (entry)
+              }
+              case inSInt: SInt => {
+                val entry = sint_fun(name, inSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case inUInt: UInt => {
+                val entry = uint_fun(name, inUInt)
+                cdef.entries += (entry)
+              }
+              case vecvelt:ValidIO[_] => {
+                val vecvelt_bad = valid_fun(vecvelt, cdef, name)
+                if (vecvelt_bad) badElements(name) = vecvelt
+              }
+              case vecdelt:DecoupledIO[_] => {
+                val vecdelt_bad = decoupled_fun(vecdelt, cdef, name)
+                if (vecdelt_bad) badElements(name) = vecdelt
+              }
+            }
+          }
+          val outputs = vecelt.flatten.filter(_._2.dir == OUTPUT)
+          for (out <- outputs) {
+            out._2 match {
+              case outBool: Bool => {
+                val entry = bool_fun(name, outBool)
+                cdef.entries += (entry)
+              }
+              case outSInt: SInt => {
+                val entry = sint_fun(name, outSInt)
+                cdef.entries += (entry)
+              }
+              //Also used for Bits
+              case outUInt: UInt => {
+                val entry = uint_fun(name, outUInt)
+                cdef.entries += (entry)
+              }
+              case vecvelt:ValidIO[_] => {
+                val vecvelt_bad = valid_fun(vecvelt, cdef, name)
+                if (vecvelt_bad) badElements(name) = vecvelt
+              }
+              case vecdelt:DecoupledIO[_] => {
+                val vecdelt_bad = decoupled_fun(vecdelt, cdef, name)
+                if (vecdelt_bad) badElements(name) = vecdelt
+              }
             }
           }
         }
