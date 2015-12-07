@@ -65,4 +65,42 @@ class SubwordSuite extends TestSuite {
       launchVerilogTester((c: SubwordModule) => new SubwordTester(c))
     }
   }
+
+
+  class SubwordModule2 extends Module {
+    val w = 4
+    val io = new Bundle {
+      val out_initial = UInt(INPUT, w)
+      val in = Bool(INPUT)
+      val out = UInt(OUTPUT, w)
+    }
+
+    io.out    := io.out_initial
+    io.out(0) := io.in
+  }
+
+  class SubwordTester2(c: SubwordModule2) extends Tester(c) {
+    for (
+      in          <- Array(0, 1);
+      out_initial <- 0 until 1 << c.w
+    )
+    {
+      poke(c.io.in, in)
+      poke(c.io.out_initial, out_initial)
+      var expected = out_initial
+      if (in == 1) {
+        // Set the least significant bit
+        expected |= 0x0001
+      } else {
+        // Clear the least significant bit
+        expected &= 0xFFFE
+      }
+      expect(c.io.out, expected)
+    }
+  }
+
+  @Test def testSubwordCpp2() {
+    println("\ntestSubwordCpp2 ...")
+    launchCppTester((c: SubwordModule2) => new SubwordTester2(c))
+  }
 }
