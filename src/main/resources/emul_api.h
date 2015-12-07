@@ -132,9 +132,9 @@ private:
   virtual inline void step() {
     module->print(std::cerr);
     module->clock(LIT<1>(0));
-    module->dump();
     // FIXME: should call twice to get the output for now
     module->clock_lo(LIT<1>(0), false);
+    module->dump();
   }
  
   virtual inline void update() {
