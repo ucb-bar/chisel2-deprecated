@@ -36,7 +36,7 @@ class Insert(tgt: Bits, bit: UInt, length: Int) extends proc {
       case None => ChiselError.error("Subword assignment requires a default value to have been assigned")
       case Some(next) =>
         val mask = UInt((BigInt(1) << length) - 1, length)
-        val shiftedMask = Cat(UInt(0, 1), (mask << bit)) // zero-extend to tgt.width
+        val shiftedMask = UInt(0, width = tgt.width) | (mask << bit) // zero-extend to tgt.width
         val fill =
           if (length == 1) src.asInstanceOf[Bits].toBool.toSInt & shiftedMask
           else (src.asInstanceOf[Bits] & mask) << bit
