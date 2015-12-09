@@ -68,4 +68,81 @@ class CombLoopSuite extends TestSuite {
     }
     assertTrue(ChiselError.hasErrors)
   }
+
+  // Verify that if we suppress combination loop detection,
+  //  we get something we can execute.
+  @Test def testCombLoopForwardReference() {
+    println("\ntestCombLoopForwardReference ...")
+
+
+    class test_in extends Module
+    {
+      val io = new Bundle
+      {
+          val five  = Bool( INPUT )
+          val latch = Bool( INPUT )
+          val add   = UInt( INPUT, 16 )
+          val out   = UInt( OUTPUT, 16 )
+        }
+    
+      val other = Mux( io.five, UInt(5,16), io.add )
+      val latch = Reg( init=UInt(0,16) )
+      when( io.latch ) { latch := other }
+      io.out := Mux( io.latch, latch, other ) 
+    }
+    
+    class test_add extends Module
+    {
+      val io = new Bundle
+      {
+          val ina   = UInt( INPUT, 16 )
+          val inb   = UInt( INPUT, 16 )
+          val out   = UInt( OUTPUT, 16 )
+        }
+      io.out := io.ina + io.inb
+    }
+    
+    class testelement extends Module
+    {
+      val io = new Bundle
+      {
+        val five_a  = Bool( INPUT )
+        val five_b  = Bool( INPUT )
+        val latch_a = Bool( INPUT )
+        val latch_b = Bool( INPUT )
+        }
+    
+      // Modules
+      val ina = Module( new test_in )
+      val inb = Module( new test_in )
+      val add = Module( new test_add )
+    
+      // Input A
+      ina.io.five   := io.five_a
+      ina.io.latch  := io.latch_a
+      ina.io.add    := add.io.out
+      
+      // Input B
+      inb.io.five   := io.five_b
+      inb.io.latch  := io.latch_b
+      inb.io.add    := add.io.out
+      
+      // Lut X
+        add.io.ina    := ina.io.out
+        add.io.inb    := inb.io.out
+    }
+    
+    class testelement_Tests(c: testelement) extends Tester(c)
+    {
+      step( 1 )
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--compile", "--test", "--genHarness", "--noCombLoop")
+    chiselMainTest( testArgs, () => Module( new testelement() ) ) {
+      c => new testelement_Tests( c )
+    }
+
+  }
+
 }

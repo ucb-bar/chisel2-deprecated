@@ -76,6 +76,14 @@ class CppBackend extends Backend {
   protected[this] var potentialShadowRegisters = 0
   protected[this] val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
+  type Declarations = Option[StringBuilder]
+  def newDeclarations(): Declarations = {
+    if (true) {
+      Some(new StringBuilder)
+    } else {
+      None
+    }
+  }
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject) {
@@ -223,13 +231,25 @@ class CppBackend extends Backend {
   def emitLoWordRef(node: Node): String = emitWordRef(node, 0)
   // If we're generating multiple methods, literals and temporaries have to live in the main object.
   // We only get to ask isInObject once, so we'd better arrange for it to give the correct answer before we ask.
-  def emitTmpDec(node: Node): String = {
+  def emitTmpDec(node: Node, collectDeclarations: Declarations): String = {
     if (node.isInObject) {
       ""
-    } else if (words(node) == 1) {
-      s"  val_t ${emitRef(node)};\n"
     } else {
-      s"  val_t ${emitRef(node)}[${words(node)}];\n"
+      val res = if (words(node) == 1) {
+        s"  val_t ${emitRef(node)};\n"
+      } else {
+        s"  val_t ${emitRef(node)}[${words(node)}];\n"
+      }
+      // If we're collecting declarations, add this to the list.
+      collectDeclarations match {
+        case Some(s: StringBuilder) => {
+          s.append(res)
+          ""
+        }
+        case None => {
+          res
+        }
+      }
     }
   }
   def block(s: Seq[String]): String =
@@ -259,15 +279,15 @@ class CppBackend extends Backend {
     s"  ${emitLoWordRef(x)} = ${body};\n"
   }
 
-  def emitDefLo(node: Node): String = {
+  def emitDefLo(node: Node, declarations: Declarations): String = {
     node match {
       case x: Mux =>
         val op = if (!x.inputs.exists(isLit _)) "TERNARY_1" else "TERNARY"
-        emitTmpDec(x) +
+        emitTmpDec(x, declarations) +
         block((0 until words(x)).map(i => s"${emitWordRef(x, i)} = ${op}(${emitLoWordRef(x.inputs(0))}, ${emitWordRef(x.inputs(1), i)}, ${emitWordRef(x.inputs(2), i)})"))
 
       case o: Op => {
-        emitTmpDec(o) +
+        emitTmpDec(o, declarations) +
         (if (o.inputs.length == 1) {
           (if (o.op == "^") {
             val res = ArrayBuffer[String]()
@@ -501,7 +521,7 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        emitTmpDec(node) +
+        emitTmpDec(node, declarations) +
         (if (node.inputs.length < 3 || node.needWidth() == 1) {
           if (node.inputs(1).isLit) {
             val value = node.inputs(1).litValue().toInt
@@ -531,19 +551,19 @@ class CppBackend extends Backend {
       case x: Clock => ""
 
       case x: Bits if x.isInObject && x.inputs.length == 1 => 
-        emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
+        emitTmpDec(x, declarations) + block((0 until words(x)).map(i => emitWordRef(x, i)
           + " = " + emitWordRef(x.inputs(0), i)))
       case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
-        emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
+        emitTmpDec(x, declarations) + block("val_t __r = this->__rand_val()" +:
           (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
 
       case m: MemRead =>
-        emitTmpDec(m) + block((0 until words(m)).map(i => emitWordRef(m, i)
+        emitTmpDec(m, declarations) + block((0 until words(m)).map(i => emitWordRef(m, i)
           + " = " + emitRef(m.mem) + ".get(" + emitLoWordRef(m.addr) + ", "
           + i + ")"))
 
       case r: ROMRead =>
-        emitTmpDec(r) + block((0 until words(r)).map(i => emitWordRef(r, i)
+        emitTmpDec(r, declarations) + block((0 until words(r)).map(i => emitWordRef(r, i)
           + " = " + emitRef(r.rom) + ".get(" + emitLoWordRef(r.addr) + ", "
           + i + ")"))
 
@@ -1387,7 +1407,7 @@ class CppBackend extends Backend {
     val nodeToIslandArray = generateNodeToIslandArray(islands)
 
     class ClockDomains {
-      type ClockCodeMethods = HashMap[Clock, (CMethod, CMethod, CMethod)]
+      type ClockCodeMethods = HashMap[Clock, (Declarations, CMethod, CMethod, CMethod)]
       val code = new ClockCodeMethods
       val islandClkCode = new HashMap[Int, ClockCodeMethods]
       val islandStarted = Array.fill(3, maxIslandId + 1)(0)    // An array to keep track of the first time we added code to an island.
@@ -1408,7 +1428,7 @@ class CppBackend extends Backend {
         // clock_hi method after all the clock_hi initialization code.
         val clockHiDummyName = "clock_hi_dummy" + clkName(clock)
         val clock_xhi = new CMethod(CTypedName("void", clockHiDummyName), clockArgs)
-        code += (clock -> ((clock_dlo, clock_ihi, clock_xhi)))
+        code += (clock -> ((newDeclarations(), clock_dlo, clock_ihi, clock_xhi)))
         // If we're generating islands of combinational logic,
         // have the main clock code call the island specific code,
         // and generate that island specific clock_(hi|lo) code.
@@ -1427,7 +1447,7 @@ class CppBackend extends Backend {
             val clock_ihi_I = new CMethod(CTypedName("void", clockIHiName), clockArgs)
             val clockXHiName = "clock_xhi" + clkName(clock) + "_I_" + islandId
             val clock_xhi_I = new CMethod(CTypedName("void", clockXHiName), clockArgs)
-            islandClkCode(islandId) += (clock -> ((clock_dlo_I, clock_ihi_I, clock_xhi_I)))
+            islandClkCode(islandId) += (clock -> ((newDeclarations(), clock_dlo_I, clock_ihi_I, clock_xhi_I)))
           }
         }
       }
@@ -1442,14 +1462,14 @@ class CppBackend extends Backend {
 
         // Return tuple of booleans if we actually added any clock code.
         def addClkDefs(n: Node, codeMethods: ClockCodeMethods): (Boolean, Boolean, Boolean) = {
-          val defLo = emitDefLo(n)
+          val clockNode = clock(n)
+          val defLo = emitDefLo(n, codeMethods(clockNode)._1)
           val initHi = emitInitHi(n)
           val defHi = emitDefHi(n)
-          val clockNode = clock(n)
           if (defLo != "" || initHi != "" || defHi != "") {
-            codeMethods(clockNode)._1.body.append(defLo)
-            codeMethods(clockNode)._2.body.append(initHi)
-            codeMethods(clockNode)._3.body.append(defHi)
+            codeMethods(clockNode)._2.body.append(defLo)
+            codeMethods(clockNode)._3.body.append(initHi)
+            codeMethods(clockNode)._4.body.append(defHi)
           }
           (defLo != "", initHi != "", defHi != "")
         }
@@ -1502,13 +1522,18 @@ class CppBackend extends Backend {
       def outputAllClkDomains() {
         // Are we generating partitioned islands?
         if (!partitionIslands) {
-          //.values.map(_._1.body) ++ (code.values.map(x => (x._2.append(x._3))))
+          //.values.map(_._2.body) ++ (code.values.map(x => (x._3.append(x._4))))
           for ((clock, clockMethods) <- code) {
-            val clockLo = clockMethods._1
-            val clockIHi = clockMethods._2
-            val clockXHi = clockMethods._3
+            val clockLo = clockMethods._2
+            val clockIHi = clockMethods._3
+            val clockXHi = clockMethods._4
             createCppFile()
-            writeCppFile(clockLo.head + clockLo.body.result + clockLo.tail)
+            // Are we collecting declarations?
+            val declarations: String = clockMethods._1 match {
+              case Some(s: StringBuilder) => s.toString
+              case None => ""
+            }
+            writeCppFile(clockLo.head + declarations + clockLo.body.result + clockLo.tail)
             createCppFile()
             writeCppFile(clockIHi.head + clockIHi.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
@@ -1525,7 +1550,7 @@ class CppBackend extends Backend {
           // Output the clock code in the correct order.
           for (islandId <- islandOrder(0) if islandId > 0) {
             for ((clock, clkcodes) <- islandClkCode(islandId)) {
-              val clock_lo = clkcodes._1
+              val clock_lo = clkcodes._2
               accumulatedClockLos.append(clock_lo)
               clock_lo.body.clear()      // free the memory
             }
@@ -1534,10 +1559,16 @@ class CppBackend extends Backend {
 
           // Now emit the calls on the accumulated methods from the main clock_lo method.
           for ((clock, clkcodes) <- code) {
-            val clock_lo = clkcodes._1
+            // Are we collecting declarations?
+            val declarations: String = clkcodes._1 match {
+              case Some(s: StringBuilder) => s.toString
+              case None => ""
+            }
+            val clock_lo = clkcodes._2
             createCppFile()
-            // This is just the definition of the main clock_lo method.
-            writeCppFile(clock_lo.head)
+            // This is just the definition of the main clock_lo method
+            //  (plus collected declarations if we're collecting them).
+            writeCppFile(clock_lo.head + declarations)
             // Output the actual calls to the island specific clock_lo code.
             for (clockLoMethod <- accumulatedClockLos.separateMethods) {
               writeCppFile("\t" + clockLoMethod.genCall)
@@ -1548,7 +1579,7 @@ class CppBackend extends Backend {
           // Output the island-specific clock_hi init code
           val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
-            for (clockHiI <- islandClkCode(islandId).values.map(_._2)) {
+            for (clockHiI <- islandClkCode(islandId).values.map(_._3)) {
               accumulatedClockHiIs.append(clockHiI)
               clockHiI.body.clear()         // free the memory.
             }
@@ -1558,7 +1589,7 @@ class CppBackend extends Backend {
           // Output the island-specific clock_hi def code
           val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(2) if islandId > 0) {
-            for (clockHiX <- islandClkCode(islandId).values.map(_._3)) {
+            for (clockHiX <- islandClkCode(islandId).values.map(_._4)) {
               accumulatedClockHiXs.append(clockHiX)
               clockHiX.body.clear()         // free the memory.
             }
@@ -1567,8 +1598,8 @@ class CppBackend extends Backend {
 
           // Output the code to call the island-specific clock_hi (init and exec) code.
           for ((clock, clkcodes) <- code) {
-            val clock_ihi = clkcodes._2
-            val clock_xhi = clkcodes._3
+            val clock_ihi = clkcodes._3
+            val clock_xhi = clkcodes._4
             createCppFile()
             // This is just the definition of the main clock_hi init method.
             writeCppFile(clock_ihi.head)
