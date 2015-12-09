@@ -76,14 +76,11 @@ class CppBackend extends Backend {
   protected[this] var potentialShadowRegisters = 0
   protected[this] val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
-  type Declarations = Option[StringBuilder]
+  type Declarations = StringBuilder
   def newDeclarations(): Declarations = {
-    if (true) {
-      Some(new StringBuilder)
-    } else {
-      None
-    }
+    new StringBuilder
   }
+
   override def emitTmp(node: Node): String = {
     require(false)
     if (node.isInObject) {
@@ -241,15 +238,8 @@ class CppBackend extends Backend {
         s"  val_t ${emitRef(node)}[${words(node)}];\n"
       }
       // If we're collecting declarations, add this to the list.
-      collectDeclarations match {
-        case Some(s: StringBuilder) => {
-          s.append(res)
-          ""
-        }
-        case None => {
-          res
-        }
-      }
+      collectDeclarations.append(res)
+      ""
     }
   }
   def block(s: Seq[String]): String =
@@ -1529,10 +1519,7 @@ class CppBackend extends Backend {
             val clockXHi = clockMethods._4
             createCppFile()
             // Are we collecting declarations?
-            val declarations: String = clockMethods._1 match {
-              case Some(s: StringBuilder) => s.toString
-              case None => ""
-            }
+            val declarations: String = clockMethods._1.toString
             writeCppFile(clockLo.head + declarations + clockLo.body.result + clockLo.tail)
             createCppFile()
             writeCppFile(clockIHi.head + clockIHi.body.result)
@@ -1560,10 +1547,7 @@ class CppBackend extends Backend {
           // Now emit the calls on the accumulated methods from the main clock_lo method.
           for ((clock, clkcodes) <- code) {
             // Are we collecting declarations?
-            val declarations: String = clkcodes._1 match {
-              case Some(s: StringBuilder) => s.toString
-              case None => ""
-            }
+            val declarations: String = clkcodes._1.toString
             val clock_lo = clkcodes._2
             createCppFile()
             // This is just the definition of the main clock_lo method
