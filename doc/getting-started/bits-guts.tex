@@ -31,7 +31,7 @@ class FullAdder extends Module {
 }
 \end{scala}
 
-In this example we make sure to use the \verb+:=+ reassignment for the \verb+io.sum+ and \verb+io.cout+ output values because we only know what they're values are later in the code and not at the time of construction of the \verb+io+ Bundle. All other values in this example use the \verb+=+ assignment operator since they need to be created. 
+In this example we make sure to use the \verb+:=+ reassignment for the \verb+io.sum+ and \verb+io.cout+ output values because we only know what their values are later in the code and not at the time of construction of the \verb+io+ Bundle. All other values in this example use the \verb+=+ assignment operator since they need to be created. 
 
 In general, the rule of thumb is to use the reassignment operator \verb+:=+ if the value already has been assigned by the \verb+=+ operator, otherwise the \verb+=+ operator should be used. Note that if you do not use the \verb+=+ or \verb+:=+ operators correctly you will get an error when you try and compile your design.
 
