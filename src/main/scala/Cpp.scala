@@ -1000,8 +1000,12 @@ class CppBackend extends Backend {
       var accumlatedMethodTail = ""
       val separateMethods = ArrayBuffer[CMethod]()
 
-      def append(methodDefinition: CMethod) {
-        val methodBody = methodDefinition.body.toString
+      def append(methodDefinition: CMethod, declarations: Option[Declarations]) {
+        // If we have declarations, insert them ahead of the method body.
+        val methodBody = (declarations match {
+          case Some(s: StringBuilder) => s.toString
+          case None => ""
+        }) + methodDefinition.body.toString
         val nLinesApprox = methodBody.count(_ == '\n')
 
         def newMethod() {
@@ -1019,7 +1023,7 @@ class CppBackend extends Backend {
           newMethod()
         }
         // Can we just merge this method in with the previous one?
-        if (accumlation + nLinesApprox > limit) {
+        if ( (accumlation + nLinesApprox) > limit) {
           // No. Time for a new method.
           // First, close off any accumulated method ..
           if (accumlation > 0) {
@@ -1537,8 +1541,10 @@ class CppBackend extends Backend {
           // Output the clock code in the correct order.
           for (islandId <- islandOrder(0) if islandId > 0) {
             for ((clock, clkcodes) <- islandClkCode(islandId)) {
+              // Are we collecting declarations?
+              val declarations = clkcodes._1
               val clock_lo = clkcodes._2
-              accumulatedClockLos.append(clock_lo)
+              accumulatedClockLos.append(clock_lo, Some(declarations))
               clock_lo.body.clear()      // free the memory
             }
           }
@@ -1546,13 +1552,10 @@ class CppBackend extends Backend {
 
           // Now emit the calls on the accumulated methods from the main clock_lo method.
           for ((clock, clkcodes) <- code) {
-            // Are we collecting declarations?
-            val declarations: String = clkcodes._1.toString
             val clock_lo = clkcodes._2
             createCppFile()
-            // This is just the definition of the main clock_lo method
-            //  (plus collected declarations if we're collecting them).
-            writeCppFile(clock_lo.head + declarations)
+            // This is just the definition of the main clock_lo method.
+            writeCppFile(clock_lo.head)
             // Output the actual calls to the island specific clock_lo code.
             for (clockLoMethod <- accumulatedClockLos.separateMethods) {
               writeCppFile("\t" + clockLoMethod.genCall)
@@ -1564,7 +1567,7 @@ class CppBackend extends Backend {
           val accumulatedClockHiIs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(1) if islandId > 0) {
             for (clockHiI <- islandClkCode(islandId).values.map(_._3)) {
-              accumulatedClockHiIs.append(clockHiI)
+              accumulatedClockHiIs.append(clockHiI, None)
               clockHiI.body.clear()         // free the memory.
             }
           }
@@ -1574,7 +1577,7 @@ class CppBackend extends Backend {
           val accumulatedClockHiXs = new CoalesceMethods(lineLimitFunctions)
           for (islandId <- islandOrder(2) if islandId > 0) {
             for (clockHiX <- islandClkCode(islandId).values.map(_._4)) {
-              accumulatedClockHiXs.append(clockHiX)
+              accumulatedClockHiXs.append(clockHiX, None)
               clockHiX.body.clear()         // free the memory.
             }
           }
