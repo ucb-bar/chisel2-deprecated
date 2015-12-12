@@ -62,8 +62,7 @@ class GCDUnitTester extends UnitTester {
 }
 
 object GCDUnitTest extends UnitTester {
-  def main(args: Array[String]): Unit = {
-    Chisel2State.args = args
+  def main(implicit args: Array[String]): Unit = {
 
     execute { new GCDUnitTester }
   }

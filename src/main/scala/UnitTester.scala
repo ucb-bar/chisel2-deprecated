@@ -40,7 +40,8 @@ object Chisel2State {
 }
 
 trait UnitTestRunners {
-  def execute(t: => UnitTester): Boolean = {
+  def execute(t: => UnitTester)(implicit args: Array[String]): Boolean = {
+    Chisel2State.args = args
     try {
       // Construct the combined circuit, containing all the required
       //  poke()'s and expect()'s as arrays of data.
