@@ -3,7 +3,6 @@
 package unitTests
 
 import Chisel._
-import Chisel.testers.{UnitTestRunners, UnitTester}
 
 class GCD extends Module {
   val io = new Bundle {
@@ -34,7 +33,7 @@ class GCDUnitTester extends UnitTester {
       else {
         y -= x
       }
-      if(y > 0) depth += 1
+      depth += 1
     }
     return (x, depth)
   }
@@ -62,15 +61,10 @@ class GCDUnitTester extends UnitTester {
 
 }
 
-class GCDTester extends UnitTestRunners {
-  execute { new GCDUnitTester }
-}
-
-object GCDUnitTest {
+object GCDUnitTest extends UnitTester {
   def main(args: Array[String]): Unit = {
-    val tutorial_args = args.slice(1, args.length)
+    Chisel2State.args = args
 
-    new GCDTester
+    execute { new GCDUnitTester }
   }
 }
-
