@@ -61,8 +61,9 @@ object NodeExtract {
       case (Some(hl), Some(ll)) => apply(mod, hl.value.toInt, ll.value.toInt, width)
       case _ =>
         val rsh = Op(">>", widthInfer, mod, lo)
-        val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
-        val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
+        val msh = Op("-", Node.maxWidth _, UInt(mod.getWidth - 1), Op("-", Node.maxWidth _, hi, lo))
+        val allmask = Op("~", Node.widthOf(0), UInt(0, width = mod.getWidth))
+        val mask = Op(">>", Node.widthOf(0), allmask, msh)
         Op("&", widthInfer, rsh, mask)
     }
   }
