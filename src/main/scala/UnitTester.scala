@@ -80,12 +80,19 @@ trait UnitTestRunners {
 case class Step(input_map: mutable.HashMap[Data,Int], output_map: mutable.HashMap[Data,Int])
 
 class UnitTester extends Module with UnitTestRunners {
+  val rnd = new scala.util.Random(Driver.testerSeed)
+
+  def int(x: Bits):    BigInt = x.litValue()
+
   override val io = new Bundle {
     val running       = Bool(INPUT)
     val error         = Bool(OUTPUT)
     val pc            = UInt(OUTPUT)
     val done          = Bool(OUTPUT)
   }
+  val setDone = Reg(init = Bool(false))
+  val setError = Reg(init = Bool(false))
+
   var max_width = Width(0)
   val set_input_op :: wait_for_op :: expect_op :: Nil = Enum(UInt(), 3)
 
@@ -160,8 +167,8 @@ class UnitTester extends Module with UnitTestRunners {
       }
       println()
     }
-    io.done  := Bool(false)
-    io.error := Bool(false)
+    io.done  := setDone
+    io.error := setError
 
 
     val pc             = Reg(init=UInt(0, 8))
