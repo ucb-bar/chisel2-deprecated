@@ -77,7 +77,7 @@ trait UnitTestRunners {
   }
 }
 
-case class Step(input_map: mutable.HashMap[Data,Int], output_map: mutable.HashMap[Data,Int])
+case class Step(input_map: mutable.HashMap[Data,BigInt], output_map: mutable.HashMap[Data,BigInt])
 
 class UnitTester extends Module with UnitTestRunners {
   val rnd = new scala.util.Random(Driver.testerSeed)
@@ -107,7 +107,7 @@ class UnitTester extends Module with UnitTestRunners {
   val test_actions = new ArrayBuffer[Step]()
   step(1) // gives us a slot to put in our input and outputs from beginning
 
-  def poke(io_port: Bits, value: Int): Unit = {
+  def poke(io_port: Bits, value: BigInt): Unit = {
 //    println(s"io_port $io_port, len ${test_actions.last.input_map.size} " +
 //            s"ip_port.dir ${io_port.dir}")
 
@@ -118,7 +118,7 @@ class UnitTester extends Module with UnitTestRunners {
     test_actions.last.input_map(io_port) = value
   }
 
-  def expect(io_port: Bits, value: Int): Unit = {
+  def expect(io_port: Bits, value: BigInt): Unit = {
     require(io_port.dir == OUTPUT, s"expect error: $io_port not an output")
     require(!test_actions.last.output_map.contains(io_port), s"second expect to $io_port without step")
 
@@ -129,8 +129,8 @@ class UnitTester extends Module with UnitTestRunners {
   def step(number_of_cycles: Int): Unit = {
     test_actions ++= Array.fill(number_of_cycles) {
       new Step(
-        new mutable.HashMap[Data, Int](),
-        new mutable.HashMap[Data, Int]()
+        new mutable.HashMap[Data, BigInt](),
+        new mutable.HashMap[Data, BigInt]()
       )
     }
   }
@@ -154,7 +154,7 @@ class UnitTester extends Module with UnitTestRunners {
         dut_inputs.map { dut_input => "%8s".format(port_name(dut, dut_input))}.mkString +
         dut_outputs.map { dut_output => "%8s".format(port_name(dut, dut_output))}.mkString
     )
-    def val_str(hash : mutable.HashMap[Data, Int], key: Data) : String = {
+    def val_str(hash : mutable.HashMap[Data, BigInt], key: Data) : String = {
       if( hash.contains(key) ) hash(key).toString else "-"
     }
     test_actions.zipWithIndex.foreach { case (step, step_number) =>
@@ -176,7 +176,7 @@ class UnitTester extends Module with UnitTestRunners {
     io.pc := pc
 
     dut_inputs.foreach { input_port =>
-      var default_value = 0
+      var default_value = BigInt(0)
       val input_values = Vec(
         test_actions.map { step =>
           default_value = step.input_map.getOrElse(input_port, default_value)
@@ -189,7 +189,7 @@ class UnitTester extends Module with UnitTestRunners {
     dut_outputs.foreach { output_port =>
       val output_values = Vec(
         test_actions.map { step =>
-          output_port.fromBits(UInt(step.output_map.getOrElse(output_port, 0)))
+          output_port.fromBits(UInt(step.output_map.getOrElse(output_port, BigInt(0))))
         }
       )
       val ok_to_test_output_values = Vec(
