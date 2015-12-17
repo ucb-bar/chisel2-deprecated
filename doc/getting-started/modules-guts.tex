@@ -1,8 +1,8 @@
 \section{Module Instantiation}
 
-Like other hardware description languages, Chisel allows fairly straightforward module instantiation to enable modularity and hierarchy. In Chisel, instantiating a Module class is the equivalent to instantiating a module in Verilog. To do this, we simply use a call to \verb+Module+ with module created with the Scala \verb+new+ keyword in order to indicate that we are instantiation a new module. We want to make sure we assign this to a value so that we can reference its input and outputs which we also need to connect.
+Like other hardware description languages, Chisel allows fairly straightforward module instantiation to enable modularity and hierarchy. In Chisel, instantiating a Module class is the equivalent to instantiating a module in Verilog. To do this, we simply use a call to \verb+Module+ with the module created with the Scala \verb+new+ keyword in order to indicate that we are instantiation a new module. We want to make sure we assign this to a value so that we can reference its input and outputs, which we also need to connect.
 
-For example, suppose we would like to construct a 4-bit adder using multiple copies of the  \verb+FullAdder+ module. as shown in the Figure 1. The Chisel source code is shown below.
+For example, suppose we would like to construct a 4-bit adder using multiple copies of the  \verb+FullAdder+ module, as shown in the Figure 1. The Chisel source code is shown below.
 
 \begin{figure}[ht!]
 \centering
@@ -49,7 +49,7 @@ class Adder4 extends Module {
 }
 \end{scala}
 
-In this example, notice how when referencing each module I/O we must first reference the \verb+io+ that contains the ports for the I/Os. Again, note how all assignments to the module I/Os use a reassignment operator \verb+:=+. When instantiating modules, it is important to make sure that you connect all the input and output ports. If a port is not connected, the Chisel compiler may optimize away portions of your design that it find unecessary due to the unconnected ports and throw errors or warnings.
+In this example, notice how when referencing each module I/O we must first reference \verb+io+ that contains the ports for the I/Os. Again, note how all assignments to the module I/Os use a reassignment operator \verb+:=+. When instantiating modules, it is important to make sure that you connect all the input and output ports. If a port is not connected, the Chisel compiler may optimize away portions of your design that it finds unnecessary due to the unconnected ports and throw errors or warnings.
 
 \section{The Vec Class}
 
@@ -75,7 +75,7 @@ val reg_vec32 := Vec.fill(32){ Reg() }
 In order to assign to a particular value of the \verb+Vec+, we simply assign the target value to the vector at a specified index. For instance, if we wanted to assign a UInt value of zero to the first register in the above example, the assignment would look like:
 
 \begin{scala}
-reg_vec32(1) := UInt(0)
+reg_vec32(0) := UInt(0)
 \end{scala}
 
 To access a particular element in the vector at some index, we specify the index of the vector. For example, to extract the 5th element of the register vector in the above example and assign it to some value \verb+reg5+, the assignment would look like:
@@ -163,6 +163,7 @@ Instantiating a parametrized module is very similar to instantiating an unparame
 val adder4 = Module(new Adder(4))
 \end{scala}
 
+% Martin: Shouldn't this be called ``named'' parameter instead of ``explicite''?
 We can also instantiate the \verb+Adder+ by explicitly specifying the value of it parameter \verb+n+ like the this:
 
 \begin{scala}
@@ -259,12 +260,12 @@ For more advanced uses, tips, and tricks, please see the Advanced Parameterizati
 
 \section{Built In Primitives}
 
-Like other HDL, Chisel provides some very basic primitives. These are constructs that are built in to the Chisel compiler and come for free. The Reg, UInt, and Bundle classes are such primitives that has already been covered. Unlike Module instantiations, primitive do not require explicit connections of their io ports to use. Other useful primitive types include the Mem and Vec classes which will be discussed in a more advanced tutorial. In this tutorial we explore the use of the \verb+Mux+ primitive
+Like other HDL, Chisel provides some very basic primitives. These are constructs that are built in to the Chisel compiler and come for free. The Reg, UInt, and Bundle classes are such primitives that have already been covered. Unlike Module instantiations, primitive do not require explicit connections of their io ports to use. Other useful primitive types include the Mem and Vec classes which will be discussed in a more advanced tutorial. In this tutorial we explore the use of the \verb+Mux+ primitive.
 
 \subsection{The Mux Class}
 
-The \verb+Mux+ primitive is a two input multiplexer. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexer, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The third input \verb+select+ which is a Bool type determines which one to output.
-A \verb+select+ value of \verb+true+ will output the first value \verb+A+, while a \verb+select+ value of \verb+false+ will pass \verb+B+.
+The \verb+Mux+ primitive is a two input multiplexer. In order to use the \verb+Mux+ we first need to define the expected syntax of the \verb+Mux+ class. As with any two input multiplexer, it takes three inputs and one output. Two of the inputs correspond to the data values \verb+A+ and \verb+B+ that we would like to select which can be any width and data type as long as they are the same. The first input \verb+select+, which is a Bool type, determines which one to output.
+A \verb+select+ value of \verb+true+ will output the value \verb+A+, while a \verb+select+ value of \verb+false+ will pass \verb+B+.
 
 \begin{scala}
 val out = Mux(select, A, B)
