@@ -32,6 +32,7 @@ public:
     assert(fd != -1);
     assert(lseek(fd, pgsize-1, SEEK_SET) != -1);
     assert(write(fd, "", 1) != -1);
+    assert(fsync(fd) != -1);	// ensure the data is available
     channel = (char*)mmap(NULL, pgsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); 
     assert(channel != MAP_FAILED);
   }

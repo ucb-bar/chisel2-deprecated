@@ -138,7 +138,25 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private class Channel(name: String) {
     private lazy val file = new java.io.RandomAccessFile(name, "rw")
     private lazy val channel = file.getChannel
-    @volatile private lazy val buffer = channel map (FileChannel.MapMode.READ_WRITE, 0, channel.size)
+    @volatile private lazy val buffer = {
+      /* We have seen runs where buffer.put(0,0) fails with:
+[info]   java.lang.IndexOutOfBoundsException:
+[info]   at java.nio.Buffer.checkIndex(Buffer.java:532)
+[info]   at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:300)
+[info]   at Chisel.Tester$Channel.release(Tester.scala:148)
+[info]   at Chisel.Tester.start(Tester.scala:717)
+[info]   at Chisel.Tester.<init>(Tester.scala:743)
+[info]   at ArbiterSuite$ArbiterTests$8.<init>(ArbiterTest.scala:396)
+[info]   at ArbiterSuite$$anonfun$testStableRRArbiter$1.apply(ArbiterTest.scala:440)
+[info]   at ArbiterSuite$$anonfun$testStableRRArbiter$1.apply(ArbiterTest.scala:440)
+[info]   at Chisel.Driver$.apply(Driver.scala:65)
+[info]   at Chisel.chiselMain$.apply(hcl.scala:63)
+[info]   ...
+       */ 
+      val size = channel.size
+      assert(size > 16, "channel.size is bogus: %d".format(size))
+      channel map (FileChannel.MapMode.READ_WRITE, 0, size)
+    }
     implicit def intToByte(i: Int) = i.toByte
     def aquire {
       buffer put (0, 1)
