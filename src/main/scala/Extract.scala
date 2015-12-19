@@ -59,11 +59,7 @@ object NodeExtract {
     val widthInfer = if (width == -1) Node.widthOf(0) else Node.fixWidth(width)
     (hi.litOpt, lo.litOpt) match {
       case (Some(hl), Some(ll)) => apply(mod, hl.value.toInt, ll.value.toInt, width)
-      case _ =>
-        val rsh = Op(">>", widthInfer, mod, lo)
-        val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
-        val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
-        Op("&", widthInfer, rsh, mask)
+      case _ => makeExtract(mod, hi, lo, widthInfer)
     }
   }
 

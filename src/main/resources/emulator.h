@@ -1246,8 +1246,10 @@ class dat_t {
   }
   template <int dw>
   dat_t<dw> extract(val_t e, val_t s) {
+	const int bw = e-s+1;
+	dat_t<w> msk = mask<w>(bw);
     dat_t<w> x = (*this >> s);
-    return x.extract<dw>();
+    return x & msk;
   }
   template <int dw, int iwe, int iws>
   inline dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s) {

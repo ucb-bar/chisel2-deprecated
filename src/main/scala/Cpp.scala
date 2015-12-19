@@ -77,7 +77,6 @@ class CppBackend extends Backend {
   protected[this] val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
   override def emitTmp(node: Node): String = {
-    require(false)
     if (node.isInObject) {
       emitRef(node)
     } else {
@@ -501,38 +500,59 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        emitTmpDec(node) +
-        (if (node.inputs.length < 3 || node.needWidth() == 1) {
-          if (node.inputs(1).isLit) {
+        val oneBit = node.inputs.length < 3 || node.needWidth() == 1
+        val knownWidth = oneBit || (node.inputs(1).isLit && node.inputs(2).isLit)
+        if (oneBit) {
+          emitTmpDec(node) + {
+            if (node.inputs(1).isLit) {
             val value = node.inputs(1).litValue().toInt
             "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
-          } else if (node.inputs(0).needWidth() <= bpw) {
-            "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
-          } else {
-            val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
-            s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1"
+            } else if (node.inputs(0).needWidth() <= bpw) {
+              "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
+            } else {
+              val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
+              s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1"
+            }
           }
+        } else if (knownWidth || node.inputs(2).isLit) {
+            emitTmpDec(node) + {
+              val rsh = node.inputs(2).litValue().toInt
+              if (rsh % bpw == 0) {
+                block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
+              } else {
+                block((0 until words(node)).map(i => emitWordRef(node, i)
+                  + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
+                  + (rsh % bpw) + (
+                    if (i + rsh/bpw + 1 < words(node.inputs(0))) {
+                      " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
+                    } else {
+                      ""
+                    }))) + trunc(node)
+              }
+            }
         } else {
-          val rsh = node.inputs(2).litValue().toInt
-          if (rsh % bpw == 0) {
-            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
-          } else {
-            block((0 until words(node)).map(i => emitWordRef(node, i)
-              + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
-              + (rsh % bpw) + (
-                if (i + rsh/bpw + 1 < words(node.inputs(0))) {
-                  " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
-                } else {
-                  ""
-                }))) + trunc(node)
-          }
-        })
+          // Use the low level extract code.
+          val dw = node.needWidth
+          emitTmp(node) + ";\n  " + emitRef(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + dw + ">(" + emitRef(node.inputs(1)) + ", " + emitRef(node.inputs(2)) + ");\n" + trunc(node)
+        }
 
       case x: Clock => ""
 
-      case x: Bits if x.isInObject && x.inputs.length == 1 => 
-        emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-          + " = " + emitWordRef(x.inputs(0), i)))
+      case x: Bits if x.isInObject && x.inputs.length == 1 => {
+        // Do we need to explicitly assign components?
+        def explicitComponentAssignment(x: Node): Boolean = {
+          x.inputs(0) match {
+            case e: Extract if (e.inputs.length > 2 && e.needWidth() != 1 && !(e.inputs(1).isLit && e.inputs(2).isLit)) => false
+            case _ => true
+          }
+        }
+        if (explicitComponentAssignment(x)) {
+          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
+            + " = " + emitWordRef(x.inputs(0), i)))
+        } else {
+          block(Seq(emitRef(x) + " = " + emitRef(x.inputs(0))))
+        }
+      }
       case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
         emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
           (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
