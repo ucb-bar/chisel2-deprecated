@@ -514,7 +514,7 @@ class CppBackend extends Backend {
               s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1;\n"
             }
           }
-        } else if (knownWidth || node.inputs(2).isLit) {
+        } else if (knownWidth) {
             emitTmpDec(node) + {
               val rsh = node.inputs(2).litValue().toInt
               if (rsh % bpw == 0) {
@@ -533,7 +533,7 @@ class CppBackend extends Backend {
         } else {
           // Use the low level extract code.
           val dw = node.needWidth
-          emitTmp(node) + ";\n  " + emitRef(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + dw + ">(" + emitRef(node.inputs(1)) + ", " + emitRef(node.inputs(2)) + ");\n" + trunc(node)
+          emitTmp(node) + ";\n  " + emitRef(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + dw + ">(" + emitRef(node.inputs(1)) + ", " + emitRef(node.inputs(2)) + ");\n"
         }
 
       case x: Clock => ""

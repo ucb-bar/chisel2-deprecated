@@ -670,8 +670,7 @@ struct bit_word_funs<2> {
     d[1] = sww > 1 ? s0[1] : 0;
   }
   static void mask (val_t d[], int nb) {
-    d[0] = val_all_ones();
-    d[1] = mask_val(nb - val_n_bits());
+	mask_n(d, 2, nb);
   }
   static void add (val_t d[], val_t x[], val_t y[], int nb) {
     val_t x0     = x[0];
@@ -845,9 +844,7 @@ struct bit_word_funs<3> {
     d[2] = sww > 2 ? s0[2] : 0;
   }
   static void mask (val_t d[], int nb) {
-    d[0] = val_all_ones();
-    d[1] = val_all_ones();
-    d[2] = mask_val(nb - 2*val_n_bits());
+	mask_n(d, 3, nb);
   }
   static void add (val_t d[], val_t s0[], val_t s1[], int nb) {
     add_n(d, s0, s1, 3, nb);
