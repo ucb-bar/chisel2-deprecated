@@ -505,13 +505,13 @@ class CppBackend extends Backend {
         if (oneBit) {
           emitTmpDec(node) + {
             if (node.inputs(1).isLit) {
-            val value = node.inputs(1).litValue().toInt
-            "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
+              val value = node.inputs(1).litValue().toInt
+                  "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
             } else if (node.inputs(0).needWidth() <= bpw) {
               "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
             } else {
               val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
-              s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1;\n"
+                  s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1;\n"
             }
           }
         } else if (knownWidth) {
@@ -521,13 +521,13 @@ class CppBackend extends Backend {
                 block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
               } else {
                 block((0 until words(node)).map(i => emitWordRef(node, i)
-                  + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
-                  + (rsh % bpw) + (
-                    if (i + rsh/bpw + 1 < words(node.inputs(0))) {
-                      " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
-                    } else {
-                      ""
-                    }))) + trunc(node)
+                    + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
+                    + (rsh % bpw) + (
+                        if (i + rsh/bpw + 1 < words(node.inputs(0))) {
+                          " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
+                        } else {
+                          ""
+                        }))) + trunc(node)
               }
             }
         } else {
