@@ -500,7 +500,7 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        val oneBit = node.inputs.length < 3 || node.needWidth() == 1
+        val oneBit = node.inputs.length < 3
         val knownWidth = oneBit || (node.inputs(1).isLit && node.inputs(2).isLit)
         if (oneBit) {
           emitTmpDec(node) + {
