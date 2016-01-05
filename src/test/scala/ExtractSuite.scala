@@ -312,7 +312,7 @@ class ExtractSuite extends TestSuite {
      // Pick a random power of 2 from 4 to maxWidth
       for (inputWidth <- genMaxWidths(rnd, maxWidth, nTests)) {
         for (width <- genExtractWidths(rnd, inputWidth, nRuns)) {
-          val hi = width
+          val hi = width - 1
           for (tester <- Array("c", "v")) {
             if (tester == "v" && !Driver.isVCSAvailable) {
               println("vcs unavailable - skipping Verilog test")
@@ -321,6 +321,123 @@ class ExtractSuite extends TestSuite {
                 () => Module(new ExtractDynamic(inputWidth, hi))) {
                   c => new TestExtractDynamicLo(c, inputWidth, nRuns, hi)
               }
+            }
+          }
+        }
+      }
+    }
+
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicLoTests, dynamicLoRuns)
+  }
+
+  // Test dynamic onebit (hi == lo).
+  @Test def extractDynamicOneBit() {
+    println("\nextractDynamicOneBit ...")
+    class ExtractDynamic(w: Int) extends Module {
+      val io = new Bundle {
+        val in = UInt(INPUT, width = w)
+        val data = UInt(OUTPUT)
+        val hi = UInt(INPUT, width = 16)
+      }
+      io.data := UInt(0)
+
+      // Protect against bad random startup values.
+      val hi = UInt(INPUT, 16)
+      hi := UInt(0, 16)
+      when(io.hi < UInt(w)) {
+        hi := io.hi
+      }
+      io.data := io.in(hi, hi)
+    }
+
+    class TestExtractDynamicOneBit(m: ExtractDynamic, maxWidth: Int, nRuns: Int) extends Tester(m) {
+      val width = 1
+      for ((hi, dummy) <- genHiLo(rnd, maxWidth, nRuns)) {
+        val lo = hi
+        val data = BigInt(maxWidth, rnd)
+        val mask = (BigInt(1) << width) - 1
+        println("width: %d, hi: %d, lo: %d, mask: 0x%x".format(maxWidth, hi, lo, mask))
+        poke(m.io.in, data)
+        poke(m.io.hi, hi)
+        step(1)
+        expect(m.io.data, (data >> lo) & mask)
+      }
+    }
+
+    class TestExtractDynamic(rnd: Random, maxWidth: Int, nTests: Int, nRuns: Int) {
+
+     // Pick a random power of 2 from 4 to maxWidth
+      for (inputWidth <- genMaxWidths(rnd, maxWidth, nTests)) {
+        for (tester <- Array("c", "v")) {
+          if (tester == "v" && !Driver.isVCSAvailable) {
+            println("vcs unavailable - skipping Verilog test")
+          } else {
+            chiselMainTest(chiselEnvironmentArguments() ++ Array[String]("--backend", tester, "--compile", "--genHarness", "--test", "--targetDir", dir.getPath.toString()),
+              () => Module(new ExtractDynamic(inputWidth))) {
+                c => new TestExtractDynamicOneBit(c, inputWidth, nRuns)
+            }
+          }
+        }
+      }
+    }
+
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicLoTests, dynamicLoRuns)
+  }
+
+  // Test dynamic val_t (extract bits from a created temporary).
+  @Test def extractDynamicVal_t() {
+    println("\nextractDynamicVal_t ...")
+    class ExtractDynamic(w: Int) extends Module {
+      val io = new Bundle {
+        val in1 = UInt(INPUT, width = w/2)
+        val in2 = UInt(INPUT, width = w/2)
+        val data = UInt(OUTPUT)
+        val hi = UInt(INPUT, width = 16)
+        val lo = UInt(INPUT, width = 16)
+      }
+      io.data := UInt(0)
+
+      // Protect against bad random startup values.
+      val hi = UInt(INPUT, 16)
+      hi := UInt(0, 16)
+      val lo = UInt(INPUT, 16)
+      lo := UInt(0, 16)
+      when(io.hi >= io.lo && io.hi < UInt(w)) {
+        hi := io.hi
+        lo := io.lo
+      }
+      val in = Cat(io.in1, io.in2)
+      io.data := in(hi, lo)
+    }
+
+    class TestExtractDynamicVal_t(m: ExtractDynamic, maxWidth: Int, nRuns: Int) extends Tester(m) {
+      for ((hi, lo) <- genHiLo(rnd, maxWidth, nRuns)) {
+        val width = hi - lo + 1
+        val halfWidth = maxWidth/2
+        val data = BigInt(maxWidth, rnd)
+        val mask = (BigInt(1) << width) - 1
+        val halfMask = (BigInt(1) << halfWidth) - 1
+        println("width: %d, hw: %d, data: 0x%x, hi: %d, lo: %d, mask: 0x%x".format(maxWidth, halfWidth, data, hi, lo, mask))
+        poke(m.io.in2, data & halfMask)
+        poke(m.io.in1, (data >> halfWidth) & halfMask)
+        poke(m.io.hi, hi)
+        poke(m.io.lo, lo)
+        step(1)
+        expect(m.io.data, (data >> lo) & mask)
+      }
+    }
+
+    class TestExtractDynamic(rnd: Random, maxWidth: Int, nTests: Int, nRuns: Int) {
+
+     // Pick a random power of 2 from 4 to maxWidth
+      for (inputWidth <- genMaxWidths(rnd, maxWidth, nTests)) {
+        for (tester <- Array("c", "v")) {
+          if (tester == "v" && !Driver.isVCSAvailable) {
+            println("vcs unavailable - skipping Verilog test")
+          } else {
+            chiselMainTest(chiselEnvironmentArguments() ++ Array[String]("--backend", tester, "--compile", "--genHarness", "--test", "--targetDir", dir.getPath.toString()),
+              () => Module(new ExtractDynamic(inputWidth))) {
+                c => new TestExtractDynamicVal_t(c, inputWidth, nRuns)
             }
           }
         }

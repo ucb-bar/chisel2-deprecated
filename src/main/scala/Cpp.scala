@@ -94,6 +94,11 @@ class CppBackend extends Backend {
     }
   }
 
+  // Emit the address of a node's values.
+  def emitValueAddress(node: Node): String = {
+    "&" + emitLoWordRef(node)
+  }
+
   // Manage a constant pool.
   protected[this] val coalesceConstants = multiwordLiteralInObject
   protected[this] val constantPool = HashMap[(String, Width), Literal]()
@@ -500,31 +505,49 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        val oneBit = node.inputs.length < 3
-        val knownWidth = oneBit || (node.inputs(1).isLit && node.inputs(2).isLit)
+        val source = node.inputs(0)
+        val hi = node.inputs(1)
+        val lo = if (node.inputs.length < 3) {
+          hi
+        } else {
+          node.inputs(2)
+        }
+        val oneBit = x.isOneBit
+        val knownWidth = x.isStaticWidth
         if (oneBit) {
           emitTmpDec(node) + {
-            if (node.inputs(1).isLit) {
-              val value = node.inputs(1).litValue().toInt
-                  "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
-            } else if (node.inputs(0).needWidth() <= bpw) {
-              "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
+            // Ensure all the other bits are zero.
+            if (words(node) > 1) {
+              if (node.isInObject) {
+                emitRef(node) + " = 0;\n"
+              } else {
+                "  memset(" + emitValueAddress(node) + ", 0, sizeof(" + emitRef(node) + "));\n"
+              }
             } else {
-              val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
-                  s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1;\n"
+              ""
+            }
+          } + {
+            if (hi.isLit) {
+              val value = hi.litValue().toInt
+                  "  " + emitLoWordRef(node) + " = (" + emitWordRef(source, value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
+            } else if (source.needWidth() <= bpw) {
+              "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(source) + " >> " + emitLoWordRef(hi) + ") & 1;\n"
+            } else {
+              val inputWord = wordMangle(source, emitLoWordRef(hi) + "/" + bpw)
+                  s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(hi)} % ${bpw}) & 1;\n"
             }
           }
         } else if (knownWidth) {
             emitTmpDec(node) + {
-              val rsh = node.inputs(2).litValue().toInt
+              val rsh = lo.litValue().toInt
               if (rsh % bpw == 0) {
-                block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
+                block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i + rsh/bpw))) + trunc(node)
               } else {
                 block((0 until words(node)).map(i => emitWordRef(node, i)
-                    + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
+                    + " = " + emitWordRef(source, i + rsh/bpw) + " >> "
                     + (rsh % bpw) + (
-                        if (i + rsh/bpw + 1 < words(node.inputs(0))) {
-                          " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
+                        if (i + rsh/bpw + 1 < words(source)) {
+                          " | " + emitWordRef(source, i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
                         } else {
                           ""
                         }))) + trunc(node)
@@ -532,26 +555,15 @@ class CppBackend extends Backend {
             }
         } else {
           // Use the low level extract code.
-          val dw = node.needWidth
-          emitTmp(node) + ";\n  " + emitRef(node) + " = " + emitRef(node.inputs(0)) + ".extract<" + dw + ">(" + emitRef(node.inputs(1)) + ", " + emitRef(node.inputs(2)) + ");\n"
+          val nw = words(node)
+          emitTmpDec(node) + ";\n  " + "  bit_word_funs<" + nw + ">::extract(" + emitValueAddress(node) + ", " + emitValueAddress(source) + ", " + emitRef(hi) + ", " + emitRef(lo) + ");\n"
         }
 
       case x: Clock => ""
 
       case x: Bits if x.isInObject && x.inputs.length == 1 => {
-        // Do we need to explicitly assign components?
-        def explicitComponentAssignment(x: Node): Boolean = {
-          x.inputs(0) match {
-            case e: Extract if (e.inputs.length > 2 && e.needWidth() != 1 && !(e.inputs(1).isLit && e.inputs(2).isLit)) => false
-            case _ => true
-          }
-        }
-        if (explicitComponentAssignment(x)) {
-          emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
-            + " = " + emitWordRef(x.inputs(0), i)))
-        } else {
-          block(Seq(emitRef(x) + " = " + emitRef(x.inputs(0))))
-        }
+        emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
+          + " = " + emitWordRef(x.inputs(0), i)))
       }
       case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
         emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:

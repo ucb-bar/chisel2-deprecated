@@ -254,16 +254,13 @@ class VerilogBackend extends Backend {
         val hi = emitRef(node.inputs(1))
         List("  assign " + emitTmp(node) + " = ",
           // Is this a single bit extraction?
-          if (node.inputs.size < 3) {
+          if (x.isOneBit) {
             List(source, "[", hi, "]").mkString 
           } else {
             // We have three inputs.
             val lo = emitRef(node.inputs(2))
-            // Are hi and lo the same (i.e., a single bit extraction?
-            if (hi == lo) {
-              List(source, "[", hi, "]").mkString 
-            } else if (node.inputs(1).isLit && node.inputs(2).isLit) {
             // Are hi and lo constant expressions?
+            if (x.isStaticWidth) {
               List(source, "[", hi , ":", lo, "]").mkString
             } else {
               // The extraction operands are different and at least one of them is not an integer.

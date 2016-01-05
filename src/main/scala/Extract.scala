@@ -132,6 +132,35 @@ class Extract(hi: Node, lo: Node) extends Node {
     }
   }
 
+  // Static width - we can determine the width of the extracted bits at elaboration time.
+  def isStaticWidth: Boolean = {
+    if (this.inputs.length < 3 || this.needWidth() == 1) {
+      true
+    } else {
+      val hi = this.inputs(1)
+      val lo = this.inputs(2)
+      // The width is known if both inputs will have the same runtime value, or both are literals.
+      hi == lo || (hi.isLit && lo.isLit)
+    }
+  }
+
+  // Is this a (known) single bit extraction?
+  def isOneBit: Boolean = {
+    // It must at lease be static, then either have only one argument, or two identical arguments,
+    //  or two arguments with identical values.
+    //  TODO: This last test is redundant if literal nodes are identical if their values are identical
+    isStaticWidth && (this.inputs.length < 3 || {
+      (this.inputs(1), this.inputs(2)) match {
+        case (hi: Literal, lo: Literal) => hi.value == lo.value
+        case _ => {
+           // If the width is static and we get here, both inputs must be the same.
+          assert(hi == lo)
+          true
+        }
+      }
+    })
+  }
+
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
   override def isTypeOnly = false
 }
