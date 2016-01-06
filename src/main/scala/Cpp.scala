@@ -77,6 +77,7 @@ class CppBackend extends Backend {
   protected[this] val allocateOnlyNeededShadowRegisters = Driver.allocateOnlyNeededShadowRegisters
 
   override def emitTmp(node: Node): String = {
+    require(false)
     if (node.isInObject) {
       emitRef(node)
     } else {
