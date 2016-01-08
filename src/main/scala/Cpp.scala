@@ -513,9 +513,13 @@ class CppBackend extends Backend {
         } else {
           node.inputs(2)
         }
-        val oneBit = x.isOneBit
-        val knownWidth = x.isStaticWidth
-        if (oneBit) {
+        // Is this a no-op - (i.e., all the source bits are extracted)?
+        if (x.isNop) {
+          emitTmpDec(node) + {
+            // A straight assignment.
+            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i)))
+          }
+        } else if (x.isOneBit) {
           emitTmpDec(node) + {
             // Ensure all the other bits are zero.
             if (words(node) > 1) {
@@ -538,7 +542,7 @@ class CppBackend extends Backend {
                   s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(hi)} % ${bpw}) & 1;\n"
             }
           }
-        } else if (knownWidth) {
+        } else if (x.isStaticWidth) {
             emitTmpDec(node) + {
               val rsh = lo.litValue().toInt
               if (rsh % bpw == 0) {

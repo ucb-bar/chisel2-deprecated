@@ -56,30 +56,50 @@ class ExtractSuite extends TestSuite {
   }
 
   // Generate a list of hi, lo specs where hi >= lo and (hi - lo + 1) <= inputWidth.
-  //  The first element in the list will have hi == lo
+  //  The first element in the list will have hi == lo, and the second will have lo = 0, hi = inputWidth - 1
   def genHiLo(rnd: Random, inputWidth: Int, nTests: Int): List[(Int, Int)] = {
     for {
       t <- List.range(1, nTests)
-      extractWidth = rnd.nextInt(inputWidth - 1) + 1
-      lo = rnd.nextInt(inputWidth - extractWidth)
-      hi = if (t == 1) lo else lo + extractWidth - 1
+      extractWidth = t match {
+        case 1 => 1
+        case 2 => inputWidth
+        case _ => rnd.nextInt(inputWidth - 1) + 1
+      }
+      lo = t match {
+        case 2 => 0
+        case _ => rnd.nextInt(inputWidth - extractWidth)
+      }
+      hi = lo + extractWidth - 1
     }
       yield (hi, lo)
   }
 
-  // Generate a list of widths (either hi or lo) where 0 < width <= inputWidth, ensuring a width of 1 is in the list.
+  // Generate a list of widths where 1 < width <= inputWidth, ensuring widths of 1 and inputWidth are in the list,
+  //  (assuming the list is long enough).
   def genExtractWidths(rnd: Random, inputWidth: Int, nTests: Int): List[Int] = {
+    var l1 = false
+    var lmax = false
+    val l1Test = nTests
+    val lmaxTest = nTests - 1
     val result = for {
         t <- List.range(1, nTests)
-        extractWidth = rnd.nextInt(inputWidth) + 1
+        extractWidth = {
+          val ni = t match {
+            case `l1Test` if (!l1) => 1
+            case `lmaxTest` if (!lmax) => inputWidth
+            case _ => rnd.nextInt(inputWidth) + 1
+          }
+          ni match {
+            case 1 => l1 = true
+            case `inputWidth` => lmax = true
+            case _ =>
+          }
+          ni
+        }
       }
         yield extractWidth
 
-    if (result.contains(1)) {
-      result
-    } else {
-      1 :: result.tail
-    }
+    result
   }
 
   /** Bad Width Inference in Extract #621

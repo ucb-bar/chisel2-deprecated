@@ -253,8 +253,12 @@ class VerilogBackend extends Backend {
         val source = emitRef(node.inputs(0))
         val hi = emitRef(node.inputs(1))
         List("  assign " + emitTmp(node) + " = ",
+          // Is this a no-op - extract all the source bits.
+          if (x.isNop) {
+            source
+          } else
           // Is this a single bit extraction?
-          if (x.isOneBit) {
+            if (x.isOneBit) {
             List(source, "[", hi, "]").mkString 
           } else {
             // We have three inputs.

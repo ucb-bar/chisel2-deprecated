@@ -146,7 +146,7 @@ class Extract(hi: Node, lo: Node) extends Node {
 
   // Is this a (known) single bit extraction?
   def isOneBit: Boolean = {
-    // It must at lease be static, then either have only one argument, or two identical arguments,
+    // It must at least be static, then either have only one argument, or two identical arguments,
     //  or two arguments with identical values.
     //  TODO: This last test is redundant if literal nodes are identical if their values are identical
     isStaticWidth && (this.inputs.length < 3 || {
@@ -159,6 +159,20 @@ class Extract(hi: Node, lo: Node) extends Node {
         }
       }
     })
+  }
+
+  // Is this operation a no-op - extract all source bits?
+  def isNop: Boolean = {
+    // The extracted width must be static and equal to the source width, and the lo value must be 0.
+    isStaticWidth && this.inputs(1).isLit && {
+      val hiValue = this.inputs(1).litValue()
+      val loValue = if (this.inputs.length < 3) {
+        hiValue
+      } else {
+        this.inputs(2).litValue()
+      }
+      hiValue - loValue + 1 == this.inputs(0).needWidth && loValue == 0
+    }
   }
 
   // Chisel3 - this node contains data - used for verifying Wire() wrapping
