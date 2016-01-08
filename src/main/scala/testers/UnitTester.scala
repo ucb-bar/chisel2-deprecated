@@ -38,48 +38,8 @@ import scala.collection.mutable.ArrayBuffer
 object Chisel2State {
   var args = Array[String]()
 }
-
-trait UnitTestRunners {
-  def execute(t: => UnitTester)(implicit optionArgs: Array[String]): Boolean = {
-    Chisel2State.args = optionArgs
-    try {
-      // Construct the combined circuit, containing all the required
-      //  poke()'s and expect()'s as arrays of data.
-      val mod = Driver(Chisel2State.args, () => Module(t), true)
-      if (Driver.isTesting) {
-        // Initialize a tester with tracing turned on.
-        val c = new Tester(mod, true)
-        // Run the testing circuit until we see io.done.
-        while(c.peek(mod.io.done) == 0) {
-          c.step(1)
-        }
-        val error = c.peek(mod.io.error)
-        val pc = c.peek(mod.io.pc)
-        if (error != 0)
-          c.fail
-
-	// Do an additional step to get any printf output.
-        c.step(1)
-        c.finish
-      }
-      true
-    } catch {
-      case e: Throwable =>
-        println(e)
-        false
-    }
-  }
-
-  def elaborate(t: => Module): Module = {
-    val removeArgs = Array("--compile", "--test", "--genHarness")
-    val filteredArgs = Chisel2State.args.filterNot(removeArgs.contains(_))
-    val mod = Driver(filteredArgs ++ Array("--compile", "--genHarness"), () => t, true)
-    mod
-  }
-}
-
 /**
- * Use a UnitTester to constuct a test harness for a chisel module
+ * Use a UnitTester to construct a test harness for a chisel module
  * this module will be canonically referred to as the device_under_test, often simply as c in
  * a unit test, and also dut
  * The UnitTester is used to put series of values (as chisel.Vec's) into the ports of the dut io which are INPUTs
@@ -101,7 +61,7 @@ trait UnitTestRunners {
  *   poke(c.io.in0, 5); poke(c.io.in1, ); poke(
  *
  */
-class UnitTester extends Module with UnitTestRunners {
+class UnitTester extends BasicTester with UnitTestRunners {
   case class Step(input_map: mutable.HashMap[Data,BigInt], output_map: mutable.HashMap[Data,BigInt])
 
   val rnd = new scala.util.Random(Driver.testerSeed)
@@ -114,8 +74,8 @@ class UnitTester extends Module with UnitTestRunners {
     val pc            = UInt(OUTPUT, 32)
     val done          = Bool(OUTPUT)
   }
-  val setDone = Reg(init = Bool(false))
-  val setError = Reg(init = Bool(false))
+  io.done  := setDone
+  io.error := setError
 
   var max_width = Width(0)
   val set_input_op :: wait_for_op :: expect_op :: Nil = Enum(UInt(), 3)

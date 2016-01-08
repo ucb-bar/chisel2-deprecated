@@ -35,6 +35,7 @@ import org.junit.Test
 import org.junit.Ignore
 
 // Test the Chisel3 UnitTester interface.
+
 class GCDUnitTest extends TestSuite {
 
  @Test def testGCDUnitTester() {
