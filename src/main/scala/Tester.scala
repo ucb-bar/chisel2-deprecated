@@ -255,7 +255,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     if (isStale) update
     val value = 
       if (data.isLit) data.litValue()
-      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
+      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap getOrElse (data, BigInt(0))
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
     if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
     value
