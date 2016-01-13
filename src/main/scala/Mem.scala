@@ -58,11 +58,11 @@ object Mem {
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
     if (Driver.minimumCompatibility > "2") {
-      ChiselError.warning("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
+      ChiselError.error("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
       if (seqRead)
-        ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
+        ChiselError.error("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
       if (orderedWrites)
-        ChiselError.warning("Mem(..., orderedWrites) is deprecated.")
+        ChiselError.error("Mem(..., orderedWrites) is deprecated.")
     }
     construct(n, out, seqRead, orderedWrites, clock)
   }

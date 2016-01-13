@@ -99,7 +99,7 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
 class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
   if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg] && Driver.minimumCompatibility > "2") {
-    ChiselError.warning("Vec(Reg) is deprecated. Please use Reg(Vec)")
+    ChiselError.error("Vec(Reg) is deprecated. Please use Reg(Vec)")
   }
   val readPorts = new HashMap[UInt, T]
   override def apply(idx: Int): T = self(idx)
