@@ -361,7 +361,12 @@ abstract class Bits extends Data with proc {
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (b: Bits): Bool     = newLogicalOp(b, "!=");
+  def != (b: Bits): Bool = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("!= is deprecated, use =/= instead")
+    }
+    newLogicalOp(b, "!=");
+  }
   /** not equal to */
   def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
   /** Bitwise and */

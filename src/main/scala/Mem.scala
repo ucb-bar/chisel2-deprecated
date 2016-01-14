@@ -306,6 +306,9 @@ object SeqMem {
 
   @deprecated("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", "2.29")
   def apply[T <: Data](out: => T, n: Int): SeqMem[T] = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.")
+    }
     apply(n, out)
   }
 }

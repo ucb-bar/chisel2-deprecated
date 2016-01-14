@@ -49,6 +49,9 @@ object VecMux {
 object Vec {
   @deprecated("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", "2.29")
   def apply[T <: Data](gen: => T, n: Int): Vec[T] = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.")
+    }
     apply(n, gen)
   }
 
