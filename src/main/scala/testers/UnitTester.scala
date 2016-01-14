@@ -34,10 +34,15 @@ import Chisel._
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
+
+// scalastyle:off regex
+// scalastyle:off method.name
 
 object Chisel2State {
   var args = Array[String]()
 }
+
 /**
  * Use a UnitTester to construct a test harness for a chisel module
  * this module will be canonically referred to as the device_under_test, often simply as c in
@@ -64,8 +69,6 @@ object Chisel2State {
 class UnitTester extends BasicTester with UnitTestRunners {
   case class Step(input_map: mutable.HashMap[Data,BigInt], output_map: mutable.HashMap[Data,BigInt])
 
-  val rnd = new scala.util.Random(Driver.testerSeed)
-
   def int(x: Bits):    BigInt = x.litValue()
 
   override val io = new Bundle {
@@ -77,8 +80,7 @@ class UnitTester extends BasicTester with UnitTestRunners {
   io.done  := setDone
   io.error := setError
 
-  var max_width = Width(0)
-  val set_input_op :: wait_for_op :: expect_op :: Nil = Enum(UInt(), 3)
+  val rnd = new scala.util.Random(Driver.testerSeed)
 
   val ports_referenced = new mutable.HashSet[Data]
 
@@ -119,12 +121,8 @@ class UnitTester extends BasicTester with UnitTestRunners {
     /**
      * connect to the device under test by connecting each of it's io ports to an appropriate register
      */
-    val dut_inputs = dut.wires.flatMap { case (name, element) =>
-      if(element.dir == INPUT) Some(element) else None
-    }
-    val dut_outputs = dut.wires.flatMap { case (name, element) =>
-      if(element.dir == OUTPUT) Some(element) else None
-    }
+    val dut_inputs  = dut.io.flatten.flatMap { case (name, port) => if (port.dir == INPUT  && ports_referenced.contains(port)) Some(port) else None }
+    val dut_outputs = dut.io.flatten.flatMap { case (name, port) => if (port.dir == OUTPUT && ports_referenced.contains(port)) Some(port) else None }
 
     val port_to_name = {
       val port_to_name_accumulator = new mutable.HashMap[Data, String]()
@@ -148,10 +146,9 @@ class UnitTester extends BasicTester with UnitTestRunners {
           e match {
             case bb: Bundle  => parse_bundle(bb, new_name)
             case vv: Vec[_]  => parse_vecs(vv, new_name)
-            case ee: Bits => {}
-            case _           => {
-              throw new Exception(s"bad bundle member ${new_name} $e")
-            }
+            case ee: Bits    =>
+            case _           =>
+              throw new Exception(s"bad bundle member $new_name $e")
           }
         }
       }
@@ -164,10 +161,9 @@ class UnitTester extends BasicTester with UnitTestRunners {
           e match {
             case bb: Bundle  => parse_bundle(bb, new_name)
             case vv: Vec[_]  => parse_vecs(vv, new_name)
-            case ee: Bits => {}
-            case _           => {
-              throw new Exception(s"bad bundle member ${new_name} $e")
-            }
+            case ee: Bits    =>
+            case _           =>
+              throw new Exception(s"bad bundle member $new_name $e")
           }
         }
       }
@@ -183,40 +179,38 @@ class UnitTester extends BasicTester with UnitTestRunners {
     /**
      *  Print a title for the testing state table
      */
-    val max_col_width = 2 + (if (ports_referenced.isEmpty) {
-      0
-    } else {
-      ports_referenced.map { port =>
-        Array(port_to_name(port).length, port.getWidth / 4).max  // width/4 is how wide value might be in hex
-      }.max
-    })
-    val (string_col_template, number_col_template) = (s"%${max_col_width}s", s"%${max_col_width}x")
+    if(ports_referenced.nonEmpty) {
+      val max_col_width = ports_referenced.map { port =>
+        Array(port_to_name(port).length, port.getWidth / 4).max // width/4 is how wide value might be in hex
+      }.max + 2
+      val (string_col_template, number_col_template) = (s"%${max_col_width}s", s"%${max_col_width}x")
 
-    println("="*80)
-    println("UnitTester state table")
-    println(
-      "%6s".format("step") +
-        dut_inputs.map  { dut_input  => string_col_template.format(port_to_name(dut_input))}.mkString +
-        dut_outputs.map { dut_output => string_col_template.format(port_to_name(dut_output))}.mkString
-    )
-    println("-"*80)
-    /**
-     * prints out a table form of input and expected outputs
-     */
-    def val_str(hash : mutable.HashMap[Data, BigInt], key: Data) : String = {
-      if( hash.contains(key) ) "%x".format(hash(key)) else "-"
-    }
-    test_actions.zipWithIndex.foreach { case (step, step_number) =>
-      print("%6d".format(step_number))
-      for(port <- dut_inputs) {
-        print(string_col_template.format(val_str(step.input_map, port)))
+      println("=" * 80)
+      println("UnitTester state table")
+      println(
+        "%6s".format("step") +
+          dut_inputs.map { dut_input => string_col_template.format(port_to_name(dut_input)) }.mkString +
+          dut_outputs.map { dut_output => string_col_template.format(port_to_name(dut_output)) }.mkString
+      )
+      println("-" * 80)
+      /**
+        * prints out a table form of input and expected outputs
+        */
+      def val_str(hash: mutable.HashMap[Data, BigInt], key: Data): String = {
+        if (hash.contains(key)) "%x".format(hash(key)) else "-"
       }
-      for(port <- dut_outputs) {
-        print(string_col_template.format(val_str(step.output_map, port)))
+      test_actions.zipWithIndex.foreach { case (step, step_number) =>
+        print("%6d".format(step_number))
+        for (port <- dut_inputs) {
+          print(string_col_template.format(val_str(step.input_map, port)))
+        }
+        for (port <- dut_outputs) {
+          print(string_col_template.format(val_str(step.output_map, port)))
+        }
+        println()
       }
-      println()
+      println("=" * 80)
     }
-    println("="*80)
 
     io.done  := setDone
     io.error := setError
@@ -232,14 +226,14 @@ class UnitTester extends BasicTester with UnitTestRunners {
       port_to_display.append(pc)
 
       for( dut_input <- dut_inputs ) {
-        format_statement.append(",  " + port_to_name(dut_input)+": %x")
+        format_statement.append(",  " + port_to_name(dut_input) + ": %x")
         port_to_display.append(dut_input)
       }
       for( dut_output <- dut_outputs ) {
-        format_statement.append(",   " + port_to_name(dut_output)+": %x")
+        format_statement.append(",   " + port_to_name(dut_output) + ": %x")
         port_to_display.append(dut_output)
       }
-      printf(format_statement.toString() + "\n", port_to_display.map{_.toBits()}.toSeq :_* )
+      printf(format_statement.toString(), port_to_display.map{_.toBits()}.toSeq :_* )
     }
 
     log_referenced_ports
@@ -272,11 +266,11 @@ class UnitTester extends BasicTester with UnitTestRunners {
 
       when(ok_to_test_output_values(pc)) {
         when(output_port.toBits() === output_values(pc).toBits()) {
-//          printf("    passed -- " + port_to_name(output_port) + ":  0x%x\n",
+//          printf("    passed -- " + port_to_name(output_port) + ":  0x%x",
 //            output_port.toBits()
 //          )
         }.otherwise {
-          printf("    failed -- port " + port_to_name(output_port) + ":  0x%x expected 0x%x\n",
+          printf("    failed -- port " + port_to_name(output_port) + ":  0x%x expected 0x%x",
             output_port.toBits(),
             output_values(pc).toBits()
           )

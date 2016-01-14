@@ -31,6 +31,8 @@
 package Chisel.testers
 import Chisel._
 
+// scalastyle:off regex
+
 // Wrapper to run Chisel3-style testers in Chisel2.
 
 trait UnitTestRunners {
@@ -49,8 +51,9 @@ trait UnitTestRunners {
         }
         val error = c.peek(mod.io.error)
         val pc = c.peek(mod.io.pc)
-        if (error != 0)
+        if (error != 0) {
           c.fail
+        }
 
   // Do an additional step to get any printf output.
         c.step(1)

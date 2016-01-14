@@ -41,9 +41,12 @@ import scala.collection.mutable.ArrayBuffer
  * that use Decoupled inputs and either Decoupled or Valid outputs
  * Multiple decoupled inputs are supported.
  * Testers that subclass this will be strictly ordered.
- * Input will flow into their devices asynchronosly but in order they were generated
+ * Input will flow into their devices asynchronously but in order they were generated
  * be compared in the order they are generated
  */
+
+// scalastyle:off regex
+// scalastyle:off method.name
 
 abstract class DecoupledTester extends BasicTester with UnitTestRunners {
   def device_under_test : Module
@@ -178,7 +181,7 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
    * this builds a circuit to load inputs and circuits to test outputs that are controlled
    * by either a decoupled or valid
    */
-  def finish(): Unit = {
+  def finish(show_io_table: Boolean = false): Unit = {
     io_info = new IOAccessor(device_under_test.io)
 
     process_input_events()
@@ -197,9 +200,8 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
     io.done  := setDone
     io.error := setError
 
-  //  printf("ic %d, oc %d, iec %d, oec %d\n", input_complete, output_complete, input_event_counter, output_event_counter)
     when(input_complete && output_complete) {
-      printf("All input and output events completed.\n")
+      printf("All input and output events completed")
       stop()
     }
 
@@ -241,7 +243,9 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
             input_event_counter := input_event_counter + UInt(1)
           }
         }.otherwise {
-          printf(s"controller ${io_info.port_to_name(controlling_port)} says not my turn.\n")
+          when(is_this_my_turn(input_event_counter)) {
+            printf(s"controller ${io_info.port_to_name(controlling_port)} says waiting for valid")
+          }
         }
       }
     }
@@ -251,7 +255,7 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
      */
     decoupled_control_port_to_output_steps.foreach { case (controlling_port, steps) =>
       println(s"Building output events for ${io_info.port_to_name(controlling_port)}")
-      val counter_for_this_decoupled = Reg(init = UInt(0, width = log2Up(output_event_list.size)))
+      val counter_for_this_decoupled = Reg(init = UInt(0, width = log2Up(output_event_list.size) + 1))
       val associated_event_numbers = steps.map { step => step.event_number }.toSet
 
       val ports_referenced_for_this_controlling_port = new mutable.HashSet[Data]()
@@ -269,11 +273,11 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
       when(!output_complete && is_this_my_turn(output_event_counter)) {
         when(controlling_port.valid) {
           ports_referenced_for_this_controlling_port.foreach { port =>
-            printf(s"output test event %d testing ${io_info.port_to_name(port)} = %d, should be %d.\n",
+            printf(s"output test event %d testing ${io_info.port_to_name(port)} = %d, should be %d",
               output_event_counter, port.asInstanceOf[UInt], port_vector_values(port)(output_event_counter)
             )
-            when(port.asInstanceOf[UInt] != port_vector_values(port)(output_event_counter)) {
-              printf(s"Error: event %d ${io_info.port_to_name(port)} was %d should be %d\n.",
+            when(port.asInstanceOf[UInt] =/= port_vector_values(port)(output_event_counter)) {
+              printf(s"Error: event %d ${io_info.port_to_name(port)} was %d should be %d",
                 output_event_counter, port.toBits(), port_vector_values(port)(output_event_counter))
               error()
             }
@@ -288,7 +292,7 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
      * Test values on output ports moderated with a valid interface
      */
     valid_control_port_to_output_steps.foreach { case (controlling_port, steps) =>
-      val counter_for_this_valid = Reg(init = UInt(0, width = log2Up(output_event_list.size)))
+      val counter_for_this_valid = Reg(init = UInt(0, width = log2Up(output_event_list.size) + 1))
       val associated_event_numbers = steps.map { step => step.event_number }.toSet
 
       val ports_referenced_for_this_controlling_port = new mutable.HashSet[Data]()
@@ -305,11 +309,11 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
       when(!output_complete && is_this_my_turn(output_event_counter)) {
         when(controlling_port.valid) {
           ports_referenced_for_this_controlling_port.foreach { port =>
-            printf(s"output test event %d testing ${io_info.port_to_name(port)} = %d, should be %d\n",
+            printf(s"output test event %d testing ${io_info.port_to_name(port)} = %d, should be %d",
               output_event_counter, port.asInstanceOf[UInt], port_vector_values(port)(output_event_counter)
             )
-            when(port.asInstanceOf[UInt] != port_vector_values(port)(output_event_counter)) {
-              printf(s"Error: event %d ${io_info.port_to_name(port)} was %x should be %x\n",
+            when(port.asInstanceOf[UInt] =/= port_vector_values(port)(output_event_counter)) {
+              printf(s"Error: event %d ${io_info.port_to_name(port)} was %x should be %x",
                 output_event_counter, port.toBits(), port_vector_values(port)(output_event_counter))
               error()
             }
@@ -319,5 +323,6 @@ abstract class DecoupledTester extends BasicTester with UnitTestRunners {
         }
       }
     }
+    io_info.show_ports("".r)
   }
 }
