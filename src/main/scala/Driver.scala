@@ -42,10 +42,22 @@ object Driver extends FileSystemUtilities{
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
       ChiselError.report
-      if (ChiselError.hasErrors && !getLineNumbers) {
+      if (wantLineNumbers) {
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
         apply(args :+ "--lineNumbers", gen, wrapped)
       }
+    }
+  }
+  
+  // If we encountered errors, and re-running with --lineNumbers may help
+  //  diagnose the problem, indicate we should do so.
+  def wantLineNumbers: Boolean = {
+    if (ChiselError.hasErrors && !getLineNumbers) {
+      // If we have a non-cpp compilation error with no line number information,
+      //  re-running may help.
+      ChiselError.getErrorList.exists(e => e.line == null && !e.msgFun().startsWith("failed to compile "))
+    } else {
+      false
     }
   }
 

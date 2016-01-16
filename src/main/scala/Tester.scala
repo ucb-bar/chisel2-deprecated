@@ -72,6 +72,7 @@ trait Tests {
   def expect (data: Bits, expected: Long): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
+  def newTestOutputString: String
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean
   def expect (data: Bits, expected: Int, msg: => String): Boolean
   def expect (data: Bits, expected: Long, msg: => String): Boolean
@@ -86,10 +87,11 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
+  * @param _base base for prints, default 16 (hex)
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
+class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int = 16) extends FileSystemUtilities {
   var t = 0 // simulation time
   var delta = 0
   private val _pokeMap = HashMap[Bits, BigInt]()
@@ -103,7 +105,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private var isStale = false
   // Return any accumulated module printf output since the last call.
   private var _lastLogIndex = 0
-  private def newTestOutputString: String = {
+  def newTestOutputString: String = {
     val result = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
     _lastLogIndex = _logs.length
     result
@@ -136,7 +138,25 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   private class Channel(name: String) {
     private lazy val file = new java.io.RandomAccessFile(name, "rw")
     private lazy val channel = file.getChannel
-    @volatile private lazy val buffer = channel map (FileChannel.MapMode.READ_WRITE, 0, channel.size)
+    @volatile private lazy val buffer = {
+      /* We have seen runs where buffer.put(0,0) fails with:
+[info]   java.lang.IndexOutOfBoundsException:
+[info]   at java.nio.Buffer.checkIndex(Buffer.java:532)
+[info]   at java.nio.DirectByteBuffer.put(DirectByteBuffer.java:300)
+[info]   at Chisel.Tester$Channel.release(Tester.scala:148)
+[info]   at Chisel.Tester.start(Tester.scala:717)
+[info]   at Chisel.Tester.<init>(Tester.scala:743)
+[info]   at ArbiterSuite$ArbiterTests$8.<init>(ArbiterTest.scala:396)
+[info]   at ArbiterSuite$$anonfun$testStableRRArbiter$1.apply(ArbiterTest.scala:440)
+[info]   at ArbiterSuite$$anonfun$testStableRRArbiter$1.apply(ArbiterTest.scala:440)
+[info]   at Chisel.Driver$.apply(Driver.scala:65)
+[info]   at Chisel.chiselMain$.apply(hcl.scala:63)
+[info]   ...
+       */ 
+      val size = channel.size
+      assert(size > 16, "channel.size is bogus: %d".format(size))
+      channel map (FileChannel.MapMode.READ_WRITE, 0, size)
+    }
     implicit def intToByte(i: Int) = i.toByte
     def aquire {
       buffer put (0, 1)
@@ -159,9 +179,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     new java.io.File(name).delete
   }
 
-  private lazy val inChannel = new Channel("channel.in")
-  private lazy val outChannel = new Channel("channel.out")
-  private lazy val cmdChannel = new Channel("channel.cmd")
+  private lazy val inChannel  = new Channel(inChannelName)  
+  private lazy val outChannel = new Channel(outChannelName)
+  private lazy val cmdChannel = new Channel(cmdChannelName) 
 
   def dumpName(data: Node): String = Driver.backend match {
     case _: FloBackend => data.getNode.name
@@ -226,7 +246,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off Offset in memory to look at */
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
     val value = peekNode(data, Some(off))
-    if (isTrace) println("  PEEK %s[%d] -> %x".format(dumpName(data), off, value))
+    if (isTrace) println(s"  PEEK ${dumpName(data)}[${off}] -> ${value.toString(_base)}")
     value
   }
   /** Peek at the value of some bits
@@ -237,21 +257,31 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
       if (data.isLit) data.litValue()
       else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
-    if (isTrace) println("  PEEK %s -> %x".format(dumpName(data), value))
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
     value
   }
   /** Peek at Aggregate data
     * @return an Array of BigInts representing the data */
   def peek(data: Aggregate): Array[BigInt] = {
-    data.flatten.map(x => x._2) map (peek(_))
+    data.flatten map (x => peek(x._2))
   }
   /** Interpret data as a single precision float */
   def peek(data: Flo): Float = {
-    intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
+    val _isTrace = isTrace
+    isTrace = false
+    val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
+    isTrace = _isTrace
+    value
   }
   /** Interpret the data as a double precision float */
   def peek(data: Dbl): Double = {
-    longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
+    val _isTrace = isTrace
+    isTrace = false
+    val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
+    isTrace = _isTrace
+    value
   }
 
   private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
@@ -288,7 +318,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     * @param off The offset representing the index to write to memory
     */
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
-    if (isTrace) println("  POKE %s[%d] <- %x".format(dumpName(data), off, value))
+    if (isTrace) println(s"  POKE ${dumpName(data)}[${off}] <- ${value.toString(_base)}")
     pokeNode(data, value, Some(off))
   }
   /** Set the value of some 'data' Node */
@@ -305,11 +335,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     }
     data.getNode match {
       case _: Delay =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         pokeNode(data.getNode, value)
         isStale = true
       case _ if data.isTopLevelIO && data.dir == INPUT =>
-        if (isTrace) println("  POKE %s <- %x".format(dumpName(data), value))
+        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         _pokeMap(data) = value
         isStale = true
       case _ =>
@@ -323,11 +353,19 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   }
   /** Set the value of a hardware single precision floating point representation */
   def poke(data: Flo, x: Float): Unit = {
+    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
+    val _isTrace = isTrace
+    isTrace = false
     poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
+    isTrace = _isTrace
   }
   /** Set the value of a hardware double precision floating point representation */
   def poke(data: Dbl, x: Double): Unit = {
+    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
+    val _isTrace = isTrace
+    isTrace = false
     poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
+    isTrace = _isTrace
   }
 
   private def sendCmd(data: Int) = {
@@ -380,7 +418,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     val value = if (!valid) None else {
       outChannel.consume
       Some(((0 until chunk) foldLeft BigInt(0))(
-        (res, i) => res | (BigInt(outChannel(i)) << (64*i))))
+        (res, i) => res | (int(outChannel(i)) << (64*i))))
     }
     outChannel.release
     value
@@ -500,15 +538,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Convert Bits to BigInt */
   def int(x: Bits):    BigInt = x.litValue()
 
-  var ok = true
-  var failureTime = -1
-
   /** Indicate a failure has occurred.  */
-  def fail() {
+  var failureTime = -1
+  var ok = true
+  def fail {
+    if (failureTime == -1) failureTime = t
     ok = false
-    if (failureTime == -1) {
-      failureTime = t
-    }
   }
 
   // Prepend an optional string - issue #534
@@ -526,16 +561,20 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     */
   def expect (good: Boolean, msg: => String): Boolean = {
     if (isTrace) println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
-    if (!good) { fail() }
+    if (!good) fail
     good
   }
 
   /** Expect the value of data to have the same bits as a BigInt */
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
     val exp = expected & mask
-    expect(got == exp, prependOptionalString(msg, "EXPECT %s <- %x == %x".format(dumpName(data), got, exp)))
+    isTrace = _isTrace
+    expect(got == exp, prependOptionalString(msg, 
+      s"  EXPECT ${dumpName(data)} <- ${got.toString(_base)} == ${exp.toString(_base)}"))
   }
   def expect (data: Bits, expected: BigInt): Boolean = {
     expect(data, expected, "")
@@ -544,10 +583,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of Aggregate data to be have the values as passed in with the array */
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean = {
     val kv = (data.flatten.map(x => x._2), expected.reverse).zipped
-    var allGood = true
-    for ((d, e) <- kv)
-      allGood = expect(d, e) && allGood
-    allGood
+    kv forall {case (d, e) => expect(d, e)}
   }
 
   /** Expect the value of 'data' to be 'expected'
@@ -572,8 +608,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Flo, expected: Float, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val got = peek(data)
-    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
+    isTrace = _isTrace
+    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
   }
   def expect (data: Flo, expected: Float): Boolean = {
     expect(data, expected, "")
@@ -582,8 +621,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Dbl, expected: Double, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val got = peek(data)
-    expect(got == expected, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), got, expected)))
+    isTrace = _isTrace
+    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
   }
   def expect (data: Dbl, expected: Double): Boolean = {
     expect(data, expected, "")
@@ -595,6 +637,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   /** A tolerant expect for Float
     * Allows for a single least significant bit error in the floating point representation */
   def expect (data: Bits, expected: Float, msg: => String): Boolean = {
+    val _isTrace = isTrace
+    isTrace = false
     val gotBits = peek(data).toInt
     val expectedBits = java.lang.Float.floatToIntBits(expected)
     var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
@@ -606,7 +650,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         expectedFloat = gotFLoat
       }
     }
-    expect(gotFLoat == expectedFloat, prependOptionalString(msg, "EXPECT %s <- %s == %s".format(dumpName(data), gotFLoat, expectedFloat)))
+    isTrace = _isTrace
+    expect(gotFLoat == expectedFloat, prependOptionalString(msg, 
+      s"  EXPECT ${dumpName(data)} <- ${gotFLoat} == ${expectedFloat}"))
   }
   def expect (data: Bits, expected: Float): Boolean = {
     expect(data, expected, "")
@@ -630,42 +676,64 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
 
   // Always use a specific seed so results (whenever) are reproducible.
   val rnd = new Random(Driver.testerSeed)
-  val process: Process = {
-    val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val target = s"${Driver.targetDir}/${n}"
-    // If the caller has provided a specific command to execute, use it.
-    val cmd = Driver.testCommand match {
-      case Some(cmd) => cmd
-      case None => Driver.backend match {
-        case b: FloBackend =>
-          val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
-          if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
-          if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
-          command ++= ArrayBuffer(":target-dir", Driver.targetDir)
-          command.mkString(" ")
-        case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
-          if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
-          if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
-        case _ => target
-      }
+  val targetSubDir = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+  val target = s"${Driver.targetDir}/${targetSubDir}"
+  // If the caller has provided a specific command to execute, use it.
+  val cmd = Driver.testCommand match {
+    case Some(cmd) => cmd
+    case None => Driver.backend match {
+      case b: FloBackend =>
+        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
+        if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
+        if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
+        command ++= ArrayBuffer(":target-dir", Driver.targetDir)
+        command.mkString(" ")
+      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
+        if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
+        if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
+      case _ => target
     }
+  }
+
+  val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
     val processBuilder = Process(cmd) 
     val processLogger = ProcessLogger(_logs += _)
     val process = processBuilder run processLogger
+
+    // Set up a Future to wait for (and signal) the test process exit.
+    val exitValue: Future[Int] = Future {
+      blocking {
+        process.exitValue
+      }
+    }
     println("SEED " + Driver.testerSeed)
     println("STARTING " + cmd)
-    while(!new java.io.File("sim.start").exists) Thread.sleep(100)
-    new java.io.File("sim.start").delete 
+    // Wait for the startup message
+    // NOTE: There may be several messages before we see our startup message.
+    val simStartupMessageStart = "sim start on "
+    while (!_logs.exists(_ startsWith simStartupMessageStart) && !exitValue.isCompleted) { Thread.sleep(100) }
+    // Remove the startup message (and any precursors).
+    while (!_logs.isEmpty && !_logs.head.startsWith(simStartupMessageStart)) {
+      println(_logs.remove(0))
+    }
+    if (!_logs.isEmpty) println(_logs.remove(0)) else println("<no startup message>")
+    while (_logs.size < 3) { Thread.sleep(100) }
+    val in_channel_name = _logs.remove(0)
+    val out_channel_name = _logs.remove(0)
+    val cmd_channel_name = _logs.remove(0)
+    println(s"inChannelName: ${in_channel_name}")
+    println(s"outChannelName: ${out_channel_name}")
+    println(s"cmdChannelName: ${cmd_channel_name}")
     // Init channels
+    (process, exitValue, in_channel_name, out_channel_name, cmd_channel_name)
+  }
+
+  private def start {
     inChannel.consume
     cmdChannel.consume
     inChannel.release
     outChannel.release
     cmdChannel.release
-    process
-  }
-
-  private def start {
     t = 0
     mwhile(!recvOutputs) { }
     // reset(5)
@@ -687,13 +755,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
     outChannel.close
     cmdChannel.close
     if(!ok) throwException("Module under test FAILED at least one test vector.")
-  }
-
-  // Set up a Future to wait for (and signal) the test process exit.
-  private val exitValue: Future[Int] = Future {
-    blocking {
-      process.exitValue
-    }
   }
 
   // Once everything has been prepared, we can start the communications.

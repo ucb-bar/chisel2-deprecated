@@ -1,106 +1,72 @@
 #include "vpi.h"
 
-/*==========================================================================
-                 User Functions
-=============================================================================*/
+vpi_api_t* vpi_api = NULL;
 
-PLI_INT32 init_clks_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->init_clks();
+extern "C" {
+
+PLI_INT32 init_clks_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->init_clks();
   return 0;
 }
 
-PLI_INT32 init_rsts_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->init_rsts();
+PLI_INT32 init_rsts_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->init_rsts();
   return 0;
 }
 
-PLI_INT32 init_ins_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->init_ins();
+PLI_INT32 init_ins_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->init_ins();
   return 0;
 }
 
-PLI_INT32 init_outs_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->init_outs();
+PLI_INT32 init_outs_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->init_outs();
   return 0;
 }
 
-PLI_INT32 init_sigs_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->init_sigs();
+PLI_INT32 init_sigs_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->init_sigs();
   return 0;
 }
 
-PLI_INT32 tick_calltf(PLI_BYTE8 *vpi_api) {
-  ((vpi_api_t*)vpi_api)->tick();
+PLI_INT32 tick_calltf(PLI_BYTE8 *user_data) {
+  vpi_api->tick();
+  return 0;
+}
+
+PLI_INT32 tick_compiletf(PLI_BYTE8 *user_data) {
+  s_cb_data data_s;
+  data_s.reason    = cbStartOfSimulation;
+  data_s.cb_rtn    = sim_start_cb;
+  data_s.obj       = NULL;
+  data_s.time      = NULL;
+  data_s.value     = NULL;
+  data_s.user_data = NULL;
+  vpi_free_object(vpi_register_cb(&data_s)); 
+ 
+  data_s.reason    = cbEndOfSimulation;
+  data_s.cb_rtn    = sim_end_cb;
+  data_s.obj       = NULL;
+  data_s.time      = NULL;
+  data_s.value     = NULL;
+  data_s.user_data = NULL;
+  vpi_free_object(vpi_register_cb(&data_s));
+  return 0;
+}
+
+PLI_INT32 sim_start_cb(p_cb_data cb_data) {
+  vpi_api = new vpi_api_t;
+  return 0;
+}
+
+PLI_INT32 sim_end_cb(p_cb_data cb_data) {
+  delete vpi_api;
   return 0;
 }
 
 PLI_INT32 tick_cb(p_cb_data cb_data) {
-  ((vpi_api_t*)cb_data->user_data)->tick();
+  vpi_api->tick();
   return 0;
 }
 
-/*==========================================================================
-                 Registration Functions
-=============================================================================*/
-void registration() {
-  vpi_api_t* vpi_api = new vpi_api_t;
-
-  s_vpi_systf_data tf_data;
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_clks";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_clks_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data = (PLI_BYTE8*) vpi_api;
-  vpi_register_systf(&tf_data);
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_rsts";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_rsts_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data = (PLI_BYTE8*) vpi_api;
-  vpi_register_systf(&tf_data);
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_ins";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_ins_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data =(PLI_BYTE8*) vpi_api;
-  vpi_register_systf(&tf_data);
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_outs";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_outs_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data =(PLI_BYTE8*) vpi_api;
-  vpi_register_systf(&tf_data);
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$init_sigs";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = init_sigs_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data =(PLI_BYTE8*) vpi_api;
-  vpi_register_systf(&tf_data);
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = (PLI_BYTE8*) "$tick";
-  tf_data.sizetf    = NULL;
-  tf_data.calltf    = tick_calltf;
-  tf_data.compiletf = NULL;
-  tf_data.user_data =(PLI_BYTE8* )vpi_api;
-  vpi_register_systf(&tf_data);
-  return;
 }
-
-/*==========================================================================
-                 Start-up Array
-=============================================================================*/
-void (*vlog_startup_routines[]) () = {
-  registration,
-  0
-};
-

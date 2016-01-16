@@ -267,6 +267,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     debugs += x.getNode
   }
 
+  def debug(data: Aggregate): Unit = {
+    data.flatten.map(x => debug(x._2))
+  }
+
   /** Adds a printf to the module called each clock cycle
     * @param message A c style sting to print out eg) %d, %x
     * @param args Nodes whos data values should be printed
@@ -296,7 +300,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     val gen = pin.clone
     io match {
       case b: Bundle => {
-        for ((n, io) <- gen.flatten) {
+        for ((n, io) <- gen.flatten if !io.isDirectionless && !io.getNode.isLit) {
           io.compOpt = Some(this)
           io.isIo = true
         }
@@ -593,7 +597,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
       val nodeNames = nodes.map(_.name).mkString(", ")
       val plural = if (nodes.length > 1) "s" else ""
       val errorString = "Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeNames)
-      ChiselError.warning(errorString, errorLine)
+      ChiselError.error(errorString, errorLine)
     }
   }
 
