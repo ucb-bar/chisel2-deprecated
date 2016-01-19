@@ -22,7 +22,7 @@ compile:
 	$(SBT) $(SBT_FLAGS) compile
 
 publish-local:
-	$(SBT) $(SBT_FLAGS) publish-local
+	$(SBT) $(SBT_FLAGS) +publish-local
 
 smoke:
 	$(SBT) $(SBT_FLAGS) "testOnly $(SMOKE_TESTS)"
