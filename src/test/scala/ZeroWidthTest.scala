@@ -87,7 +87,8 @@ class ZeroWidthTest extends TestSuite {
       val res = UInt(0,0)
       assertTrue( res.getWidth == 0 )
       assertTrue( res.litValue() == 0 )
-      }
+    }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Generate a zero-width wire from a '>>' */
@@ -98,6 +99,7 @@ class ZeroWidthTest extends TestSuite {
       assertTrue( res.getWidth == 0 )
       assertTrue( res.litValue() == 0 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   /** Generate a zero-width wire from an extraction. */
@@ -108,6 +110,7 @@ class ZeroWidthTest extends TestSuite {
       assertTrue( res.getWidth == 0 )
       assertTrue( res.litValue() == 0 )
     }
+    val dummyInst = Module(new Dummy)
   }
 
   @Test def testOperators() {
@@ -195,8 +198,8 @@ class ZeroWidthTest extends TestSuite {
       // ===(b: UInt): Bool
       val v = io.x === io.y
 
-      // != (b: UInt): Bool
-      val w = io.x != io.y
+      // =/= (b: UInt): Bool
+      val w = io.x =/= io.y
 
       // >  (b: UInt): Bool
       val x = io.x > io.y

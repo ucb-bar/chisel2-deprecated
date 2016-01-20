@@ -31,17 +31,38 @@
 package Chisel
 import scala.collection.SortedMap
 
+/** Read Only Memory object
+  * Optionally create in a map with integer addresses attached
+  * Create a [[Chisel.Vec Vec]] of literals rather than ROM directly
+  */
 object ROM {
+  /** @param elt0 the first data object at address 0 in the ROM
+    * @param elts any number of data objects for the ROM */
   def apply[T <: Data](elt0: T, elts: T*): ROM[T] = apply(elt0 +: elts.toSeq)
+  /** @param elts any number of data objects for the ROM */
   def apply[T <: Data](elts: Iterable[T]): ROM[T] = apply(elts.toSeq.zipWithIndex.map { case(z,i) => i -> z })
+  /** @param elt0 the first data object at address 0 in the ROM
+    * @param elts any number of data objects for the ROM */
   def apply[T <: Data](elt0: (Int, T), elts: (Int, T)*): ROM[T] = apply(elt0 +: elts.toSeq)
+  /** @param elts any number of data objects for the ROM
+    * @param n optionally force the size of the ROM */
   def apply[T <: Data](elts: Seq[(Int, T)], n: Option[Int]): ROM[T] = new ROM(SortedMap(elts:_*), n)
+  /** @param elts any number of data objects for the ROM
+    * @param n optionally force the size of the ROM */
   def apply[T <: Data](elts: Seq[(Int, T)], n: Int): ROM[T] = apply(elts, Some(n))
+  /** @param elts any number of data objects for the ROM */
   def apply[T <: Data](elts: Seq[(Int, T)]): ROM[T] = apply(elts, None)
+  /** @param elts any number of data objects for the ROM */
   def apply[T <: Data](elts: Array[(Int, T)]): ROM[T] = apply(elts.toSeq, None)
+  /** @param elts any number of data objects for the ROM
+    * @param n optionally force the size of the ROM */
   def apply[T <: Data](elts: Array[(Int, T)], n: Int): ROM[T] = apply(elts.toSeq, Some(n))
 }
 
+/** Class defining a ROM
+  * Use the [[Chisel.ROM$ ROM]] object rather than instantiating the ROM directly
+  * @param elts any number of data elements combined with Integer address
+  * @param lengthIn optionally force the size of the ROM */
 class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) extends Vec[T](i => elts.head._2.cloneType, Nil) {
   override val self = elts.unzip._2.toVector
   override val length: Int = lengthIn match {
@@ -50,6 +71,7 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
   }
   private lazy val data = new ROMData(elts, length)
 
+  /** Read data from the ROM at an address */
   override def read(addr: UInt): T = {
     val res = gen(0)
     val port = new ROMRead().init("", Node.widthOf(1), addr, data)
@@ -58,25 +80,24 @@ class ROM[T <: Data](elts: SortedMap[Int, T], lengthIn: Option[Int] = None) exte
     res
   }
 
+  /** Illegal, cannot write to Read only memory */
   override def write(addr: UInt, data: T): Unit =
     ChiselError.error("Can't write to ROM")
 }
 
+/** ROMData stores the data for [[Chisel.ROM ROM]] */
 class ROMData(elts: SortedMap[Int, Node], val n: Int) extends Node {
   val w = elts.values.map(_.litOpt.get.needWidth()).max
   val sparseLits = {
     inferWidth = Node.fixWidth(w)
     elts.mapValues(_.matchWidth(Width(w)).litOf)
   }
-  val lits = {
-    val dc = Bits.DC(w).litOf
-    Array.tabulate(n)(i => sparseLits.getOrElse(i, dc))
-  }
 
   override lazy val isInObject: Boolean = true
   override lazy val isInVCD: Boolean = Driver.isVCDMem
 }
 
+/** Class to read from ROM - internal, do not use */
 class ROMRead extends Node {
   def inputsTailMaxWidth: (=> Node) => Width = { (m) => {
     m.inputs.map(_.widthW).tail.max

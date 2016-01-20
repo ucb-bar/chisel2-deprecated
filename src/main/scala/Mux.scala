@@ -30,7 +30,13 @@
 
 package Chisel
 
+/** MuxLookup creates a cascade of n Muxs to search for a key value */
 object MuxLookup {
+  /** @param key a key to search for
+    * @param default a default value if nothing is found
+    * @param mapping a sequence to search of keys and values
+    * @return the value found or the default if not
+    */
   def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
@@ -40,8 +46,12 @@ object MuxLookup {
 
 }
 
+/** MuxCase returns the first value that is enabled in a map of values */
 object MuxCase {
-  def apply[T <: Bits] (default: T, mapping: Seq[(Bool, T)]): T = {
+  /** @param default the default value if none are enabled
+    * @param mapping a set of data values with associated enables
+    * @return the first value in mapping that is enabled */
+  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
@@ -50,7 +60,11 @@ object MuxCase {
   }
 }
 
+/** A multiplexor which is a generalization of [[Chisel.Mux Mux]] to use nodes which aren't bools
+  * [[Chisel.Mux Mux]] uses this method internally
+  * If the values are not literals a [[Chisel.Mux Mux]] class is created and initialized */
 object Multiplex {
+  /** muliplex between nodes with if (t != 0) c else a */
   def apply (t: Node, c: Node, a: Node): Node = {
     t.litOpt match { 
       case Some(tl) => if (tl.value == 0) a else c 
@@ -68,6 +82,7 @@ object Multiplex {
   }
 }
 
+/** Usefulness is questionable, remove? */
 object isLessThan {
 
   def distFromData(x: java.lang.Class[_]): Int = {
@@ -89,12 +104,20 @@ object isLessThan {
   }
 }
 
+/** Implement a Multiplexor with a Bool
+  * A convienient wrapper for [[Chisel.Multiplex$ Multiplex]] */
 object Mux {
+  /** Create a Mux
+    * @param cond a condition to determine which value to choose
+    * @param tc the value chosen when cond is true or 1
+    * @param fc the value chosen when cond is false or 0
+    * @example
+    * {{{ val muxOut = Mux(data_in === UInt(3), UInt(3, 4), UInt(0, 4)) }}} */
   def apply[T<:Data](cond: Bool, tc: T, fc: T): T = {
     // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
     if (Driver.minimumCompatibility > "2") {
       if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
-        ChiselError.warning("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+        ChiselError.error("Unable to have mixed type mux CON " + tc + " ALT " + fc)
       }
     }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
@@ -108,7 +131,8 @@ object Mux {
     Mux[T,T,T](target, cond, tc, fc)
   }
 
-  // THIS IS THE MAIN MUX CONSTRUCTOR
+  /** The main Mux constructor, avoid using directly
+    * Try to use other apply method */
   def apply[RT<:Data,TT<:Data,FT<:Data](result: RT, cond: Bool, tc: TT, fc: FT)(
    implicit evi_tc: TT <:< RT, evi_fc: FT <:< RT): RT = {
     // The implicit lines require evidence that TT and RT (the mux inputs) are subtypes of the return.
@@ -136,17 +160,22 @@ object Mux {
   }
 }
 
+/** Mux class defined as an operator
+  */
 class Mux extends Op {
   val op = "Mux"
   override def toString: String =
     inputs(0) + " ? " + inputs(1) + " : " + inputs(2)
+  /** set last input to 'a' */
   def ::(a: Node): Mux = { inputs(2) = a; this }
 
+  /** force the inputs to have the same width as this Mux */
   override def forceMatchingWidths {
     if (inputs(1).widthW != widthW) inputs(1) = inputs(1).matchWidth(widthW)
     if (inputs(2).widthW != widthW) inputs(2) = inputs(2).matchWidth(widthW)
   }
 
+  /** Check for zero width cutting edge of the graph for all zero input nodes found */
   override def W0Wtransform() {
     val w1 = inputs(1).widthW
     val w2 = inputs(2).widthW

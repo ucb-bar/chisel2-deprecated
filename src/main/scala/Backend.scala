@@ -79,20 +79,20 @@ trait FileSystemUtilities {
   def cc(dir: String, name: String, flags: String = "", isCC: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val cmd = List(compiler, "-c", "-o", dir + name + ".o", flags, dir + name + ".cpp").mkString(" ")
-    if (!run(cmd)) throw new Exception("failed to compile " + name + ".cpp")
+    if (!run(cmd)) throwException("failed to compile " + name + ".cpp")
   }
 
   def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val shared = if (isLib) "-shared" else ""
     val ac = (List(compiler, LDFLAGS, shared, "-o", dir + target) ++ (objects map (dir + _))).mkString(" ")
-    if (!run(ac)) throw new Exception("failed to link " + objects.mkString(", "))
+    if (!run(ac)) throwException("failed to link " + objects.mkString(", "))
   }
 }
 
-abstract class Backend extends FileSystemUtilities{
+class Backend extends FileSystemUtilities{
   /* Set of keywords which cannot be used as node and component names. */
-  val keywords: Set[String]
+  val keywords = VerilogBackend.keywords
   val nameSpace = HashSet[String]()
   /* Set of Ops that this backend doesn't natively support and thus must be
      lowered to simpler Ops. */
@@ -102,6 +102,19 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Whether or not this backend decomposes along Module boundaries. */
   def isEmittingComponents: Boolean = false
+
+  private val uniqueSet = HashSet[String]()
+
+  /** Assert that 'uniqueStr' is unique for this backend */
+  private[Chisel] def assertUnique(uniqueStr : String, msg : String) {
+    // Multiple empty strings are allowed
+    if (uniqueStr != "") {
+      if (uniqueSet(uniqueStr))
+        ChiselError.warning("[BUG] Internal error: " + msg)
+      else
+        uniqueSet += uniqueStr
+    }
+  }
 
   def extractClassName(comp: Module): String = {
     val cname  = comp.getClass().getName().replace("$", "_")
@@ -147,9 +160,7 @@ abstract class Backend extends FileSystemUtilities{
 
   /* Returns a string derived from _name_ that can be used as a valid
    identifier for the targeted backend. */
-  def asValidName( name: String ): String = {
-    if (keywords contains name) name + "_" else name;
-  }
+  def asValidName( name: String ): String = if (keywords(name)) name + "_" else name
 
   def nameAll() {
     // Helper classes to get unique names for everything
@@ -165,7 +176,8 @@ abstract class Backend extends FileSystemUtilities{
           } yield new_cand).head // only use the first one
         } else candidate
       }
-      def reserveName(name: String): Unit = assert(name == getUniqueName(name))
+      // Ignore attempts to reserve an empty ("") name - pr499, issue 459
+      def reserveName(name: String): Unit = if (name != "") assert(name == getUniqueName(name), "name " + name + " cannot be reserved")
       def getUniqueName(candidate: String): String = {
         val unique_name = ensureUnique(candidate)
         namespace += unique_name.toLowerCase
@@ -185,16 +197,18 @@ abstract class Backend extends FileSystemUtilities{
       if(comp.name.isEmpty) comp.name = extractClassName(comp)
         // ensure this component has a name
       val children = childrenOfParent.getOrElse(comp, Seq.empty)
-      assert(children.filter(_.name.isEmpty).isEmpty, "Chisel Internal Error: Unnamed Children")
+      assert(children.filter(_.name.isEmpty).isEmpty, ChiselError.error("Internal Error: Unnamed Children"))
         // since sortedComps, all children should have names due to check above
       
       // ensure all nodes in the design has SOME name
       comp dfs { 
-        case reg: Reg if reg.name == "" =>
+        case reg: Reg if reg.name.isEmpty =>
           reg setName "R" + reg.component.nextIndex
         case clk: Clock if clk.name == "" =>
           clk setName "C" + clk.component.nextIndex
-        case node: Node if !node.isTypeNode && node.name == "" && node.compOpt != None =>
+        case mem: Mem[_] if mem.name.isEmpty =>
+          mem setName "T" + mem.component.nextIndex
+        case node: Node if !node.isTypeNode && node.name.isEmpty && node.compOpt != None =>
           node.name = "T" + node.component.nextIndex
         case _ =>
       }
@@ -207,10 +221,12 @@ abstract class Backend extends FileSystemUtilities{
       children.foreach(c => c.name = namespace.getUniqueName(c.name))
       // Then, check all other nodes in the design
       comp dfs { 
-        case reg: Reg =>
+        case reg: Reg => 
           reg setName namespace.getUniqueName(reg.name)
         case clk: Clock =>
           clk setName namespace.getUniqueName(clk.name)
+        case mem: Mem[_] => 
+          mem setName namespace.getUniqueName(mem.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
           // the isLit check should not be necessary
           // the isIo check is also strange and happens because parents see child io in the DFS
@@ -334,14 +350,14 @@ abstract class Backend extends FileSystemUtilities{
         case _: Literal => // Skip the below check for Literals, which can safely be static
         //tmp fix, what happens if multiple componenets reference static nodes?
         case input: Node => input.compOpt match {
-          case Some(p) if compSet contains p =>
+          case Some(p) if compSet(p) =>
           case _ => assert(input.component == nextComp, 
             /* If Backend.collectNodesIntoComp does not resolve the component
                field for all components, we will most likely end-up here. */
-            (if (!input.name.isEmpty) input.name else "?") +
+            ChiselError.error("Internal Error: " + (if (!input.name.isEmpty) input.name else "?") +
             "[" + input.getClass.getName + "] has no match between component " +
             ((input.compOpt map (_.toString)) getOrElse "(null)") +
-            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?"))
+            " and '" + nextComp + "' input of " + (if (!node.name.isEmpty) node.name else "?")))
         }
       }
       comps ++= node.inputs map (_ -> nextComp)
@@ -431,15 +447,11 @@ abstract class Backend extends FileSystemUtilities{
       case x: Delay =>
         val clock = x.clock getOrElse x.component._clock.get
         val reset =
-          if (x.component.hasExplicitReset) x.component._reset.get
-          else if (x.clock != None) x.clock.get.getReset
+          if (x.clock != None) x.clock.get.getReset
+          else if (x.component.hasExplicitReset) x.component._reset.get
           else if (x.component.hasExplicitClock) x.component._clock.get.getReset
           else x.component._reset.get
         x.assignReset(x.component addResetPin reset)
-        x.assignClock(clock)
-        x.component.addClock(clock)
-      case x: Printf =>
-        val clock = x.clock getOrElse x.component._clock.get
         x.assignClock(clock)
         x.component.addClock(clock)
       case _ =>
@@ -457,7 +469,7 @@ abstract class Backend extends FileSystemUtilities{
       for (reset <- child.resets.keys) {
         // create a reset pin in parent if reset does not originate in parent and
         // if reset is not an output from one of parent's children
-        if (reset.component != parent && !(childSet contains reset.component))
+        if (reset.component != parent && !childSet(reset.component))
           parent addResetPin reset
         // special case for implicit reset
         if (reset == Driver.implicitReset && parent == topMod) 
@@ -488,10 +500,10 @@ abstract class Backend extends FileSystemUtilities{
     val dfsStack = Stack[Node]()
     walked += root
     dfsStack.push(root)
-    val clock = root.clock getOrElse (throw new RuntimeException("Reg should have its own clock"))
+    val clock = root.clock getOrElse (throwException(s"Reg(${root.name} in ${extractClassName(root.component)}) should have its own clock"))
     while(!dfsStack.isEmpty) {
       val node = dfsStack.pop
-      node.consumers filterNot (walked contains _) foreach {
+      node.consumers filterNot walked foreach {
         case _: Delay =>
         case consumer => consumer.clock match {
           case Some(clk) if clk != clock =>
@@ -521,7 +533,7 @@ abstract class Backend extends FileSystemUtilities{
           hasError = true
         }
       }
-      if (hasError) throw new Exception("Could not elaborate code due to uninferred width(s)")
+      if (hasError) throwException("Could not elaborate code due to uninferred width(s)")
     }
 
     var count = 0
@@ -551,16 +563,21 @@ abstract class Backend extends FileSystemUtilities{
     Driver.idfs (_.forceMatchingWidths)
   }
 
+  def convertMaskedWrites(mod: Module) {
+    Driver.bfs {
+      case mem: Mem[_] => mem.convertMaskedWrites
+      case _ =>
+    }
+  }
+
   def computeMemPorts(mod: Module) {
-    if (Driver.hasMem) {
-      Driver.bfs { 
-        case memacc: MemAccess => memacc.referenced = true
-        case _ =>
-      }
-      Driver.bfs { 
-        case mem: Mem[_] => mem.computePorts
-        case _ =>
-      }
+    Driver.bfs {
+      case memacc: MemAccess => memacc.referenced = true
+      case _ =>
+    }
+    Driver.bfs {
+      case mem: Mem[_] => mem.computePorts
+      case _ =>
     }
   }
 
@@ -588,7 +605,7 @@ abstract class Backend extends FileSystemUtilities{
       Driver.bfs { x =>
         for (i <- 0 until x.inputs.length) x.inputs(i) match {
           case op: Op =>
-            if (needsLowering contains op.op)
+            if (needsLowering(op.op))
             x.inputs(i) = lowerTo.getOrElseUpdate(op, op.lower)
           case _ =>
         }
@@ -652,7 +669,7 @@ abstract class Backend extends FileSystemUtilities{
   def nameBindings {
     for (comp <- Driver.sortedComps ; bind <- comp.bindings) {
       var genName = bind.targetComponent.name + "_" + bind.targetNode.name
-      if (nameSpace contains genName) genName += ("_" + bind.emitIndex)
+      if (nameSpace(genName)) genName += ("_" + bind.emitIndex)
       bind.name = asValidName(genName) // Not using nameIt to avoid override
       bind.named = true
     }
@@ -660,58 +677,56 @@ abstract class Backend extends FileSystemUtilities{
 
   def findCombLoop {
     // Tarjan's strongly connected components algorithm to find loops
-    var sccIndex = 0
-    val stack = new Stack[Node]
-    val sccList = new ArrayBuffer[ArrayBuffer[Node]]
+    var index = 0
+    val stack = Stack[Node]()
+    val onStack = HashSet[Node]()
+    val sccs = ArrayBuffer[List[Node]]()
 
-    def tarjanSCC(n: Node): Unit = {
-      if (n.isInstanceOf[Delay]) throw new Exception("trying to DFS on a register")
+    def tarjanSCC(node: Node): Unit = node match {
+      case _: Delay => throwException("trying to DFS on a register")
+      case _ =>
 
-      n.sccIndex = sccIndex
-      n.sccLowlink = sccIndex
-      sccIndex += 1
-      stack.push(n)
+      node.sccIndex = Some(index)
+      node.sccLowlink = Some(index)
+      index += 1
+      stack.push(node)
+      onStack += node
 
-      n.inputs foreach {
+      node.inputs foreach {
         case _: Delay =>
-        case i if i.isReg =>
-        case i if i.sccIndex == -1 =>
-          tarjanSCC(i)
-          n.sccLowlink = math.min(n.sccLowlink, i.sccLowlink)
-        case i =>
-          n.sccLowlink = math.min(n.sccLowlink, i.sccIndex)
+        case input if input.sccIndex == None =>
+          tarjanSCC(input)
+          node.sccLowlink = Some(math.min(node.sccLowlink getOrElse -1, input.sccLowlink getOrElse -1))
+        case input if onStack(input) =>
+          node.sccLowlink = Some(math.min(node.sccLowlink getOrElse -1, input.sccIndex getOrElse -1))
+        case _ =>
       }
 
-      if (n.sccLowlink == n.sccIndex) {
-        val scc = new ArrayBuffer[Node]
+      if (node.sccLowlink == node.sccIndex) {
+        val scc = ArrayBuffer[Node]()
         do {
           scc += stack.pop
-        } while (!(n == scc.last))
-        sccList += scc
+          onStack -= scc.last
+        } while (node ne scc.last)
+        sccs += scc.toList
       }
     }
 
     Driver.bfs { 
       case _: Delay =>
-      case node if node.isReg || node.sccIndex == -1 =>
-      case node => tarjanSCC(node)
+      case node if node.sccIndex == None => tarjanSCC(node)
+      case _ =>
     }
 
     // check for combinational loops
-    var containsCombPath = false
-    for (nodelist <- sccList) {
-      if (nodelist.length > 1) {
-        containsCombPath = true
-        ChiselError.error("FOUND COMBINATIONAL PATH!")
-        for ((node, ind) <- nodelist zip nodelist.indices) {
-          ChiselError.error("  (" + ind +  ")", node.line)
-        }
-      }
-    }
+    sccs filter (_.size > 1) foreach {scc => 
+      ChiselError.error("FOUND COMBINATIONAL PATH!")
+      scc.zipWithIndex foreach { case (node, i) =>
+        ChiselError.error(s"  (${i}: ${node.component.getPathName(".")}.${node.name})", node.line) }}
   }
 
   /** Prints the call stack of Component as seen by the push/pop runtime. */
-  protected def genIndent(x: Int): String = (0 until x) map ("    ") mkString ""
+  protected def genIndent(x: Int): String = (for (i <- 0 until x) yield "    ").mkString
   protected def printStack {
     ChiselError.info(Driver.printStackStruct map {
       case (i, c) => "%s%s %s\n".format(genIndent(i), c.moduleName, c.name)
@@ -744,7 +759,7 @@ abstract class Backend extends FileSystemUtilities{
         case (node, None) => Driver.orderedNodes += node
         case (node, Some(depth)) => { 
           node.depth = math.max(node.depth, depth)
-          if (!(walked contains node)) {
+          if (!walked(node)) {
             walked += node
             stack push ((node, None))
             node.inputs foreach {
@@ -814,11 +829,17 @@ abstract class Backend extends FileSystemUtilities{
   }
 
   def elaborate(c: Module): Unit = {
+    ChiselError.checkpoint()
     ChiselError.info("// COMPILING " + c + "(" + c.children.size + ")");
     sortComponents
     markComponents
 
     verifyComponents
+    ChiselError.checkpoint()
+
+    // Ensure all conditional assignments have defauts.
+    verifyAllMuxes
+    ChiselError.checkpoint()
 
     ChiselError.info("giving names")
     nameAll
@@ -827,6 +848,9 @@ abstract class Backend extends FileSystemUtilities{
     ChiselError.info("executing custom transforms")
     execute(c, transforms)
     ChiselError.checkpoint()
+
+    ChiselError.info("convert masked writes of inline mems")
+    convertMaskedWrites(c)
 
     ChiselError.info("adding clocks and resets")
     assignClockAndResetToModules

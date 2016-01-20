@@ -32,7 +32,6 @@ package Chisel
 
 class DotBackend extends Backend {
   import PartitionIslands._
-  val keywords = Set[String]()
   var islands = Array[Island]()
   val allDottable = false
   val useComponentNames = false
@@ -112,6 +111,11 @@ class DotBackend extends Backend {
     def outputAnIsland(island: Island) {
       val island_res = new StringBuilder()
       val islandId = if (island == null) 0 else island.islandId
+      // Should we identify ports? Currently, only for Mux nodes.
+      def usePort(n: Node) = n match {
+        case mux: Mux => true
+        case _ => false
+      }
 
       for (m <- top.nodes) {
         if (isDottable(m)) {
@@ -138,6 +142,7 @@ class DotBackend extends Backend {
             if (isNodeInIsland(m, island)) {
               m match {
                 case reg: Delay => island_res.append("[shape=square," + label + "];" + EOL)
+                case mux: Mux => island_res.append("[shape=Mdiamond," + label + "];" + EOL)
                 case _ => island_res.append("[" + label + "];" + EOL)
               }
             }
@@ -148,10 +153,21 @@ class DotBackend extends Backend {
         if( m.component == top && isDottable(m)) {
           /* We have to check the node's component agrees because output
            nodes are part of a component *mods* as well as its parent *mods*! */
-          for (in <- m.inputs) {
+          val muxPort = usePort(m)
+          for ((in, index) <- m.inputs.zip(List("n", "w", "e"))) {
             if (isDottable(in)) {
               if (isNodeInIsland(in, island)) {
-                val edge = (emitRef(in) + " -> " + emitRef(m)
+                val srcPort = if (usePort(in)) {
+                  ":s"
+                } else {
+                  ""
+                }
+                val dstPort = if (muxPort) {
+                  ":" + index
+                } else {
+                  ""
+                }
+                val edge = (emitRef(in) + srcPort  + " -> " + emitRef(m) + dstPort
                   + "[label=\"" + in.needWidth() + "\"];"+ EOL)
                 if (islandId != 0) {
                   // If we're drawing partitioned islands, duplicate the logic
@@ -255,7 +271,7 @@ class DotBackend extends Backend {
       out_d.write(innercrossings)
     } else {
       Predef.assert(innercrossings.length == 0,
-        {println("length:" + innercrossings.length + ", " + innercrossings)})
+        ChiselError.error("Internal Error: length:" + innercrossings.length + ", " + innercrossings))
     }
     out_d.write("}")
     out_d.close()

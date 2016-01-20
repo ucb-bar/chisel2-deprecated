@@ -30,13 +30,21 @@
 
 package Chisel
 
+// TODO: Should be UInt rather than Bits as input must be positive
+/** Compute Log2 with truncation of a UInt in hardware using a Mux Tree
+  * An alternative interpretation is it computes the minimum number of bits needed to represent x
+  * @example
+  * {{{ data_out := Log2(data_in) }}}
+  * @note Truncation is used so Log2(UInt(12412)) = 13*/
 object Log2 {
   def apply(x: Bits): UInt = UInt().asTypeFor(new Log2(x))
+  /** Compute the Log2 on the least significant n bits of x */
   def apply(x: Bits, n: Int): UInt = apply(x(n-1,0))
 }
 
-/** Returns the bit position of the trailing 1 in the input vector
-  with the assumption that multiple bits of the input bit vector can be set
+/** @return the bit position of the trailing 1 in the input vector
+  * with the assumption that multiple bits of the input bit vector can be set
+  * @example {{{ data_out := PriorityEncoder(data_in) }}}
   */
 object PriorityEncoder
 {
@@ -44,8 +52,8 @@ object PriorityEncoder
   def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
 }
 
-/** Does the inverse of UIntToOH.
-  */
+/** Converts from One Hot Encoding to a UInt indicating which bit is active
+  * This is the inverse of [[Chisel.UIntToOH UIntToOH]]*/
 object OHToUInt
 {
   def apply(in: Seq[Bool]): UInt = apply(Vec(in))
@@ -53,6 +61,8 @@ object OHToUInt
   def apply(in: Bits): UInt = UInt().asTypeFor(new OHToUInt(in))
 }
 
+// TODO: make protected or private?
+/** A class defining an Operator which has a output width log2 of the number of input bits */
 abstract class Log2Like(x: Bits, name: String) extends Op {
   val op = name
   inputs += x
@@ -72,6 +82,8 @@ abstract class Log2Like(x: Bits, name: String) extends Op {
   }
 }
 
+/** Compute Log2 with truncation
+  * Use the [[Chisel.Log2$ Log2]] object rather than this class directly*/
 class Log2(x: Bits) extends Log2Like(x, "Log2") {
   override def lower: Node = {
     val w0 = inputs(0).widthW
@@ -84,6 +96,8 @@ class Log2(x: Bits) extends Log2Like(x, "Log2") {
   }
 }
 
+/** A class to detect the trailing bit
+  * Use the [[Chisel.PriorityEncoder$ PriorityEncoder]] object rather than this class directly */
 class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   override def lower: Node = {
     val w0 = inputs(0).widthW
@@ -94,6 +108,8 @@ class PriorityEncoder(x: Bits) extends Log2Like(x, "PriEnc") {
   }
 }
 
+/** Converts a One Hot encoding to a UInt
+  * Use the [[Chisel.OHToUInt$ OHToUInt]] object rather than this class directly */
 class OHToUInt(x: Bits) extends Log2Like(x, "OHToUInt") {
   override def lower: Node = {
     def doLower(x: Node, length: Int): Node = {

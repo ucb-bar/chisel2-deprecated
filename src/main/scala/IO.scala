@@ -34,14 +34,17 @@ abstract class IODirection {
   def toString: String
 }
 
+/** Define the IODirection INPUT */
 object INPUT extends IODirection {
   override def toString = "INPUT"
 }
 
+/** Define the IODirection OUTPUT */
 object OUTPUT extends IODirection {
   override def toString = "OUTPUT"
 }
 
+/** Define the IODirection NODIR */
 object NODIR extends IODirection {
   override def toString = "NODIR"
 }

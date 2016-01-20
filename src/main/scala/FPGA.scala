@@ -30,6 +30,7 @@
 
 package Chisel
 
+/** class with no inline mem */
 class FPGABackend extends VerilogBackend
 {
   Driver.isInlineMem = false

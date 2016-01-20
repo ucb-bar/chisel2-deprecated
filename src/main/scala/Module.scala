@@ -30,10 +30,20 @@
 
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet, HashSet, HashMap, Stack, Queue=>ScalaQueue}
+import scala.collection.immutable.ListSet
 
+/** Methods to insert [[Chisel.Module Modules]] into components correctly */
 object Module {
+  /** @return the top level module
+    * @throws ChiselException if no top component is set
+    */
   def topMod = Driver.topComponent getOrElse (throwException("no top component"))
 
+  /** The wrapper method for all instantiations of modules
+    * @param m The module newly created
+    * @param p Parameters passed down implicitly from that it is created in
+    * @return A properly wrapped module that has been added to the Driver
+    */
   def apply[T <: Module](m: => T)(implicit p: Parameters = params): T = {
     Driver.modStackPushed = true
     Driver.parStack.push(p.push)
@@ -41,6 +51,11 @@ object Module {
     Driver.parStack.pop
     res
   }
+  /** The wrapper method for all instatiations of modules
+    * @param m The module newly created
+    * @param f Additonal parameters to be included
+    * @return A properly wrapped module that has been added to the Driver
+    */
   def apply[T <: Module](m: => T, f: PartialFunction[Any,Any]): T = {
     val q = params.alterPartial(f)
     apply(m)(q)
@@ -96,10 +111,12 @@ object Module {
     }
   }
 
-  // XXX Remove and instead call current()
-  def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
+  /** Do not use: call current instead */
+  private[Chisel] def getComponent = if (Driver.compStack.length != 0) Some(Driver.compStack.top) else None
+  /** @return the current module */
   def current = getComponent getOrElse topMod
 
+  /** @return the backend from the [[Chisel.Driver Driver]] */
   def backend = Driver.backend
 
   protected[Chisel] def asModule(m: Module)(block: => Unit): Unit = {
@@ -119,7 +136,21 @@ object Module {
          ( + ) sets the default reset signal
          ( + ) overridden if Delay specifies its own clock w/ reset != implicitReset
 */
-abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) {
+/** A Module or block to logically divide a hardware design
+  * @note This is the same construct as module in verilog
+  * Also see [[Chisel.Module$ Module]] object
+  * @example
+  * {{{ class MyModule extends Module {
+  *   val io = new Bundle {
+  *     val dataIn = UInt(INPUT, 4)
+  *     val dataOut = UInt(OUTPUT, 4)
+  *   }
+  *   io.dataOut := io.dataIn
+  * }
+  * val myInst = Module(new MyModule) // create a MyModule
+  * }}}
+  */
+abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _reset: Option[Bool] = None) extends Nameable {
   /** A backend(Backend.scala) might generate multiple module source code
     from one Module, based on the parameters to instantiate the component
     instance. Since we do not want to blindly generate one module per instance
@@ -129,13 +160,13 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     Module/modules source text before their first instantiation. */
   private[Chisel] var level = 0
   private[Chisel] var traversal = 0
-  /** Name of the instance. */
-  var name: String = ""
   /** Name of the module this component generates (defaults to class name). */
   var moduleName: String = ""
-  var named = false
   var parent: Module = null
   val children = ArrayBuffer[Module]()
+
+  /** Set the declaration name of the module to be string 'n' */
+  def setModuleName(n : String) { moduleName = n }
 
   private[Chisel] val bindings = ArrayBuffer[Binding]()
   private[Chisel] val printfs = ArrayBuffer[Printf]()
@@ -150,7 +181,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   private[Chisel] def hasWhenCond: Boolean = !whenConds.isEmpty
   private[Chisel] def whenCond: Bool = if (hasWhenCond) whenConds.top else trueCond
 
-  var verilog_parameters = "";
+  private[Chisel] var verilog_parameters = "";
   //Parameter Stuff
   lazy val params = Module.params
   params.path = this.getClass :: params.path
@@ -165,8 +196,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   private[Chisel] var resetPin: Option[Bool] = None
   private[Chisel] var hasExplicitClock = _clock != None
   private[Chisel] var hasExplicitReset = _reset != None
+  /** @return the implied clock for this module */
   def clock: Clock = _clock getOrElse (
     if (parent == null) Driver.implicitClock else parent.clock)
+  /** @return the implied reset for this module */
   def reset = resetPin match {
     case None => {
       val r = Bool(INPUT)
@@ -178,11 +211,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     case Some(r) => r
   }
-  def reset_=(r: Bool) {
+  private[Chisel] def reset_=(r: Bool) {
     _reset = Some(r)
   }
-  // returns the pin connected to the reset signal, creates a new one if
-  // no such pin exists
+  /** @return the pin connected to the reset signal or creates a new one if no such pin exists */
   def addResetPin(r: Bool): Bool = {
     val pin = _reset match {
       case Some(p) if p == r => reset
@@ -194,21 +226,30 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     resets getOrElseUpdate (r, pin)
   }
+  /** Add a clock to the module
+    * @param clock the clock to add
+    */
   def addClock(clock: Clock) { clocks += clock }
 
   override def toString = s"<${this.name} (${this.getClass.toString})>"
 
+  /** A method to trace the graph of nodes backwards looking at inputs
+    * @param m Node to find bindings for
+    * @return nodes which have node m binded as their input
+    */
   def findBinding(m: Node) = bindings find (_.inputs(0) == m)
 
+  /** the I/O for this module */
   def io: Data
 
-  var nindex: Option[Int] = None
+  private[Chisel] var nindex: Option[Int] = None
   def nextIndex : Int = {
     nindex = nindex match { case None => Some(0) case Some(i) => Some(i+1) }
     nindex.get
   }
 
   // override def toString: String = name this one isn't really working...
+  /** Get the I/O names and connections */
   def wires: Array[(String, Bits)] = io.flatten
 
   /** Add an assertion in the code generated by a backend. */
@@ -226,6 +267,14 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     debugs += x.getNode
   }
 
+  def debug(data: Aggregate): Unit = {
+    data.flatten.map(x => debug(x._2))
+  }
+
+  /** Adds a printf to the module called each clock cycle
+    * @param message A c style sting to print out eg) %d, %x
+    * @param args Nodes whos data values should be printed
+    */
   def printf(message: String, args: Node*): Unit = {
     val p = new Printf(Module.current.whenCond && !reset, message, args)
     printfs += p
@@ -238,23 +287,20 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
   }
 
+  /** Connect io with matching names for two modules */
   def <>(src: Module) { io <> src.io }
 
   def apply(name: String): Data = io(name)
-  // COMPILATION OF REFERENCE
-  def emitDec(b: Backend): String = {
-    var res = ""
-    // val wires = io.flatten;
-    for ((n, w) <- wires)
-      res += b.emitDec(w)
-    res
-  }
 
+  /** Add a pin with a name to the module
+    * @param pin the I/O to add
+    * @param name A name for the pin
+    */
   def addPin[T <: Data](pin: T, name: String = "") = {
     val gen = pin.clone
     io match {
       case b: Bundle => {
-        for ((n, io) <- gen.flatten) {
+        for ((n, io) <- gen.flatten if !io.isDirectionless && !io.getNode.isLit) {
           io.compOpt = Some(this)
           io.isIo = true
         }
@@ -266,6 +312,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     gen
   }
 
+  /** Add a submodule to this module */
   def addModule[T<:Module](c: =>T, f: PartialFunction[Any,Any]) = {
     Driver.modStackPushed = true
     Driver.modAdded = true
@@ -277,6 +324,8 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     Driver.compStack.pop
     res
   }
+
+  /** Add a submodule to this module */
   def addModule[T <: Module](c: => T)(implicit p:Parameters = params) = {
     Driver.modStackPushed = true
     Driver.modAdded = true
@@ -289,6 +338,14 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     res
   }
 
+  def addNode[T <: Node](node: T) = {
+    nodes += node.getNode
+    node.getNode.compOpt = Some(this)
+    node
+  }
+
+  // TODO: should be private[Chisel]?
+  /** A breadth first search of the graph of nodes */
   def bfs (visit: Node => Unit) = {
     // initialize BFS
     val queue = new ScalaQueue[Node]
@@ -304,9 +361,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
     // Do BFS
     val _walked = HashSet[Node](queue:_*)
-    def walked(node: Node) = (_walked contains node) || node.isIo
+    def walked(node: Node) = node == null || _walked(node) || node.isIo
     def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
-    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    def enqueueInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach enqueueNode }
     def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
@@ -319,6 +376,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
   }
 
+  /** A depth first search of the graph of nodes */
   def dfs(visit: Node => Unit): Unit = {
     val stack = new Stack[Node]
     // initialize DFS
@@ -333,9 +391,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
     // Do DFS
     val _walked = HashSet[Node](stack:_*)
-    def walked(node: Node) = (_walked contains node) || node.isIo
+    def walked(node: Node) = node == null || _walked(node) || node.isIo
     def pushNode(node: Node) { stack push node ; _walked += node }
-    def pushInputs(top: Node) { top.inputs filterNot walked foreach pushNode }
+    def pushInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach pushNode }
     def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
@@ -348,9 +406,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
   }
 
+  /** Add a default reset to the module*/
   def addDefaultReset {
     _reset match {
-      case None => throw new RuntimeException
+      case None => throwException("no default reset")
       case Some(r) => resetPin match {
         case None => 
         case Some(p) =>
@@ -481,8 +540,10 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
    They never get overridden yet it is called
    for each component (See Backend implementations). */
   def stripComponent(s: String): String = s.split("__").last
-  /** Returns the absolute path to a component instance from toplevel. */
+  /** @return the absolute path to a component instance from toplevel */
   def getPathName: String = getPathName()
+  /** @param separator The separator to use for the path name
+    * @return the absolute path to a component instance from toplevel */
   def getPathName(separator: String = "_"): String = {
     if ( parent == null ) name else parent.getPathName(separator) + separator + name;
   }
@@ -536,7 +597,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
       val nodeNames = nodes.map(_.name).mkString(", ")
       val plural = if (nodes.length > 1) "s" else ""
       val errorString = "Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeNames)
-      ChiselError.warning(errorString, errorLine)
+      ChiselError.error(errorString, errorLine)
     }
   }
 

@@ -197,30 +197,42 @@ static void mul_n (val_t d[], val_t s0[], val_t s1[], int nb0, int nb1) {
   }
 }
 
-static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
+/** Right shift with sign extension
+ * d is where to store the result
+ * s0 is the number to be shifted
+ * amount is by how much it is to be shifted
+ * nw is the number of val_n_bits() bit words in the source
+ * w is the total number of bits in s0
+ */
+static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, const unsigned int nw, const unsigned int w) {
 
-  int n_shift_bits     = amount % val_n_bits();
+  unsigned int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
-  int n_rev_shift_bits = val_n_bits() - n_shift_bits;
+  unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
   int is_zero_carry    = n_shift_bits == 0;
-  int msb              = s0[nw-1] >> (w - nw*val_n_bits() - 1);
+  // get the msb which is total bits (w) - bits in non most sig word - 1 to have 1 bit remaining
+  int msb              = s0[nw-1] >> (w - (nw-1)*val_n_bits() - 1);
   val_t carry = 0;
 
-  if (msb == 0)
-    for (int i = 0; i < n_shift_words; i++) {
-      d[nw-i-1] = 0;
-    }
+  // Limit the right shift to be a positive number and no more than nw in the source ie. cant shift beyond zero width
+  n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
+  n_shift_words = (n_shift_words > nw) ? nw : n_shift_words;
+
+  for (int i = 0; i < nw; i++)
+    d[i] = 0;
 
   for (int i = nw-1; i >= n_shift_words; i--) {
     val_t val = s0[i];
-    d[i-n_shift_words] = val >> n_shift_bits | carry;
-    carry              = is_zero_carry ? 0 : val << n_rev_shift_bits;
+    d[i - n_shift_words] = ( val >> n_shift_bits ) | carry;
+    carry  = is_zero_carry ? 0 : val << n_rev_shift_bits;
   }
 
+  // If don't need sign extension return
   if (msb == 0) {
     return;
   }
 
+  // Where sign extension begins
   int boundary = (w - amount);
 
   for (int i = nw-1; i >= 0; i--) {
@@ -228,19 +240,23 @@ static void rsha_n (val_t d[], val_t s0[], int amount, int nw, int w) {
     if (idx  > boundary) {
       d[i] = val_all_ones();
     } else {
+      // set the sign extended part of this word
       d[i] = d[i] | (val_all_ones() << (boundary - idx));
-      d[nw-1] = d[nw-1] & (val_all_ones() >> ((nw-1)*val_n_bits() - w));
+      // set the bits above w to zero as they are beyond the length of s0
+      d[nw-1] = d[nw-1] & (val_all_ones() >> (nw*val_n_bits() - w));
       return;
     }
   }
 }
 
-static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
+static void rsh_n (val_t d[], const val_t s0[], const unsigned int amount, const unsigned int nw) {
   val_t carry = 0;
-  int n_shift_bits     = amount % val_n_bits();
-  int n_shift_words    = amount / val_n_bits();
-  int n_rev_shift_bits = val_n_bits() - n_shift_bits;
-  int is_zero_carry    = n_shift_bits == 0;
+  unsigned int n_shift_bits = amount % val_n_bits();
+  int n_shift_words = amount / val_n_bits();
+  unsigned int n_rev_shift_bits = val_n_bits() - n_shift_bits;
+  int is_zero_carry = n_shift_bits == 0;
+  n_shift_words = (n_shift_words < 0)  ? 0  : n_shift_words;
+  n_shift_words = (n_shift_words > nw) ? nw : n_shift_words;
   for (int i = 0; i < n_shift_words; i++)
     d[nw-i-1] = 0;
   for (int i = nw-1; i >= n_shift_words; i--) {
@@ -250,7 +266,7 @@ static void rsh_n (val_t d[], val_t s0[], int amount, int nw) {
   }
 }
 
-static void lsh_n (val_t d[], val_t s0[], int amount, int nwd, int nws) {
+static void lsh_n (val_t d[], const val_t s0[], const int amount, const int nwd, const int nws) {
   val_t carry          = 0;
   int n_shift_bits     = amount % val_n_bits();
   int n_shift_words    = amount / val_n_bits();
@@ -494,16 +510,16 @@ struct bit_word_funs {
   static bool neq (val_t s0[], val_t s1[]) {
     return !eq(s0, s1);
   }
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     rsha_n(d, s0, amount, nw, w);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     rsh_n(d, s0, amount, nw);
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     lsh_n(d, s0, amount, nw, nw);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     // TODO: FINISH THIS
     const int bw = e-s+1;
     val_t msk[nw];
@@ -609,13 +625,13 @@ struct bit_word_funs<1> {
   static bool neq (val_t s0[], val_t s1[]) {
     return s0[0] != s1[0];
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     d[0] = (s0[0] << amount);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     d[0] = (s0[0] >> amount);
   }
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     d[0] = s0[0] << (val_n_bits() - w);
     d[0] = (sval_t(d[0]) >> (val_n_bits() - w + amount)) & mask_val(w);
   }
@@ -729,7 +745,7 @@ struct bit_word_funs<2> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     val_t msk[2];
     const int bw = e-s+1;
     mask_n(msk, 2, bw);
@@ -743,7 +759,7 @@ struct bit_word_funs<2> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s) {
+  static void inject (val_t d[], const val_t s0[], const int e, const int s) {
     // Opposite of extract: Assign s0 to a subfield of d.
     const int bw = e-s+1;
     val_t msk[2];
@@ -756,7 +772,7 @@ struct bit_word_funs<2> {
     d[1] = (d[1] & ~msk_lsh[1]) | (s0_lsh[1] & msk_lsh[1]);
   }
 
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     sval_t hi = s0[1] << (2*val_n_bits() - w);
     if (amount >= val_n_bits()) {
       d[0] = hi >> (amount - w + val_n_bits());
@@ -773,7 +789,7 @@ struct bit_word_funs<2> {
       d[1] = d[1] & mask_val(w - val_n_bits());
     }
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     if (amount >= val_n_bits()) {
       d[1] = 0;
       d[0] = s0[1] >> (amount - val_n_bits());
@@ -785,7 +801,7 @@ struct bit_word_funs<2> {
       d[0] = (s0[1] << (val_n_bits() - amount)) | (s0[0] >> amount);
     }
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     if (amount == 0)
     {
       d[1] = s0[1];
@@ -891,7 +907,7 @@ struct bit_word_funs<3> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]) | (s0[2] != s1[2]);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
     val_t msk[3];
     const int bw = e-s+1;
     mask_n(msk, 3, bw);
@@ -907,7 +923,7 @@ struct bit_word_funs<3> {
     }
   }
 
-  static void inject (val_t d[], val_t s0[], int e, int s) {
+  static void inject (val_t d[], const val_t s0[], const int e, const int s) {
     const int bw = e-s+1;
     val_t msk[3];
     val_t msk_lsh[3];
@@ -920,13 +936,13 @@ struct bit_word_funs<3> {
     d[2] = (d[2] & ~msk_lsh[2]) | (s0_lsh[2] & msk_lsh[2]);
   }
 
-  static void rsha (val_t d[], val_t s0[], int amount, int w) {
+  static void rsha (val_t d[], const val_t s0[], const int amount, const int w) {
     rsha_n(d, s0, amount, 3, w);
   }
-  static void rsh (val_t d[], val_t s0[], int amount) {
+  static void rsh (val_t d[], const val_t s0[], const int amount) {
     rsh_n(d, s0, amount, 3);
   }
-  static void lsh (val_t d[], val_t s0[], int amount) {
+  static void lsh (val_t d[], const val_t s0[], const int amount) {
     lsh_n(d, s0, amount, 3, 3);
   }
   static void log2 (val_t d[], val_t s0[]) {
@@ -1174,7 +1190,7 @@ class dat_t {
   inline dat_t<w> operator >> ( dat_t<w> o ) {
     return *this >> o.lo_word();
   }
-  dat_t<w> rsha ( dat_t<w> o) {
+  dat_t<w> rsha ( const dat_t<w> o) {
     dat_t<w> res;
     int amount = o.lo_word();
     bit_word_funs<n_words>::rsha(res.values, values, amount, w);
@@ -1328,13 +1344,13 @@ static __inline__ int flo_digits(int m, int e) {
 template <int w>
 int flo_to_str(char* s, dat_t<w> x, char pad = ' ') {
   char buf[1000];
-  int n_digs = (w == 32) ? flo_digits(32, 8) : flo_digits(52, 11);
+  int n_digs = (w == 32) ? flo_digits(23, 8) : flo_digits(52, 11);
   double val = (w == 32) ? toFloat(x.values[0]) : toDouble(x.values[0]);
   // sprintf(buf, "%d %d%*e", w, n_digs, n_digs, val);
   sprintf(buf, "%*e", n_digs, val);
-  assert(strlen(buf) <= n_digs);
+  assert(strlen(buf) == n_digs);
   for (int i = 0; i < n_digs; i++)
-    s[i] = (i < strlen(buf)) ? buf[i] : pad;
+    s[i] = buf[i];
   s[n_digs] = 0;
   // printf("N-DIGS = %d BUF %lu PAD %lu\n", n_digs, strlen(buf), n_digs-strlen(buf));
   // return strlen(buf);
@@ -1366,6 +1382,8 @@ static void __attribute__((unused)) dat_format(char* s, const char* fmt)
       abort();
     *s++ = c;
   }
+  // Ensure the string is null terminated.
+  *s = '\0';
 }
 
 template <typename T, typename... Args>
@@ -1387,7 +1405,8 @@ static void dat_format(char* s, const char* fmt, T value, Args... args)
       *s++ = *fmt++;
     }
   }
-  abort();
+  // Ensure the string is null terminated.
+  *s = '\0';
 }
 
 template <int w, typename... Args>
@@ -1396,8 +1415,10 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 #if BYTE_ORDER != LITTLE_ENDIAN
 # error dat_format assumes a little-endian architecture
 #endif
+  // This makes so many assumptions it can't possibly work in the general case.
   char str[w/8+1];
   dat_format(str, fmt, args...);
+  assert(strlen(str) < sizeof(str));
 
   dat_t<w> res;
   res.values[res.n_words-1] = 0;
@@ -1409,18 +1430,25 @@ static dat_t<w> dat_format(const char* fmt, Args... args)
 template <int w, typename... Args>
 static ssize_t dat_fprintf(FILE *f, const char* fmt, Args... args)
 {
-  char str[w/8+1];
+  // Be generous. It doesn't really cost us anything.
+  char str[w*2+1];
   dat_format(str, fmt, args...);
-  return fwrite(str, 1, w/8, f);
+  ssize_t len = strlen(str);
+  assert(len < sizeof(str));
+  return fwrite(str, 1, len, f);
 }
 
 template <int w, typename... Args>
 static ssize_t dat_prints(std::ostream& s, const char* fmt, Args... args)
 {
-  char str[w/8+1];
+  // This failed silently trying to print Flo's when the size was w/8+1.
+  // Be generous. It doesn't really cost us anything.
+  char str[w*2+1];
   dat_format(str, fmt, args...);
-  s.write(str, w/8);
-  ssize_t ret = s.good() ? w/8 : -1;
+  ssize_t len = strlen(str);
+  assert(len < sizeof(str));
+  s.write(str, len);
+  ssize_t ret = s.good() ? len : -1;
   return ret;
 }
 #endif /* C++11 */
@@ -1618,6 +1646,8 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
     last_digit--;
   }
 
+  size_t rem = w % 64;
+  val_t mask = (rem) ? (1L << rem) - 1 : -1L;
   // Convert the hex data to a dat_t, from right to left.
   int digit_val;
   val_t word_accum = 0;
@@ -1628,16 +1658,16 @@ size_t dat_from_hex(std::string hex_line, dat_t<w>& res, size_t offset = 0) {
       word_accum |= ((val_t)digit_val) << bit;
       bit += 4;
       if (bit == 64) {
-	res.values[w_index] = word_accum;
+        if (w_index == res.n_words - 1) word_accum &= mask;
+	res.values[w_index++] = word_accum;
 	word_accum = 0L;
 	bit = 0;
-	w_index++;
       }
     }
   }
   if (bit != 0) {
-    res.values[w_index] = word_accum;
-    w_index++;
+    if (w_index == res.n_words - 1) word_accum &= mask;
+    res.values[w_index++] = word_accum;
   }
   while(w_index < res.n_words) res.values[w_index++] = 0L;
   if (neg) res = res - 1;
@@ -1703,7 +1733,7 @@ class mod_t {
   mod_t(): dumpfile(NULL), timestep(0) { }
   virtual ~mod_t() {}
   virtual void init ( val_t rand_init=false ) = 0;
-  virtual void clock_lo ( dat_t<1> reset ) = 0;
+  virtual void clock_lo ( dat_t<1> reset, bool assert_fire=true ) = 0;
   virtual void clock_hi ( dat_t<1> reset ) = 0;
   virtual int  clock ( dat_t<1> reset ) = 0;
   virtual void setClocks ( std::vector< int >& periods ) { };

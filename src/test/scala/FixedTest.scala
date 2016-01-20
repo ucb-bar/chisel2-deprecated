@@ -67,6 +67,37 @@ class FixedSuite extends TestSuite {
     val dummyInst = Module(new Dummy)
   }
 
+  @Test def testFixedColonEqual() {
+    class FixedColonEqual extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 32, 16)
+        val b = Fixed(OUTPUT, 16, 8)
+      }
+      io.b := io.a
+      assertTrue( io.a.getWidth() == 32)
+      assertTrue( io.a.getFractionalWidth() == 16)
+      assertTrue( io.b.getWidth() == 16)
+      assertTrue( io.b.getFractionalWidth() == 8)
+    }
+
+    trait FixedColonEqualTests extends Tests {
+      val trials = 10
+      def tests(c: FixedColonEqual) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30))
+          poke(c.io.a, inA)
+          expect(c.io.b, toFixedT(toDouble(inA, 16), 8))
+        }
+      }
+    }
+
+    class FixedColonEqualTester(c : FixedColonEqual) extends Tester(c) with FixedColonEqualTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedColonEqual) => new FixedColonEqualTester(c))
+  }
+
   @Test def testFixedEqual() {
     class FixedEqual extends Module {
       val io = new Bundle {
@@ -77,20 +108,24 @@ class FixedSuite extends TestSuite {
       io.c := io.a === io.b
     }
 
-    class FixedEqualTests(c : FixedEqual) extends Tester(c) {
+    trait FixedEqualTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = if (i%2 == 0) inA else BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, Bool(inA == inB).litValue())
+      def tests(c: FixedEqual) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30))
+          val inB = if (i%2 == 0) inA else BigInt(rnd.nextInt(1 << 30))
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, Bool(inA == inB).litValue())
+        }
       }
     }
 
-    launchCppTester((c: FixedEqual) => new FixedEqualTests(c))
+    class FixedEqualTester(c : FixedEqual) extends Tester(c) with FixedEqualTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedEqual) => new FixedEqualTester(c))
   }
 
   @Test def testFixedAdd() {
@@ -103,20 +138,24 @@ class FixedSuite extends TestSuite {
       io.c := io.a + io.b
     }
 
-    class FixedAddTests(c : FixedAdd) extends Tester(c) {
+    trait FixedAddTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixed(toDouble(inA, 16) + toDouble(inB, 16), 16))
+      def tests(c: FixedAdd) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixed(toDouble(inA, 16) + toDouble(inB, 16), 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedAdd) => new FixedAddTests(c))
+    class FixedAddTester(c: FixedAdd) extends Tester(c) with FixedAddTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedAdd) => new FixedAddTester(c))
   }
 
   @Test def testFixedSub() {
@@ -129,20 +168,24 @@ class FixedSuite extends TestSuite {
       io.c := io.a - io.b
     }
 
-    class FixedSubTests(c : FixedSub) extends Tester(c) {
+    trait FixedSubTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixed(toDouble(inA, 16) - toDouble(inB, 16), 16))
+      def tests(c: FixedSub) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixed(toDouble(inA, 16) - toDouble(inB, 16), 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedSub) => new FixedSubTests(c))
+    class FixedSubTester(c : FixedSub) extends Tester(c) with FixedSubTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedSub) => new FixedSubTester(c))
   }
   
   @Test def testFixedReg() {
@@ -154,19 +197,23 @@ class FixedSuite extends TestSuite {
       io.c := Reg(init=Fixed(0, 32, 16), next=io.a)
     }
 
-    class FixedRegTests(c : FixedReg) extends Tester(c) {
+    trait FixedRegTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        step(1)
-        expect(c.io.c, inA)
+      def tests(c: FixedReg) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          step(1)
+          expect(c.io.c, inA)
+        }
       }
     }
 
-    launchCppTester((c: FixedReg) => new FixedRegTests(c))
+    class FixedRegTester(c : FixedReg) extends Tester(c) with FixedRegTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedReg) => new FixedRegTester(c))
   }
 
   @Test def testFixedUnary() {
@@ -178,18 +225,22 @@ class FixedSuite extends TestSuite {
       io.c := -io.a
     }
 
-    class FixedUnaryTests(c : FixedUnary) extends Tester(c) {
+    trait FixedUnaryTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        expect(c.io.c, -inA)
+      def tests(c: FixedUnary) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          expect(c.io.c, -inA)
+        }
       }
     }
 
-    launchCppTester((c: FixedUnary) => new FixedUnaryTests(c))
+    class FixedUnaryTester(c : FixedUnary) extends Tester(c) with FixedUnaryTests {
+       tests(c)
+    }
+
+    launchCppTester((c: FixedUnary) => new FixedUnaryTester(c))
   }
   
   @Test def testFixedCompare() {
@@ -208,23 +259,27 @@ class FixedSuite extends TestSuite {
       io.lte := io.a <= io.b
     }
 
-    class FixedCompareTests(c : FixedCompare) extends Tester(c) {
+    trait FixedCompareTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 30))
-        val inB = BigInt(r.nextInt(1 << 30))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.gt, Bool(inA > inB).litValue())
-        expect(c.io.lt, Bool(inA < inB).litValue())
-        expect(c.io.gte, Bool(inA >= inB).litValue())
-        expect(c.io.lte, Bool(inA <= inB).litValue()) 
+      def tests(c: FixedCompare) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.gt, Bool(inA > inB).litValue())
+          expect(c.io.lt, Bool(inA < inB).litValue())
+          expect(c.io.gte, Bool(inA >= inB).litValue())
+          expect(c.io.lte, Bool(inA <= inB).litValue()) 
+        }
       }
     }
 
-    launchCppTester((c: FixedCompare) => new FixedCompareTests(c))
+    class FixedCompareTester(c : FixedCompare) extends Tester(c) with FixedCompareTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedCompare) => new FixedCompareTester(c))
   }
   
   @Test def testFixedDiv() {
@@ -237,30 +292,64 @@ class FixedSuite extends TestSuite {
       io.c := io.a / io.b
     }
 
-    class FixedDivTests(c : FixedDiv) extends Tester(c) {
+    trait FixedDivTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
+      def tests(c: FixedDiv) {
+        for (i <- 0 until trials) {
 
-      for (i <- 0 until trials) {
-
-        // For the testing find two numbers that we also give a number that is representable in fixed point
-        var inA = BigInt(r.nextInt(1 << 30))
-        var inB = BigInt(r.nextInt(1 << 30))
-        var doubleA = toDouble(inA, 16)
-        var doubleB = toDouble(inB, 16)
-        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
-          inA = BigInt(r.nextInt(1 << 30))
-          inB = BigInt(r.nextInt(1 << 30))
-          doubleA = toDouble(inA, 16)
-          doubleB = toDouble(inB, 16)
+          // For the testing find two numbers that we also give a number that is representable in fixed point
+          var inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          var inB = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          var doubleA = toDouble(inA, 16)
+          var doubleB = toDouble(inB, 16)
+          while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
+            inA = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+            inB = BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+            doubleA = toDouble(inA, 16)
+            doubleB = toDouble(inB, 16)
+          }
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixedT(toDouble(inA, 16) / toDouble(inB, 16), 16))
         }
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixedT(toDouble(inA, 16) / toDouble(inB, 16), 16))
       }
     }
 
-    launchCppTester((c: FixedDiv) => new FixedDivTests(c))
+    class FixedDivTester(c : FixedDiv) extends Tester(c) with FixedDivTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedDiv) => new FixedDivTester(c))
+  }
+
+  @Test def testFixedMul() {
+    class FixedMul extends Module {
+      val io = new Bundle {
+        val a = Fixed(INPUT, 32, 16)
+        val b = Fixed(INPUT, 32, 16)
+        val c = Fixed(OUTPUT, 64, 32)
+      }
+      io.c := io.a * io.b
+    }
+
+    trait FixedMulTests extends Tests {
+      val trials = 10
+      def tests(c: FixedMul) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 32))
+        }
+      }
+    }
+
+    class FixedMulTester(c : FixedMul) extends Tester(c) with FixedMulTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedMul) => new FixedMulTester(c))
   }
   
   @Test def testFixedMulT() {
@@ -270,23 +359,32 @@ class FixedSuite extends TestSuite {
         val b = Fixed(INPUT, 32, 16)
         val c = Fixed(OUTPUT, 32, 16)
       }
-      io.c := io.a * io.b
+      io.c := io.a *% io.b
     }
 
-    class FixedMulTTests(c : FixedMulT) extends Tester(c) {
+    trait FixedMulTTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 16))
+      def tests(c: FixedMulT) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          val expected = toFixedT(toDouble(inA, 16) * toDouble(inB, 16), 16)
+          val res = peek(c.io.c)
+          val errorVal = scala.math.abs(scala.math.abs(expected.toInt) - scala.math.abs(res.toInt))
+          val error = errorVal > 1
+          val errorMessage = if(error) "Error outside acceptiable Range: " + errorVal.toString else "Error within acceptiable range: " + errorVal.toString
+          expect(!error, errorMessage)
+        }
       }
     }
 
-    launchCppTester((c: FixedMulT) => new FixedMulTTests(c))
+    class FixedMulTTester(c : FixedMulT) extends Tester(c) with FixedMulTTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedMulT) => new FixedMulTTester(c))
   }
   
   @Test def testFixedMulR() {
@@ -299,20 +397,24 @@ class FixedSuite extends TestSuite {
       io.c := io.a *& io.b
     }
 
-    class FixedMulRTests(c : FixedMulR) extends Tester(c) {
+    trait FixedMulRTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixed(toDouble(inA, 16) * toDouble(inB, 16), 16))
+      def tests(c: FixedMulR) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixed(toDouble(inA, 16) * toDouble(inB, 16), 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedMulR) => new FixedMulRTests(c))
+    class FixedMulRTester(c : FixedMulR) extends Tester(c) with FixedMulRTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedMulR) => new FixedMulRTester(c))
   }
 
   @Test def testFixedLine() {
@@ -323,25 +425,29 @@ class FixedSuite extends TestSuite {
         val c = Fixed(OUTPUT, 32, 16)
       }
       val temp = io.a + io.b
-      val temp2 = temp - io.a
+      val temp2 = temp *& io.a
       val temp3 = temp2 - io.b
       io.c := temp3
     }
 
-    class FixedLineTests(c : FixedLine) extends Tester(c) {
+    trait FixedLineTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        expect(c.io.c, toFixed(toDouble(inA, 16) + toDouble(inB, 16) - toDouble(inA, 16) - toDouble(inB, 16), 16))
+      def tests(c: FixedLine) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          expect(c.io.c, toFixed((toDouble(inA, 16) + toDouble(inB, 16)) * toDouble(inA, 16) - toDouble(inB, 16), 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedLine) => new FixedLineTests(c))
+    class FixedLineTester(c : FixedLine) extends Tester(c) with FixedLineTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedLine) => new FixedLineTester(c))
   }
   
   @Test def testFixedMux() {
@@ -357,25 +463,29 @@ class FixedSuite extends TestSuite {
       io.res := muxSel
     }
 
-    class FixedMuxTests(c : FixedMux) extends Tester(c) {
+    trait FixedMuxTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = BigInt(r.nextInt(1 << 15))
-        val inB = BigInt(r.nextInt(1 << 15))
-        val inC = BigInt(r.nextInt(1 << 15))
-        val inSel = r.nextInt(2)
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        poke(c.io.c, inC)
-        poke(c.io.sel, inSel)
-        val res = if(inSel == 1) toDouble(inA, 16) + toDouble(inB, 16) else toDouble(inA, 16) + toDouble(inC, 16)
-        expect(c.io.res, toFixed(res, 16))
+      def tests(c: FixedMux) {
+        for (i <- 0 until trials) {
+          val inA = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inB = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inC = BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt
+          val inSel = rnd.nextInt(2)
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          poke(c.io.c, inC)
+          poke(c.io.sel, inSel)
+          val res = if(inSel == 1) toDouble(inA, 16) + toDouble(inB, 16) else toDouble(inA, 16) + toDouble(inC, 16)
+          expect(c.io.res, toFixed(res, 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedMux) => new FixedMuxTests(c))
+    class FixedMuxTester(c : FixedMux) extends Tester(c) with FixedMuxTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedMux) => new FixedMuxTester(c))
   }
   
   @Test def testFixedVec() {
@@ -388,21 +498,25 @@ class FixedSuite extends TestSuite {
       io.c := (io.a, io.b).zipped.map(_+_).reduce(_+_)
     }
 
-    class FixedVecTests(c : FixedVec) extends Tester(c) {
+    trait FixedVecTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = Array.fill(8){BigInt(r.nextInt(1 << 30))}
-        val inB = Array.fill(8){BigInt(r.nextInt(1 << 30))}
-        (c.io.a, inA).zipped.map((w, v) => poke(w, v))
-        (c.io.b, inB).zipped.map((w, v) => poke(w, v))
-        val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_+_).reduce(_+_)
-        expect(c.io.c, toFixed(res, 16))
+      def tests(c: FixedVec) {
+        for (i <- 0 until trials) {
+          val inA = Array.fill(8){BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
+          val inB = Array.fill(8){BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
+          (c.io.a, inA).zipped.map((w, v) => poke(w, v))
+          (c.io.b, inB).zipped.map((w, v) => poke(w, v))
+          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_+_).reduce(_+_)
+          expect(c.io.c, toFixed(res, 16))
+        }
       }
     }
 
-    launchCppTester((c: FixedVec) => new FixedVecTests(c))
+    class FixedVecTester(c : FixedVec) extends Tester(c) with FixedVecTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedVec) => new FixedVecTester(c))
   }
   
   @Test def testFixedVec2() {
@@ -415,21 +529,25 @@ class FixedSuite extends TestSuite {
       io.c := (io.a, io.b).zipped.map(_*&_)
     }
 
-    class FixedVec2Tests(c : FixedVec2) extends Tester(c) {
+    trait FixedVec2Tests extends Tests {
       val trials = 10
-      val r = scala.util.Random
-
-      for (i <- 0 until trials) {
-        val inA = Array.fill(8){BigInt(r.nextInt(1 << 15))}
-        val inB = Array.fill(8){BigInt(r.nextInt(1 << 15))}
-        (c.io.a, inA).zipped.map((w, v) => poke(w, v))
-        (c.io.b, inB).zipped.map((w, v) => poke(w, v))
-        val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_*_)
-        (c.io.c, res).zipped.map((w, v) => expect(w, toFixed(v, 16)))
+      def tests(c: FixedVec2) {
+        for (i <- 0 until trials) {
+          val inA = Array.fill(8){BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
+          val inB = Array.fill(8){BigInt(rnd.nextInt(1 << 15)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
+          (c.io.a, inA).zipped.map((w, v) => poke(w, v))
+          (c.io.b, inB).zipped.map((w, v) => poke(w, v))
+          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_*_)
+          (c.io.c, res).zipped.map((w, v) => expect(w, toFixed(v, 16)))
+        }
       }
     }
 
-    launchCppTester((c: FixedVec2) => new FixedVec2Tests(c))
+    class FixedVec2Tester(c : FixedVec2) extends Tester(c) with FixedVec2Tests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedVec2) => new FixedVec2Tester(c))
   }
   
   @Test def testFixedMod() {
@@ -442,31 +560,26 @@ class FixedSuite extends TestSuite {
       io.c := io.a % io.b
     }
 
-    class FixedModTests(c : FixedMod) extends Tester(c) {
+    trait FixedModTests extends Tests {
       val trials = 10
-      val r = scala.util.Random
+      def tests(c: FixedMod) {
+        for (i <- 0 until trials) {
 
-      for (i <- 0 until trials) {
-
-        // For the testing find two numbers that we also give a number that is representable in fixed point
-        var inA = BigInt(r.nextInt(1 << 30))
-        var inB = BigInt(r.nextInt(1 << 30))
-        var doubleA = toDouble(inA, 16)
-        var doubleB = toDouble(inB, 16)
-        while(  scala.math.abs(toDouble(toFixedT(doubleA / doubleB, 16), 16) - doubleA/doubleB) > scala.math.pow(2, -17)) {
-          inA = BigInt(r.nextInt(1 << 30))
-          inB = BigInt(r.nextInt(1 << 30))
-          doubleA = toDouble(inA, 16)
-          doubleB = toDouble(inB, 16)
+          // For the testing find two numbers that we also give a number that is representable in fixed point
+          var inA = BigInt(rnd.nextInt(1 << 30))
+          var inB = BigInt(rnd.nextInt(1 << 30))
+          poke(c.io.a, inA)
+          poke(c.io.b, inB)
+          val mod = inA % inB
+          expect(c.io.c, mod)
         }
-        poke(c.io.a, inA)
-        poke(c.io.b, inB)
-        val div = toDouble(inA, 16) / toDouble(inB, 16)
-        val mod = div - div.toInt.toDouble
-        expect(c.io.c, toFixedT(mod, 16))
       }
     }
 
-    launchCppTester((c: FixedMod) => new FixedModTests(c))
+    class FixedModTester(c : FixedMod) extends Tester(c) with FixedModTests {
+      tests(c)
+    }
+
+    launchCppTester((c: FixedMod) => new FixedModTester(c))
   }
 }

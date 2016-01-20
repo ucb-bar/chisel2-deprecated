@@ -516,7 +516,7 @@ case class BoolEx (expr:Ex[Boolean]) {
   def ||  (x:BoolEx):Ex[Boolean] = ExOr(expr,x.expr)
   def ^   (x:BoolEx):Ex[Boolean] = ExXor(expr,x.expr)
   def === (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
-  def !== (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
+  def =/= (x:BoolEx):Ex[Boolean] = ExEq[Boolean](expr,x.expr)
 }
 
 object Implicits {

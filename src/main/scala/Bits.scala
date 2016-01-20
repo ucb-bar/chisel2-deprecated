@@ -32,19 +32,28 @@ package Chisel
 
 /* backward compatibility */
 object Bits {
+  /** Deprecated: Do not use */
   def apply(x: Int): UInt = UInt(x);
+  /** Deprecated: Do not use */
   def apply(x: Int, width: Int): UInt = UInt(x, width);
+  /** Deprecated: Do not use */
   def apply(x: BigInt): UInt = UInt(x);
+  /** Deprecated: Do not use */
   def apply(x: BigInt, width: Int): UInt = UInt(x, width);
+  /** Deprecated: Do not use */
   def apply(x: String): UInt = UInt(x);
+  /** Deprecated: Do not use */
   def apply(x: String, width: Int): UInt = UInt(x, width);
+  /** Deprecated: Do not use */
   def apply(dir: IODirection = NODIR, width: Int = -1): UInt = UInt(dir, width);
+  /** Deprecated: Do not use */
   def DC(width: Int): UInt = UInt.DC(width)
 }
 
 
 /** Base class for built-in Chisel types Bits and SInt. */
 abstract class Bits extends Data with proc {
+  // TODO: make private or protected?
   var dir: IODirection = NODIR
 
   def create(dir: IODirection, width: Int) {
@@ -88,7 +97,7 @@ abstract class Bits extends Data with proc {
   override def assign(src: Node): Unit = {
     if (Driver.topComponent != None || checkAssign(src)) {
       if (procAssigned && Driver.minimumCompatibility > "2")
-        ChiselError.warning("Bulk-connection to a node that has been procedurally assigned-to is deprecated.")
+        ChiselError.error("Bulk-connection to a node that has been procedurally assigned-to is deprecated.")
 
       assigned = true
       if (!procAssigned) inputs += src
@@ -111,6 +120,7 @@ abstract class Bits extends Data with proc {
     }
   }
 
+  // TODO: make protected or private?
   override def defaultRequired: Boolean = true
 
   //code generation stuff
@@ -140,6 +150,7 @@ abstract class Bits extends Data with proc {
     str
   }
 
+  /** Change INPUT to OUTPUT and OUTPUT to INPUT */
   override def flip: this.type = {
     dir match {
       case INPUT => dir = OUTPUT
@@ -149,11 +160,18 @@ abstract class Bits extends Data with proc {
     this
   }
 
+  /** Set this Bits instantiation to be neither of INPUT or OUTPUT */
   override def asDirectionless: this.type = { dir = NODIR ; this }
+  /** Set this Bits instatiation to be an INPUT */
   override def asInput: this.type = { dir = INPUT ; this }
+  /** Set this Bits instatiation to be an OUTPUT */
   override def asOutput: this.type = { dir = OUTPUT ; this }
+  /** @return this instantiation is neither of INPUT or OUTPUT */
   override def isDirectionless: Boolean = { dir == NODIR }
 
+  /** Connect I/O of modules with the same name
+    * @param src Node to attempt to connect to this instantiation
+    */
   override def <>(src: Node) {
     checkCompatibility(src)
     val p = component
@@ -253,6 +271,8 @@ abstract class Bits extends Data with proc {
     }
   }
 
+  /** Copy this instantiation of the Chisel Data type with all parameters such as width and I/O direction the same
+    */
   override def cloneType: this.type = {
     val res = getClass.newInstance.asInstanceOf[this.type];
     res.inferWidth = inferWidth
@@ -261,6 +281,8 @@ abstract class Bits extends Data with proc {
     res
   }
 
+  /** Force the width of this nodes input to have the same width this if known
+    * if input node width is known force width of this node */
   override def forceMatchingWidths {
     if(inputs.length == 1 && inputs(0).widthW != widthW) {
       // Our single child differs.
@@ -311,40 +333,68 @@ abstract class Bits extends Data with proc {
   /** Extract a single Bool at index *bit*.
     */
   final def apply(bit: Int): Bool = apply(UInt(bit))
+  /** Extract a single bit at position 'bit' as a Bool */
   final def apply(bit: UInt): Bool = {
     val res = Extract(this, bit){Bool()}
     res.comp = Some(new Insert(this, bit, 1))
     res
   }
 
-  /** Extract a range of bits */
+  /** Extract a range of bits, inclusive from hi to lo
+    * {{{ myBits = 0x5, myBits(1,0) => 0x3 }}} */
   final def apply(hi: Int, lo: Int): UInt = {
     val res = Extract(this, hi, lo){UInt()}
     res.comp = Some(new Insert(this, UInt(lo), hi - lo + 1))
     res
   }
+  /** Extract a range of bits, inclusive from hi to lo */
   final def apply(hi: UInt, lo: UInt): UInt = {Extract(this, hi, lo, -1){UInt()}};
+  /** Extract a range of bits, inclusive from hi to lo */
   final def apply(range: (Int, Int)): UInt = this(range._1, range._2);
 
+  /** invert all bits with ~ */
   def unary_~(): this.type   = newUnaryOp("~");
+  /** reduction and, and all bits together */
   def andR(): Bool           = newLogicalOp(SInt(-1), "===")
+  /** reduction or, or all bits together */
   def orR(): Bool            = newLogicalOp(UInt(0), "!=")
+  /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
-  def != (b: Bits): Bool     = newLogicalOp(b, "!=");
+  @deprecated("Use =/= rather than != for chisel comparison", "3")
+  def != (b: Bits): Bool = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("!= is deprecated, use =/= instead")
+    }
+    newLogicalOp(b, "!=");
+  }
+  /** not equal to */
+  def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
+  /** Bitwise and */
   def & (b: Bits): this.type = newBinaryOp(b, "&");
+  /** Bitwise or */
   def | (b: Bits): this.type = newBinaryOp(b, "|");
+  /** Bitwise xor */
   def ^ (b: Bits): this.type = newBinaryOp(b, "^");
+  /** Shift left operation */
   def <<(b: UInt): this.type = newBinaryOp(b, "<<")
 
+  /** Set bit 'off' in data dat
+    * @param off which bit to set
+    * @param dat A UInt in which to set the bit
+    */
   def bitSet(off: UInt, dat: UInt): this.type = {
     val bit = UInt(1, 1) << off
     this & ~bit | dat.toSInt & bit
   }
 
+  /** Split up this bits instantiation to a Vec of Bools */
   def toBools: Vec[Bool] = Vec.tabulate(this.getWidth)(i => this(i))
 
+  /** Error shown when operation is not defined
+    * @throws ChiselException if the operation is not defined
+    */
   def error(b: Bits): Bits = {
-    throw new Exception("+ not defined on " + this.getClass + " and " + b.getClass)
+    throwException("+ not defined on " + this.getClass + " and " + b.getClass)
     this
   }
 
@@ -453,8 +503,11 @@ abstract class Bits extends Data with proc {
   }
 
   def === (that: BitPat): Bool = that === this
-  def != (that: BitPat): Bool = that != this
+  @deprecated("Use =/= rather than != for chisel comparison", "3")
+  def != (that: BitPat): Bool = that =/= this
+  def =/= (that: BitPat): Bool = that =/= this
 
+  /** Cat bits together to into a single data object with the width of both combined */
   override def ##[T <: Data](right: T): this.type = {
     right match {
       case b: Bits => newBinaryOp(b, "##");
@@ -473,13 +526,16 @@ abstract class Bits extends Data with proc {
 
 
 object andR {
+    /** reduction and, and all bits together */
     def apply(x: Bits): Bool = x.andR
 }
 
 object orR {
+    /** reduction or, or all bits together */
     def apply(x: Bits): Bool = x.orR
 }
 
 object xorR {
+    /** reduction xor, xor all bits together */
     def apply(x: Bits): Bool = x.xorR
 }

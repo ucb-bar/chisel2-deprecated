@@ -39,6 +39,9 @@ object Bool {
     res.init("", 1)
     res
   }
+
+  def apply(x: Node): Bool = Bool().fromNode(x)
+
   /** Factory method to create a don't-care.
     *  FIXME: This should remain a BitPat(), not a Bool().
     *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
@@ -55,29 +58,33 @@ class Bool extends UInt {
     Bool(OUTPUT).asTypeFor(n).asInstanceOf[this.type]
   }
 
+  /** Create a Bool from an Int */
   override def fromInt(x: Int): this.type = {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
+  /** Implementation of := operator, assigns value to this Bool */
   override protected def colonEquals(src: Bits): Unit = src match {
     case _: Bool => super.colonEquals(src(0))
     case _ => {
       val gotWidth = src.getWidth()
       if (gotWidth < 1) {
-        throw new Exception("unable to automatically convert " + src + " to Bool, convert manually instead")
+        throwException("unable to automatically convert " + src + " to Bool, convert manually instead")
       } else if (gotWidth > 1) {
-        throw new Exception("multi bit signal " + src + " converted to Bool")
+        throwException("multi bit signal " + src + " converted to Bool")
       }
       super.colonEquals(src(0)) // We only have one bit in *src*.
     }
   }
 
+  /** Logical and, is equivalent to bitwise and */
   def && (b: Bool): Bool =
     if (this.isLit) { if (isTrue) b else Bool(false) }
     else if (b.isLit) b && this
     else if (this._isComplementOf(b)) Bool(false)
     else newBinaryOp(b, "&")
 
+  /** Logical or, is equivalent to bitwise or */
   def || (b: Bool): Bool =
     if (this.isLit) { if (isTrue) Bool(true) else b }
     else if (b.isLit) b || this

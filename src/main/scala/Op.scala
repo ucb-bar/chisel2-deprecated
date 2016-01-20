@@ -32,7 +32,15 @@ package Chisel
 import Op._
 import Node._
 
+/** Cast a node to be Bits */
 object chiselCast {
+  /** @tparam S type of the node to cast
+    * @tparam T type of the Bits to cast to
+    * @param x the node to case
+    * @param gen the instantiation to cast to
+    * @example
+    * {{{ val myUInt = chiselCast[Data, UInt](myData, UInt(width=8)) }}}
+    */
   def apply[S <: Node, T <: Bits](x: S)(gen: => T): T = {
     val res = gen
     res assign x.toNode
@@ -40,6 +48,7 @@ object chiselCast {
   }
 }
 
+// TODO: make private[Chisel]?
 object UnaryOp {
   val Op = OpGen1({ new UnaryOp(_: String) }) _
   def apply(op: String, widthInfer: (=> Node) => Width, x: Node): Node = {
@@ -66,11 +75,12 @@ object UnaryOp {
       case "dfloor" => Op("dfloor", fixWidth(doubleWidth), x)
       case "dceil" => Op("dceil", fixWidth(doubleWidth), x)
       case "dround" => Op("dround", fixWidth(doubleWidth), x)
-      case any => throw new Exception("Unrecognized operator " + op)
+      case any => throwException("Unrecognized operator " + op)
     }
   }
 }
 
+// TODO: make private[Chisel]?
 object BinaryOp {
   val Op = OpGen2({ new BinaryOp(_)}) _
   def apply(op: String, widthInfer: (=> Node) => Width, x: Node, y: Node): Node = {
@@ -108,7 +118,7 @@ object BinaryOp {
       case "dpow"  => Op("dpow", fixWidth(doubleWidth), x, y )
       case "+&"   => Op("+", maxWidthPlusOne _,  x, y )
       case "-&"   => Op("-", maxWidthPlusOne _,  x, y )
-      case any   => throw new Exception("Unrecognized operator " + op)
+      case any   => throwException("Unrecognized operator " + op)
     }
   }
 
@@ -119,7 +129,7 @@ object BinaryOp {
   private def modSUWidth(x: => Node) = x.inputs(0).needWidth().min(x.inputs(1).needWidth() - 1)
 }
 
-
+// TODO: make private[Chisel]?
 object LogicalOp {
   val Op = OpGen2({ new LogicalOp(_)}) _
   def apply(x: Node, y: Node, op: String): Bool = {
@@ -142,7 +152,7 @@ object LogicalOp {
       case "d<"  => Op("d<",  fixWidth(1), x, y)
       case "d<=" => Op("d<=", fixWidth(1), x, y)
       case "d>=" => Op("d>=", fixWidth(1), x, y)
-      case any   => throw new Exception("Unrecognized operator " + op);
+      case any   => throwException("Unrecognized operator " + op);
     }
     Bool(OUTPUT).fromNode(node)
   }
@@ -153,7 +163,7 @@ object ReductionOp {
   def apply(x: Node, op: String): Node = {
     op match {
       case "^" => Op("^", fixWidth(1), x)
-      case any => throw new Exception("Unrecognized operator " + op)
+      case any => throwException("Unrecognized operator " + op)
     }
   }
 }
@@ -297,7 +307,7 @@ object Op {
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
           val quo = absA / absB
-          Mux(signA != signB, -quo, quo)
+          Mux(signA =/= signB, -quo, quo)
         case "s%s" =>
           val (signA, absA) = signAbs(a)
           val (signB, absB) = signAbs(b)
@@ -414,7 +424,7 @@ abstract class Op extends Node {
     case _ => false
   }
 
-  def lower: Node = throw new Exception("lowering " + op + " is not supported")
+  def lower: Node = throwException("lowering " + op + " is not supported")
   def identityFromNode: Int = op match {
     case "<<"  => 0
     case ">>"  => 0

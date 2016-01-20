@@ -31,6 +31,7 @@
 package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
+import scala.collection.immutable.ListSet
 import sys.process.stringSeqToProcess
 
 object Driver extends FileSystemUtilities{
@@ -40,10 +41,22 @@ object Driver extends FileSystemUtilities{
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
       ChiselError.report
-      if (ChiselError.hasErrors && !getLineNumbers) {
+      if (wantLineNumbers) {
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
         apply(args :+ "--lineNumbers", gen, wrapped)
       }
+    }
+  }
+  
+  // If we encountered errors, and re-running with --lineNumbers may help
+  //  diagnose the problem, indicate we should do so.
+  def wantLineNumbers: Boolean = {
+    if (ChiselError.hasErrors && !getLineNumbers) {
+      // If we have a non-cpp compilation error with no line number information,
+      //  re-running may help.
+      ChiselError.getErrorList.exists(e => e.line == null && !e.msgFun().startsWith("failed to compile "))
+    } else {
+      false
     }
   }
 
@@ -133,9 +146,10 @@ object Driver extends FileSystemUtilities{
 
     // Do BFS
     val _walked = HashSet[Node](queue:_*)
-    def walked(node: Node) = _walked contains node
-    def enqueueNode(node: Node) { queue enqueue node ; _walked += node }
-    def enqueueInputs(top: Node) { top.inputs filterNot walked foreach enqueueNode }
+    // Avoid a "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements" if node is null - unassigned MUX
+    def walked(node: Node) = node == null || _walked(node)
+    def enqueueNode(node: Node) { if (node != null) { queue enqueue node ; _walked += node }}
+    def enqueueInputs(top: Node) { ListSet((top.inputs.filter(_ != null)):_*) filterNot walked foreach enqueueNode }
     def enqueueElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach enqueueNode }
     while (!queue.isEmpty) {
       val top = queue.dequeue
@@ -169,9 +183,10 @@ object Driver extends FileSystemUtilities{
 
     // Do DFS
     val _walked = HashSet[Node](stack:_*)
-    def walked(node: Node) = _walked contains node
+    // Avoid a "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements" if node is null - unassigned MUX
+    def walked(node: Node) = node == null || _walked(node)
     def pushNode(node: Node) { stack push node ; _walked += node }
-    def pushInputs(top: Node) { top.inputs.toList filterNot walked foreach pushNode }
+    def pushInputs(top: Node) { ListSet(top.inputs:_*) filterNot walked foreach pushNode }
     def pushElems(agg: Data) { agg.flatten.unzip._2 filterNot walked foreach pushNode }
     while (!stack.isEmpty) {
       val top = stack.pop
@@ -289,7 +304,6 @@ object Driver extends FileSystemUtilities{
     parallelMakeJobs = 0
     isVCDinline = false
     isSupportW0W = false
-    hasMem = false
     backend = new CppBackend
     topComponent = None
     moduleNamePrefix = ""
@@ -378,6 +392,7 @@ object Driver extends FileSystemUtilities{
         case "--checkPorts" => isCheckingPorts = true
         case "--reportDims" => isReportDims = true
         //Jackhammer Flags
+        case "--configName" =>  chiselConfigClassName = Some(args(i + 1)); i += 1
         case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
         case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
@@ -416,11 +431,11 @@ object Driver extends FileSystemUtilities{
     // Set the backend after we've interpreted all the arguments.
     // (The backend may want to configure itself based on the arguments.)
     backend = backendName match  {
+      case "null" => new Backend
       case "c" => new CppBackend
       case "dot" => new DotBackend
       case "flo" => new FloBackend
       case "fpga" => new FPGABackend
-      case "null" => new NullBackend
       case "sysc" => new SysCBackend
       case "v" => new VerilogBackend
       case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
@@ -460,7 +475,6 @@ object Driver extends FileSystemUtilities{
   var parallelMakeJobs = 0
   var isVCDinline = false
   var isSupportW0W = false
-  var hasMem = false
   var backend: Backend = new CppBackend
   var topComponent: Option[Module] = None 
   var moduleNamePrefix = ""

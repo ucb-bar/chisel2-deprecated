@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2015 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -28,9 +28,51 @@
  MODIFICATIONS.
 */
 
-package Chisel
+import org.junit.Test
 
-class NullBackend extends Backend {
-  val keywords = Set[String]()
-  // Use the common (abstract) Backend for everything else.
+import Chisel._
+
+class DoubleSuite extends TestSuite {
+  @Test def testCompareDbl() {
+    println("\ntestCompareDbl...")
+    class CompareDblModule extends Module {
+      class IO extends Bundle {
+        val in1 = Dbl(INPUT)
+        val in2 = Dbl(INPUT)
+        val outLT = Bool(OUTPUT)
+        val outLE = Bool(OUTPUT)
+        val outGT = Bool(OUTPUT)
+        val outGE = Bool(OUTPUT)
+      }
+      val io = new IO()
+      val dbl1 = io.in1
+      val dbl2 = io.in2
+      io.outLT := dbl1 < dbl2
+      io.outLE := dbl1 <= dbl2
+      io.outGT := dbl1 > dbl2
+      io.outGE := dbl1 >= dbl2
+    }
+
+    trait CompareDblModuleTests extends Tests {
+      def tests(m: CompareDblModule) {
+        for (i <- 0 to 100) {
+          val dbl1 = rnd.nextDouble
+          val dbl2 = rnd.nextDouble
+          
+          poke(m.io.in1, dbl1)
+          poke(m.io.in2, dbl2)
+          expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)
+          expect(m.io.outLE, if (dbl1 <= dbl2) 1 else 0)
+          expect(m.io.outGT, if (dbl1 > dbl2) 1 else 0)
+          expect(m.io.outGE, if (dbl1 >= dbl2) 1 else 0)
+        }
+      }
+    }
+
+    class CompareDblModuleTester(m: CompareDblModule) extends Tester(m) with CompareDblModuleTests {
+      tests(m)
+    }
+
+    launchCppTester((m: CompareDblModule) => new CompareDblModuleTester(m))
+  }
 }

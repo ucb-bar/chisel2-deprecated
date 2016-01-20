@@ -27,7 +27,7 @@ To start working on a circuit with Chisel, create simple build.sbt
 and scala source file containing your Chisel code as follow.
 
     $ cat build.sbt
-    scalaVersion := "2.10.4"
+    scalaVersion := "2.11.7"
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
 
@@ -132,16 +132,30 @@ Documentation
 
 In order to generate the Chisel documentation (html and pdf formats),
 you'll need the LaTeX tools, tex4ht, texlive, python bs4
-BeautifulSoup, imagemagick, and source-highlight. The following
-apt-get installs should work for ubuntu 14.04 LTS
-
-    $ sudo apt-get install python-bs4 imagemagick source-highlight
-    $ sudo apt-get install tex4ht texlive-latex-base
-    $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
-    $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
+BeautifulSoup, imagemagick, and source-highlight.
 
 To generate all the documentation:
 
     $ cd doc
     $ make
+
+### Dependencies
+The following
+apt-get installs should work for ubuntu 14.04 LTS
+
+    $ sudo apt-get install python-bs4 python-jinja2 imagemagick source-highlight
+    $ sudo apt-get install tex4ht texlive-latex-base
+    $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
+    $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
+    
+On Mac OsX first install [MacTeX](https://tug.org/mactex/mactex-download.html) then use brew 
+
+	$ brew install miktex
+	$ brew install imagemagick source-highlight
+	$ brew install gawk
+
+and then downaload Beautiful Soup from [site](http://www.crummy.com/software/BeautifulSoup/#Download) unpack and run inside the folder
+
+	$  python setup.py install
+
 

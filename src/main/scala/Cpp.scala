@@ -50,7 +50,6 @@ object CString {
 
 class CppBackend extends Backend {
   import PartitionIslands._
-  val keywords = Set[String]()
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
   protected[this] val onceOnlyFiles = HashSet[String]()
@@ -63,7 +62,8 @@ class CppBackend extends Backend {
   // This is required if we're generating paritioned combinatorial islands, or we're limiting the size of functions/methods.
   protected[this] val shadowRegisterInObject = Driver.shadowRegisterInObject || Driver.partitionIslands || Driver.lineLimitFunctions > 0
   // If we need to put shadow registers in the object, we also should put multi-word literals there as well.
-  protected[this] val multiwordLiteralInObject = shadowRegisterInObject
+  // Actually, in order for emitLoWordRef() to work for multi-word literals, we need to have them in the object and initialized once.
+  protected[this] val multiwordLiteralInObject = shadowRegisterInObject || true
   protected[this] val multiwordLiterals = HashSet[Literal]()
   // Should we put unconnected inputs in the object?
   protected[this] val unconnectedInputsInObject = Driver.partitionIslands
@@ -97,11 +97,20 @@ class CppBackend extends Backend {
 
   // Manage a constant pool.
   protected[this] val coalesceConstants = multiwordLiteralInObject
-  protected[this] val constantPool = HashMap[String, Literal]()
+  protected[this] val constantPool = HashMap[(String, Width), Literal]()
 
-  protected[this] def emitLit(value: BigInt, w: Int = 0): String = {
+  protected[this] def emitValue(value: BigInt, w: Int = 0): String = {
     val hex = value.toString(16)
     "0x" + (if (hex.length > bpw/4*w) hex.slice(hex.length-bpw/4*(w + 1), hex.length-bpw/4*w) else 0) + "L"
+  }
+
+  // Emit the value of a literal, instead of a reference to it.
+  protected[this] def emitLitVal(n: Node, w: Int): String = {
+    assert(isLit(n), ChiselError.error("Internal Error: Trying to emitLitVal for non-literal %s".format(n)))
+    val l = n.asInstanceOf[Literal]
+    val lit = l.value
+    val value = if (lit < 0) (BigInt(1) << l.needWidth()) + lit else lit
+    emitValue(value, w)
   }
 
   protected[this] def wordMangle(x: Node, w: String): String = x match {
@@ -109,13 +118,10 @@ class CppBackend extends Backend {
       if (words(x) == 1) {
         emitRef(x)
       } else {
-        // Are we maintaining a constant pool?
-        if (coalesceConstants) {
-           val cn = constantPool.getOrElseUpdate(l.name, l)
-          s"T${cn.emitIndex}[${w}]"
-        } else {
-          s"T${x.emitIndex}[${w}]"
-        }
+        val node = // Are we maintaining a constant pool?
+          if (!coalesceConstants) x
+          else constantPool.getOrElseUpdate((l.name, l.width_), l)
+        s"T${node.emitIndex}[${w}]"
       }
     case _ =>
       if (x.isInObject) s"${emitRef(x)}.values[${w}]"
@@ -123,16 +129,26 @@ class CppBackend extends Backend {
       else s"${emitRef(x)}[${w}]"
   }
 
-  protected[this] def wordMangle(x: Node, w: Int): String =
-    if (w >= words(x)) {
+  protected[this] def wordMangle(x: Node, w: Int): String = {
+    val nWords = words(x)
+    // If we're asking for a word that doesn't exist, return 0.
+    // FIXME: Shouldn't this generate an error?
+    if (w >= nWords) {
       "0L"
     }  else x match {
+      // If this is a single word literal, we just output its value.
       case l: Literal =>
-        val lit = l.value
-        val value = if (lit < 0) (BigInt(1) << x.needWidth()) + lit else lit
-        emitLit(value, w)
-      case _ => wordMangle(x, w.toString)
+        if (nWords == 1) {
+          emitLitVal(l, w)
+        } else {
+          // Otherwise, we'd better have multiwordLiteralInObject so we can return a reference to the specific word.
+          assert(multiwordLiteralInObject, ChiselError.error("Internal Error: multiword literal reference without object to refer to"))
+          wordMangle(x, w.toString)
+        }
+      case _ => 
+        wordMangle(x, w.toString)
     }
+  }
 
   protected[this] def isLit(node: Node): Boolean = 
     node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
@@ -157,7 +173,7 @@ class CppBackend extends Backend {
         if (coalesceConstants) {
           // Is this the node that actually defines the constant?
           // If so, output the definition (we must do this only once).
-          if (constantPool.contains(l.name) && constantPool(l.name) == l) {
+          if (constantPool.contains((l.name, l.width_)) && constantPool((l.name, l.width_)) == l) {
             List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
           } else {
             List()
@@ -229,7 +245,7 @@ class CppBackend extends Backend {
   def trunc(x: Node): String = {
     val gotWidth = x.needWidth()
     if (gotWidth % bpw == 0) ""
-    else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitLit((BigInt(1) << (gotWidth%bpw))-1)};\n"
+    else s"  ${emitWordRef(x, words(x)-1)} = ${emitWordRef(x, words(x)-1)} & ${emitValue((BigInt(1) << (gotWidth%bpw))-1)};\n"
   }
   def opFoldLeft(o: Op, initial: (String, String) => String, subsequent: (String, String, String) => String) =
     (1 until words(o.inputs(0))).foldLeft(initial(emitLoWordRef(o.inputs(0)), emitLoWordRef(o.inputs(1))))((c, i) => subsequent(c, emitWordRef(o.inputs(0), i), emitWordRef(o.inputs(1), i)))
@@ -319,7 +335,7 @@ class CppBackend extends Backend {
           else if (o.op == "PriEnc" || o.op == "OHToUInt")
             emitLog2(o, true)
           else {
-            assert(false, "operator " + o.op + " unsupported")
+            assert(false, ChiselError.error("operator " + o.op + " unsupported"))
             ""
           })
         } else if (o.op == "+" || o.op == "-") {
@@ -346,11 +362,11 @@ class CppBackend extends Backend {
           if (o.needWidth() <= bpw) {
             "  " + emitLoWordRef(o) + " = " + emitLoWordRef(o.inputs(0)) + " << " + emitLoWordRef(o.inputs(1)) + ";\n" + trunc(o)
           } else {
-            var shb = emitLoWordRef(o.inputs(1))
+            val shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
             res += s"val_t __c = 0"
-            res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
-            res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
+            res += s"val_t __w = ${shb} / ${bpw}"
+            res += s"val_t __s = ${shb} % ${bpw}"
             res += s"val_t __r = ${bpw} - __s"
             for (i <- 0 until words(o)) {
               val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}-__w, 0, ${words(o.inputs(0)) - 1})")
@@ -363,6 +379,7 @@ class CppBackend extends Backend {
         } else if (o.op == ">>" || o.op == "s>>") {
           val arith = o.op == "s>>"
           val gotWidth = o.inputs(0).needWidth()
+          // Is this a single word shift?
           if (gotWidth <= bpw) {
             if (arith) {
               s"  ${emitLoWordRef(o)} = sval_t(${emitLoWordRef(o.inputs(0))} << ${bpw - gotWidth}) >> (${bpw - gotWidth} + ${emitLoWordRef(o.inputs(1))});\n" + trunc(o)
@@ -370,28 +387,25 @@ class CppBackend extends Backend {
               s"  ${emitLoWordRef(o)} = ${emitLoWordRef(o.inputs(0))} >> ${emitLoWordRef(o.inputs(1))};\n"
             }
           } else {
-            var shb = emitLoWordRef(o.inputs(1))
             val res = ArrayBuffer[String]()
-            res += s"val_t __c = 0"
-            res += s"val_t __w = ${emitLoWordRef(o.inputs(1))} / ${bpw}"
-            res += s"val_t __s = ${emitLoWordRef(o.inputs(1))} % ${bpw}"
-            res += s"val_t __r = ${bpw} - __s"
-            if (arith)
-              res += s"val_t __msb = (sval_t)${emitWordRef(o.inputs(0), words(o)-1)} << ${(bpw - o.needWidth() % bpw) % bpw} >> ${(bpw-1)}"
-            for (i <- words(o)-1 to 0 by -1) {
-              val inputWord = wordMangle(o.inputs(0), s"CLAMP(${i}+__w, 0, ${words(o.inputs(0))-1})")
-              res += s"val_t __v${i} = MASK(${inputWord}, __w + ${i} < ${words(o.inputs(0))})"
-              res += s"${emitWordRef(o, i)} = __v${i} >> __s | __c"
-              res += s"__c = MASK(__v${i} << __r, __s != 0)"
-              if (arith) {
-                val gotWidth = o.needWidth()
-                res += s"${emitWordRef(o, i)} |= MASK(__msb << ((${gotWidth-1}-${emitLoWordRef(o.inputs(1))}) % ${bpw}), ${(i + 1) * bpw} > ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
-                res += s"${emitWordRef(o, i)} |= MASK(__msb, ${i*bpw} >= ${gotWidth-1} - ${emitLoWordRef(o.inputs(1))})"
-              }
-            }
+            val nWords = ((gotWidth - 1) / bpw) + 1
+            /* Use int and assume rsh < 2^32, define amount_shift as the amount to right shift */
+            res += s"unsigned int __amount = ${emitLoWordRef(o.inputs(1))}"
+            /* Define in_words as number of 64 bit words for the input */
+            res += s"const unsigned int __in_words = ${nWords}"
+            /* Define in_width as the bit width of the input */
+            res += s"int __in_width = ${gotWidth}"
+            res += s"val_t __d0[${nWords}]"
+            val srcRef  = s"&${emitLoWordRef(o.inputs(0))}"
+            // Call Rshift
             if (arith) {
-              val gotWidth = o.needWidth()
-              res += emitLoWordRef(o) + " |= MASK(__msb << ((" + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ") % " + bpw + "), " + bpw + " > " + (gotWidth-1) + "-" + emitLoWordRef(o.inputs(1)) + ")"
+              res += s"rsha_n(__d0, ${srcRef}, __amount, __in_words, __in_width)"
+            } else {
+              res += s"rsh_n(__d0, ${srcRef}, __amount, __in_words)"
+            }
+            /* Attach the result from __d0 to o */
+            for ( i <- 0 until words(o) ) {
+              res += s"${emitWordRef(o, i)} = __d0[${i}]"
             }
             block(res) + (if (arith) trunc(o) else "")
           }
@@ -473,12 +487,14 @@ class CppBackend extends Backend {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") != toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") > toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
+        } else if (o.op == "d<") {
+            "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") < toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d<=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") <= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else if (o.op == "d>=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
-          assert(false, "operator " + o.op + " unsupported")
+          assert(false, ChiselError.error("operator " + o.op + " unsupported"))
           ""
         })
       }
@@ -532,12 +548,12 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = emitLoWordRef(a.cond) +
-          (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
-           else " || " + Driver.implicitReset.name + ".lo_word()")
+        val cond = 
+          if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
+          else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
-        else if (Driver.isAssertWarn) "  WARN(" + cond + ", " + CString(a.message) + ");\n"
-        else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
+        else if (Driver.isAssertWarn) s"  WARN(${cond}, ${CString(a.message)});\n"
+        else s"  ASSERT(${cond}, ${CString(a.message)});\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
@@ -566,7 +582,7 @@ class CppBackend extends Backend {
 	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
-          next.isReg
+          next match { case _: Delay => true case _ => false }
         }
         if (useShadow) {
           emitRef(reg) + "__shadow"
@@ -662,11 +678,12 @@ class CppBackend extends Backend {
     node match {
       case reg: Reg => {
         regWritten += node
-        if (reg.next.isReg) {
-          needShadow += node
+        reg.next match {
+          case _: Delay => needShadow += node
+          case _ =>
         }
       }
-      case _ => {}
+      case _ => 
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
@@ -722,7 +739,7 @@ class CppBackend extends Backend {
       // We explicitly unset CPPFLAGS and CXXFLAGS so the values
       // set in the Makefile will take effect.
       val cmd = "unset CPPFLAGS CXXFLAGS; make " + args
-      if (!run(cmd)) throw new Exception("make failed...")
+      if (!run(cmd)) throwException("make failed...")
     }
 
     def editToTarget(filename: String, replacements: HashMap[String, String]) = {
@@ -771,6 +788,8 @@ class CppBackend extends Backend {
     }
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    // Ensure onceOnlyFiles count as unoptimized.
+    unoptimizedFiles ++= onceOnlyFiles
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
@@ -807,7 +826,7 @@ class CppBackend extends Backend {
         cc(dir, n + "-emulator", allFlags)
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
-          "no unoptmized files to compile for '--compileMultipleCppFiles'")
+          ChiselError.error("Internal Error: no unoptmized files to compile for '--compileMultipleCppFiles'"))
         // Compile the O0 files.
         onceOnlyFiles.map(cc(dir, _, allFlags + " " + optim0))
 
@@ -1058,12 +1077,19 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc))
+      // Header declarations should be unique, add a simple check
+      for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc)) {
+        assertUnique(emitDec(m), "redeclaration in header for nodes")
         out_h.write(emitDec(m))
-      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc))
+      }
+      for (m <- Driver.orderedNodes.filter(_.isInVCD).sortWith(headerOrderFunc)){
+        assertUnique(vcd.emitDec(m), "redeclaration in header for vcd")
         out_h.write(vcd.emitDec(m))
-      for (clock <- Driver.clocks)
+      }
+      for (clock <- Driver.clocks) {
+        assertUnique(emitDec(clock), "redeclaration in header for clock")
         out_h.write(emitDec(clock))
+      }
 
       out_h.write("\n");
 
@@ -1088,8 +1114,8 @@ class CppBackend extends Backend {
 
       for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
-        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
-        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write(s"  void clock_lo${clockNameStr} ( dat_t<1> reset, bool assert_fire=true );\n")
+        out_h.write(s"  void clock_hi${clockNameStr} ( dat_t<1> reset );\n")
       }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
@@ -1151,12 +1177,12 @@ class CppBackend extends Backend {
       if (multiwordLiteralInObject) {
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
-          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_+", "+_) + "};\n"
         }
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
         if (coalesceConstants) {
-          for ((v,l) <- constantPool) {
+          for (((v,w),l) <- constantPool) {
             writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
           }
@@ -1372,8 +1398,9 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
+        val clockLoArgs = clockArgs :+ CTypedName("bool", "assert_fire")
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
         val clockHiName = "clock_hi" + clkName(clock)
         val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
@@ -1393,7 +1420,7 @@ class CppBackend extends Backend {
               islandClkCode += ((islandId, new ClockCodeMethods))
             }
             val clockLoName = "clock_lo" + clkName(clock) + "_I_" + islandId
-            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
+            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
             val clockIHiName = "clock_ihi" + clkName(clock) + "_I_" + islandId
@@ -1486,7 +1513,7 @@ class CppBackend extends Backend {
             writeCppFile(clockIHi.head + clockIHi.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
             // code have effectively the same signature and tail.
-            assert(clockIHi.tail == clockXHi.tail)
+            assert(clockIHi.tail == clockXHi.tail, ChiselError.error("Internal Error: clockIHi.tail != clockXHi.tail"))
             writeCppFile(clockXHi.body.result + clockXHi.tail)
           }
         } else {
@@ -1631,7 +1658,9 @@ class CppBackend extends Backend {
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
       genInitSimDataMethod(c) 
-    } else 0
+    } else {
+      0
+    }
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)

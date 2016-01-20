@@ -110,10 +110,14 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   }
 }
 
+/** An unsigned Fixed point representation
+  * Consider using [[Chisel.Fixed Fixed]] instead */
 object UFix {
   def apply(exp: Int, width: Int): UFix = new UFix(exp, UInt(width=width))
 }
 
+/** An unsigned Fixed point representation
+  * Consider using [[Chisel.Fixed Fixed]] instead */
 class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] {
   def Factory(exp: Int, width: Int) = UFix(exp, width)
   def toRaw(a: Bits) = a.toUInt
@@ -138,13 +142,15 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
   def >  (b: UFix): Bool = b.do_lessthan(this)
   def >= (b: UFix): Bool = b.do_lesseq(this)
 
-  def %  (b: UFix): UFix = throw new Exception("% unavailable for UFix")
+  def %  (b: UFix): UFix = throwException("% unavailable for UFix")
 }
 
+@deprecated("Use [[Chisel.Fixed Fixed]] instead", "3")
 object SFix {
   def apply(exp: Int, width: Int): SFix = new SFix(exp, SInt(width=width))
 }
 
+@deprecated("Use [[Chisel.Fixed Fixed]] instead", "3")
 class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] {
   def Factory(exp: Int, width: Int) = SFix(exp, width)
   def toRaw(a: Bits) = a.toSInt
@@ -169,47 +175,5 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
   def >  (b: SFix): Bool = b.do_lessthan(this)
   def >= (b: SFix): Bool = b.do_lesseq(this)
 
-  def %  (b: SFix): SFix = throw new Exception("% unavailable for UFix")
+  def %  (b: SFix): SFix = throwException("% unavailable for SFix")
 }
-
-object QR {
-  def genSFix(int: Int, frac: Int) = SFix(int, int+frac)
-  def genUFix(int: Int, frac: Int) = UFix(int, int+frac)
-}
-
-
-class Toy extends Module {
-  val io = new Bundle {
-    val in0 = SFix(2, 4).asInput
-    val in1 = SFix(2, 4).asInput
-
-    val out = SFix(4,16).asOutput
-    val oraw = Bits(OUTPUT, width=128)
-  }
-
-  val int_result = -io.in0 * (io.in0 + io.in1)
-
-  io.out := int_result
-  io.oraw := int_result.raw
-}
-
-class ToyTester(dut: Toy) extends AdvTester.AdvTester(dut) {
-  poke(dut.io.in0.raw, BigInt(16-2))
-  poke(dut.io.in1.raw, BigInt(5))
-  takestep()
-  def signed_peek(target: Bits): Double = {
-    val raw = peek(target)
-    val gotWidth = target.getWidth()
-    val max_pos = (BigInt(1) << (gotWidth-1))-1
-    (if(raw > max_pos) raw - (BigInt(1) << gotWidth) else raw).toDouble
-  }
-  def convert[T<:Fix[_,_]](target: T): Double = {
-    target match {
-      case s: SFix => (signed_peek(s.raw).toDouble * math.pow(2, s.exp-s.raw.needWidth()))
-      case u: UFix => (peek(u.raw).toDouble * math.pow(2, u.exp-u.raw.needWidth()))
-    }
-  }
-  println("In = %g, %g : Out = %g".format(convert(dut.io.in0), convert(dut.io.in1), convert(dut.io.out)))
-  println("Raw output is: %s".format(peek(dut.io.oraw).toByteArray.map("%02X".format(_)).reduce(_+" "+_)))
-}
-
