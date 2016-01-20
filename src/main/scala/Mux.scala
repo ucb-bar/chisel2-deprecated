@@ -117,7 +117,7 @@ object Mux {
     // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
     if (Driver.minimumCompatibility > "2") {
       if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
-        ChiselError.warning("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+        ChiselError.error("Unable to have mixed type mux CON " + tc + " ALT " + fc)
       }
     }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases

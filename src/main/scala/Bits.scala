@@ -97,7 +97,7 @@ abstract class Bits extends Data with proc {
   override def assign(src: Node): Unit = {
     if (Driver.topComponent != None || checkAssign(src)) {
       if (procAssigned && Driver.minimumCompatibility > "2")
-        ChiselError.warning("Bulk-connection to a node that has been procedurally assigned-to is deprecated.")
+        ChiselError.error("Bulk-connection to a node that has been procedurally assigned-to is deprecated.")
 
       assigned = true
       if (!procAssigned) inputs += src
@@ -361,7 +361,12 @@ abstract class Bits extends Data with proc {
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (b: Bits): Bool     = newLogicalOp(b, "!=");
+  def != (b: Bits): Bool = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("!= is deprecated, use =/= instead")
+    }
+    newLogicalOp(b, "!=");
+  }
   /** not equal to */
   def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
   /** Bitwise and */
