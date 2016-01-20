@@ -56,20 +56,26 @@ class ComplexSuite extends TestSuite {
         io.out.imag := UInt(0)
       }
     }
-    
-    class ComplexAssignTester(c: ComplexAssign) extends Tester(c) {
-      for (t <- 0 until 4) {
-        val test_e     = rnd.nextInt(2)
-        val test_in_real = rnd.nextInt(256)
-        val test_in_imag = rnd.nextInt(256)
-    
-        poke(c.io.e,     test_e)
-        poke(c.io.in.real, test_in_real)
-        poke(c.io.in.imag, test_in_imag)
-        step(1)
-        expect(c.io.out.real, if (test_e == 1) test_in_real else 0)
-        expect(c.io.out.imag, if (test_e == 1) test_in_imag else 0)
+   
+    trait ComplexAssignTests extends Tests {
+      def tests(c: ComplexAssign) {
+        for (t <- 0 until 4) {
+          val test_e     = rnd.nextInt(2)
+          val test_in_real = rnd.nextInt(256)
+          val test_in_imag = rnd.nextInt(256)
+      
+          poke(c.io.e,     test_e)
+          poke(c.io.in.real, test_in_real)
+          poke(c.io.in.imag, test_in_imag)
+          step(1)
+          expect(c.io.out.real, if (test_e == 1) test_in_real else 0)
+          expect(c.io.out.imag, if (test_e == 1) test_in_imag else 0)
+        }
       }
+    }
+ 
+    class ComplexAssignTester(c: ComplexAssign) extends Tester(c) with ComplexAssignTests {
+      tests(c)
     }
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--compile", "--genHarness", "--test", "--targetDir", dir.getPath)
@@ -100,38 +106,44 @@ class ComplexSuite extends TestSuite {
     
     }
     
-    class ComplexTester(c: ComplexTest) extends Tester(c) {
-      for (t <- 0 until 4) {
-        val test_cond     = rnd.nextInt(2)
-        val test_in_t_real = rnd.nextInt(256)
-        val test_in_t_imag = rnd.nextInt(256)
-        val test_in_f_real = rnd.nextInt(256)
-        val test_in_f_imag = rnd.nextInt(256)
-        val test_b_t = rnd.nextInt(2)
-        val test_b_f = rnd.nextInt(2)
-    
-        poke(c.io.cond,     test_cond)
-        poke(c.io.in_t.real, test_in_t_real)
-        poke(c.io.in_t.imag, test_in_t_imag)
-        poke(c.io.in_f.real, test_in_f_real)
-        poke(c.io.in_f.imag, test_in_f_imag)
-        poke(c.io.b_t, test_b_t)
-        poke(c.io.b_f, test_b_f)
-        step(1)
-        val result_real = if (test_cond == 1) {
-          test_in_t_real + test_in_f_real + 1
-        } else {
-          test_in_t_real - test_in_f_real + 1
+    trait ComplexTests extends Tests {
+      def tests(c: ComplexTest) {
+        for (t <- 0 until 4) {
+          val test_cond     = rnd.nextInt(2)
+          val test_in_t_real = rnd.nextInt(256)
+          val test_in_t_imag = rnd.nextInt(256)
+          val test_in_f_real = rnd.nextInt(256)
+          val test_in_f_imag = rnd.nextInt(256)
+          val test_b_t = rnd.nextInt(2)
+          val test_b_f = rnd.nextInt(2)
+      
+          poke(c.io.cond,     test_cond)
+          poke(c.io.in_t.real, test_in_t_real)
+          poke(c.io.in_t.imag, test_in_t_imag)
+          poke(c.io.in_f.real, test_in_f_real)
+          poke(c.io.in_f.imag, test_in_f_imag)
+          poke(c.io.b_t, test_b_t)
+          poke(c.io.b_f, test_b_f)
+          step(1)
+          val result_real = if (test_cond == 1) {
+            test_in_t_real + test_in_f_real + 1
+          } else {
+            test_in_t_real - test_in_f_real + 1
+          }
+          val result_imag = if (test_cond == 1) {
+            test_in_t_imag + test_in_f_imag + 1
+          } else {
+            test_in_t_imag - test_in_f_imag + 1
+          }
+          expect(c.io.out.real, result_real)
+          expect(c.io.out.imag, result_imag)
+          expect(c.io.b_o, if (test_cond == 1) test_b_t else 0)
         }
-        val result_imag = if (test_cond == 1) {
-          test_in_t_imag + test_in_f_imag + 1
-        } else {
-          test_in_t_imag - test_in_f_imag + 1
-        }
-        expect(c.io.out.real, result_real)
-        expect(c.io.out.imag, result_imag)
-        expect(c.io.b_o, if (test_cond == 1) test_b_t else 0)
       }
+    }
+
+    class ComplexTester(c: ComplexTest) extends Tester(c) with ComplexTests {
+      tests(c)
     }
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--compile", "--genHarness", "--test", "--targetDir", dir.getPath)

@@ -53,7 +53,6 @@ object VerilogBackend {
 }
 
 class VerilogBackend extends Backend {
-  val keywords = VerilogBackend.keywords
   override val needsLowering = Set("PriEnc", "OHToUInt", "Log2")
 
   override def isEmittingComponents: Boolean = true
@@ -92,7 +91,7 @@ class VerilogBackend extends Backend {
 
   def emitWidth(node: Node): String = {
     val w = node.needWidth()
-    if (w == 1) "" else "[" + (w-1) + ":0]"
+    if (w == 1) "" else s"[${w-1}:0]"
   }
 
   override def emitTmp(node: Node): String =
@@ -152,6 +151,14 @@ class VerilogBackend extends Backend {
     }
   }
 
+  // Add trailing comma to port declarations.
+  def delimitUncommentedPortDecls(portDecls: ArrayBuffer[StringBuilder]) {
+    val uncommentedPorts = portDecls.filter(!_.result.contains("//"))
+    if (!uncommentedPorts.isEmpty) {
+      uncommentedPorts.init map (_ append ",")
+    }
+  }
+
   def emitDef(c: Module): StringBuilder = {
     val spacing = (if(c.verilog_parameters != "") " " else "")
     var res = new StringBuilder 
@@ -201,8 +208,8 @@ class VerilogBackend extends Backend {
       portDec append " )"
       portDecs += portDec
     }
-    val uncommentedPorts = portDecs.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented portDecs
+    delimitUncommentedPortDecls(portDecs)
     portDecs map (_ insert (0, "       "))
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res append ",\n" else res append "\n"
     res append (portDecs addString (new StringBuilder, "\n"))
@@ -310,7 +317,7 @@ class VerilogBackend extends Backend {
       case x: Bits if x.isIo => ""
 
       case _: Assert =>
-        List("  reg", "[", (gotWidth-1), ":0] ", emitRef(node), ";\n").mkString
+        emitDecReg(node) 
 
       case _: Reg =>
         emitDecReg(node)
@@ -322,8 +329,8 @@ class VerilogBackend extends Backend {
         emitDecReg(node)
 
       case m: Mem[_] if !m.isInline => ""
-      case m: Mem[_] => 
-        List("  reg [", (m.needWidth()-1), ":0] ", emitRef(m), " [", (m.n-1), ":0];\n").mkString
+      case m: Mem[_] =>
+        s"  reg ${emitWidth(m)} ${emitRef(m)} [${m.n-1}:0];\n"
 
       case x: MemAccess =>
         x.referenced = true
@@ -370,6 +377,9 @@ class VerilogBackend extends Backend {
       harness write "  integer min = 1 << 31 - 1;\n\n"
       clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
     }
+    harness write "  reg vcdon = 0;\n"
+    harness write "  reg [1023:0] vcdfile = 0;\n"
+    harness write "  reg [1023:0] vpdfile = 0;\n"
 
     harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
@@ -395,12 +405,21 @@ class VerilogBackend extends Backend {
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_sigs(%s);\n".format(c.name)
 
-    if (Driver.isVCD) {
-      harness write "    /*** VPD dump ***/\n"
-      harness write "    $vcdplusfile(\"%s.vpd\");\n".format(Driver.targetDir+c.name)
-      harness write "    $vcdpluson(0);\n"
-      if (Driver.isVCDMem) harness.write("    $vcdplusmemon;\n")
-    }
+    harness write "    /*** VCD & VPD dump ***/\n"
+    harness write "    if ($value$plusargs(\"vcdfile=%s\", vcdfile)) begin\n"
+    harness write "      $dumpfile(vcdfile);\n"
+    harness write "      $dumpvars(0, %s);\n".format(c.name)
+    harness write "      $dumpoff;\n"
+    harness write "      vcdon = 0;\n"
+    harness write "    end\n"
+    harness write "    if ($value$plusargs(\"vpdfile=%s\", vpdfile)) begin\n"
+    harness write "      $vcdplusfile(vpdfile);\n"
+    harness write "      $vcdpluson(0);\n"
+    harness write "      $vcdplusautoflushon;\n"
+    harness write "    end\n"
+    harness write "    if ($test$plusargs(\"vpdmem\")) begin\n"
+    harness write "      $vcdplusmemon;\n"
+    harness write "    end\n"
     harness write "  end\n\n"
 
     if (clocks.size > 1) {
@@ -409,11 +428,31 @@ class VerilogBackend extends Backend {
       clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
       harness write "    #min $tick();\n"
+      if (!resets.isEmpty) {
+        harness write s"""    if (vcdfile && (${resets map (_.name) mkString " || "})) begin\n"""
+        harness write "      $dumpoff;\n"
+        harness write "      vcdon = 0;\n"
+        harness write "    end\n"
+        harness write "    else if (vcdfile && !vcdon) begin\n"
+        harness write "      $dumpon;\n"
+        harness write "      vcdon = 1;\n"
+        harness write "    end\n"
+      }
       harness write "    #min ;\n"    
       harness write "  end\n"
     } else {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
       harness write "    $tick();\n".format(mainClk.name)
+      if (!resets.isEmpty) {
+        harness write s"""    if (vcdfile && (${resets map (_.name) mkString " || "})) begin\n"""
+        harness write "      $dumpoff;\n"
+        harness write "      vcdon = 0;\n"
+        harness write "    end\n"
+        harness write "    else if (vcdfile && !vcdon) begin\n"
+        harness write "      $dumpon;\n"
+        harness write "      vcdon = 1;\n"
+        harness write "    end\n"
+      }
       harness write "  end\n\n"
     }
     harness write "endmodule\n"
@@ -493,7 +532,7 @@ class VerilogBackend extends Backend {
   }
 
   def emitPrintf(p: Printf): String = {
-    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
+    val file = "32'h80000002" 
     (List(if_not_synthesis,
     "`ifdef PRINTF_COND\n",
     "    if (`PRINTF_COND)\n",
@@ -503,7 +542,7 @@ class VerilogBackend extends Backend {
     endif_not_synthesis) addString (new StringBuilder)).result
   }
   def emitAssert(a: Assert): String = {
-    val file = if (Driver.isGenHarness) "32'h80000001" else "32'h80000002" 
+    val file = "32'h80000002" 
     (List(if_not_synthesis,
     "  if(", emitRef(a.reset), ") ", emitRef(a), " <= 1'b1;\n",
     "  if(!", emitRef(a.cond), " && ", emitRef(a), " && !", emitRef(a.reset), ") begin\n",
@@ -577,8 +616,8 @@ class VerilogBackend extends Backend {
           ports += List("    ", prune, "output", emitWidth(io), " ", emitRef(io)) addString (new StringBuilder)
       }
     }
-    val uncommentedPorts = ports.filter(!_.result.contains("//"))
-    uncommentedPorts.init map (_ append ",")
+    // Add trailing ',' to uncommented ports
+    delimitUncommentedPortDecls(ports)
     if (!c.clocks.isEmpty || !c.resets.isEmpty) res.append(",\n") else res.append("\n")
     res.append(ports addString (new StringBuilder, "\n"))
     res.append("\n);\n\n")
@@ -709,6 +748,7 @@ class VerilogBackend extends Backend {
       copyToTarget("sim_api.h")
       copyToTarget("vpi.h")
       copyToTarget("vpi.cpp")
+      copyToTarget("vpi.tab")
     }
   }
 
@@ -716,12 +756,12 @@ class VerilogBackend extends Backend {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
-    val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc", 
-     "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
+    val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc",
+      "-licwait 5",
+      "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
-    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-use_vpiobj", "vpi.so", "-o", n, vcsSrcs) mkString " "
+    val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-P", "vpi.tab", "vpi.o", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)
-    link(dir, "vpi.so", List("vpi.o"), isLib=true)
     if (!run(cmd)) throw new RuntimeException("vcs command failed")
   }
 

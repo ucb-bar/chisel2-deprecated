@@ -1,45 +1,26 @@
-ChangeLog for Chisel v2.2.28
+ChangeLog for Chisel v2.2.31
 
-#516 Add missing "d<" operator and Dbl() comparison tests.
-#513 Check for unassigned MUX default (conditional assignment) and issue a chisel-specific message "NO DEFAULT SPECIFIED FOR WIRE" instead of: "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements."
-#478 Added a setName method to Module.
-#446 Chisel Tutorial uses UFix instead of UInt.
-#442 (part b) Add the ability to change timescale in vcd dump file.
-#442 (part 1) Correct use of "is" in tutorial FSM switch.
-#440 Repeated printfs - clear printStream after returning accumulated output.
-#439 Chisel somehow finds a way to build negative width wires.
-#438 Add --assertWarn flag converting Assert to Warn.
-#431 Use the standard Chisel error mechanism in SystemC backend.
-#172 Add a test for issue 172 - unused top level IOs were trimmed.
- (Cpp backend) Constant pool literals should be identified by width as well as value.
- Update Enum Doc for size > 22 Tuple Limitation and add a test for Enums with more than 22 elements.
- Convert project/build.scala to build.sbt
- Update scalastyle plugin version.
- Make 2.11.6 the default build (and make 2.10.5 the cross scala version).
- Fixed comparison between signed and unsigned integer.
- Add python-jinja2 to ubuntu documentation dependencies.
- Added dependencies for docs build on Mac.
- Updated fixed test to randomly test against negatives.
- Replace generic "throw new Exception" with Chisel-specific throwException().
- Added a setModuleName method to Module.
- Added a new BlackBox interface.
- Added a DelayBetween method to ChiselUtil to get delays between two nodes.
- (Cpp backend) improved multi-word literal support.
- Deprecated SFix in favour of Fixed.
- Add LargeNumber tests.
- Added scaladoc comments.
- Always set testerSeed and use it, so printed value is meaningful.
- Issue more informative error messages for bad io definitions.
- Replace emulator with new emulator api, new testbench & vpi routines.
- Clone a copy of the input pin in addPin().
- Add Float/Double support to tester.
- Chisel3 support - merge chisel3prep branch into master.
- Support aggregate types in top level IOs in SystemC backend.
- Add Num trait to Complex, introduce conjugate.
- Change AsyncQueue references to AsyncFifo.
- Add fixed point data type that extends Bits with Num[Fixed]
- Add --assertWarn flag converting Assert to Warn.
- Stop suppressing compiler warnings for emulator library.
- Add parameters manual to the docs.
- Cosmetic changes to cheatsheet, installation, and man page.
- Removed old maven code.
+#603 When validateGen() fails in Reg, mention the failing element.
+#595 Improve Tester stability.
+#583 Check for empty _log on tester application exit.
+#581 Avoid Tester hang on bogus peek()/poke().
+#580 Ensure tester mapped memory is marked volatile.
+#573 Flo is not printed with printf.
+#569 Combinational loop detector is broken.
+#556 Module debug for aggregates.
+#535 Add more checkpoints in an attempt to report errors sooner.
+#534 Add optional message to (most of) expect(Bits, ...).
+#531 `Wire(new Bundle { ... })` does not compile.
+ Bumped Scala build versions to 2.10.6 and 2.11.7
+ Fix comment in QueueIO.
+ Fix bad verilog translation of mem and assert (Verilog backend).
+ No longer use deprecated -use_vpiobj for vcs compilation (Verilog backend).
+ Add cloneType methods for ArbiterIO and QueueIO Bundles.
+ Fix Queue object example and add Pipe object example.
+ Draw Muxes as diamonds with fixed port connections (Dot backend).
+ OnceOnlyFiles are also unoptimizedFiles (compile -O0) (C++ backend).
+ Set names for anonymous mems.
+ Implement rsha_n correctly (C++ backend).
+ Add optional needsHold parameter to Arbiters.
+ Fix vcd dump issues in verilog (Verilog backend).
+ Reintroduce MuxCase / PriorityMux'ing of bundles.

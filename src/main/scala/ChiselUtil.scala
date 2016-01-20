@@ -85,6 +85,7 @@ object LFSR16
 }
 
 /** Returns the number of bits set (i.e value is 1) in the input signal.
+  * @example {{{ PopCount(UInt(29)) === UInt(4) }}}
   */
 object PopCount
 {
@@ -129,11 +130,16 @@ object Reverse
 /** A register with an Enable signal */
 object RegEnable
 {
+  /** @param updateData input data into the register
+    * @param enable when high or true put updateData in a register */
   def apply[T <: Data](updateData: T, enable: Bool) = {
     val r = Reg(updateData)
     when (enable) { r := updateData }
     r
   }
+  /** @param updateData input data into the register
+    * @param resetData the initial or reset value for the register
+    * @param enable when high or true put updateData in a register */
   def apply[T <: Data](updateData: T, resetData: T, enable: Bool) = {
     val r = RegInit(resetData)
     when (enable) { r := updateData }
@@ -148,7 +154,7 @@ object ShiftRegister
   /** @param in input to delay
     * @param n number of cycles to delay */
   def apply[T <: Data](in: T, n: Int) : T = apply(in, n, Bool(true))
-  /** @param in input to delay
+  /** @param in input data to delay
     * @param n number of cycles to delay
     * @param en enable the shift */
   def apply[T <: Data](in: T, n: Int, en: Bool) : T =
@@ -157,7 +163,11 @@ object ShiftRegister
     if (n == 1) {
       RegEnable(in, en)
     } else if (n != 0) {
-      RegNext(apply(in, n-1, en))
+      if ( n < 0 ) {
+        ChiselError.error("Cannot have negative number of cycles for shift register")
+        in
+      } else
+        RegNext(apply(in, n-1, en))
     } else {
       in
     }
@@ -184,7 +194,10 @@ object ShiftRegister
   }
 }
 
-/** Returns the one hot encoding of the input UInt.
+/** @return the one hot encoding of the input UInt
+  * @example
+  * {{{ val myOH = UIntToOH(UInt(5), 8) -> 0x20
+  * val myOH2 = UIntToOH(UInt(0), 8) -> 0x01 }}}
   */
 object UIntToOH
 {
@@ -214,42 +227,72 @@ object Mux1H
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
 
-/** An I/O Bundle containing data and a signal determining if its valid */
+/** An I/O Bundle containing data and a signal determining if it is valid
+  * @constructor A bundle containing the Bool(OUTPUT) 'valid' and 'bits' OUTPUT of type T
+  * @note can be constucted using the object [[Chisel.Valid$ Valid]]
+  * @example
+  * {{{ myIO = Valid[UInt](UInt(width=4))
+  * myIO.valid := Bool(true)
+  * myIO.bits := UInt(5) }}}*/
 class ValidIO[+T <: Data](gen: T) extends Bundle
 {
+  /** A valid OUTPUT signal */
   val valid = Bool(OUTPUT)
+  /** A OUTPUT signal created using gen */
   val bits = gen.cloneType.asOutput
+  /** @return when the data is consumed
+    * @note defined as the valid signal */
   def fire(dummy: Int = 0): Bool = valid
+  /** clone this I/O */
   override def cloneType: this.type = new ValidIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a valid protocol to any interface
-  * The standard used is that the consumer uses the flipped interface.
-*/
+  * By default this creates a [[Chisel.ValidIO ValidIO]] class with valid and bits set to OUTPUT
+  * @note can be set to INPUT using the function [[Chisel.Bundle.flip flip]]
+  * @example
+  * {{{ myIO = Valid(UInt(width=4))
+  * myIO.valid := Bool(true)
+  * myIO.bits := UInt(5) }}}*/
 object Valid {
   def apply[T <: Data](gen: T): ValidIO[T] = new ValidIO(gen)
 }
 
-/** An I/O Bundle with simple handshaking using valid and ready signals for data 'bits'*/
+/** An I/O Bundle with simple handshaking using valid and ready signals for data 'bits'
+  * @note can be created using [[Chisel.Decoupled$ Decoupled]]
+  * @example
+  * {{{ val io = Decoupled(UInt(width=4))
+  * io.valid := io.ready
+  * io.bits := UInt(5) }}} */
 class DecoupledIO[+T <: Data](gen: T) extends Bundle
 {
+  /** [[Chisel.INPUT INPUT]] signal to indicate data is ready */
   val ready = Bool(INPUT)
+  /** [[Chisel.OUTPUT OUTPUT]] signal to indicate data is valid */
   val valid = Bool(OUTPUT)
+  /** [[Chisel.OUTPUT OUTPUT]] data of type T */
   val bits  = gen.cloneType.asOutput
+  /** Indicate when data has been consumed
+    * @note defined as ready && valid */
   def fire(dummy: Int = 0): Bool = ready && valid
   override def cloneType: this.type = new DecoupledIO(gen).asInstanceOf[this.type]
 }
 
 /** Adds a ready-valid handshaking protocol to any interface
-  * The standard used is that the consumer uses the flipped interface
+  * @note the I/O can be 'flipped' so the data is INPUT instead using the function [[Chisel.Bundle.flip flip]]
   */
 object Decoupled {
   def apply[T <: Data](gen: T): DecoupledIO[T] = new DecoupledIO(gen)
 }
 
-/** An I/O bundle for enqueuing data with valid/ready handshaking */
+/** An I/O bundle for enqueuing data with valid/ready handshaking
+  * @example
+  * {{{ val io = new EnqIO(UInt(width=5))
+  * when (myCond) { io.enq(UInt(3)) } }}}*/
 class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
+  // Perhaps should return ready rather than dat?
+  /** enqueue data 'dat' by setting valid and bits */
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
   valid := Bool(false);
   for (io <- bits.flatten.map(x => x._2))
@@ -257,21 +300,16 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
-/** An I/O bundle for dequeuing data with valid/ready handshaking */
+/** An I/O bundle for dequeuing data with valid/ready handshaking*/
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
   ready := Bool(false);
+  /* Strange that this requires a Boolean argument
+   * Change to deq() : (T, Bool) = { ready := Bool(true); (bits, valid) }
+   */
   def deq(b: Boolean = false): T = { ready := Bool(true); bits }
   override def cloneType: this.type = new DeqIO(gen).asInstanceOf[this.type]
-}
-
-/** An I/O bundle for dequeuing data with valid/ready handshaking */
-class DecoupledIOC[+T <: Data](gen: T) extends Bundle
-{
-  val ready = Bool(INPUT)
-  val valid = Bool(OUTPUT)
-  val bits  = gen.cloneType.asOutput
 }
 
 /** An I/O bundle for the Arbiter */
@@ -279,6 +317,7 @@ class ArbiterIO[T <: Data](gen: T, n: Int) extends Bundle {
   val in  = Vec(n,  Decoupled(gen) ).flip
   val out = Decoupled(gen)
   val chosen = UInt(OUTPUT, log2Up(n))
+  override def cloneType: this.type = new ArbiterIO(gen, n).asInstanceOf[this.type]
 }
 
 /** Arbiter Control determining which producer has access */
@@ -289,12 +328,12 @@ object ArbiterCtrl
   }
 }
 
-abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends Module {
+abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false) extends Module {
   require(isPow2(count))
   def grant: Seq[Bool]
   val io = new ArbiterIO(gen, n)
-  val locked  = if(count > 1) Reg(init=Bool(false)) else Bool(false)
-  val lockIdx = if(count > 1) Reg(init=UInt(n-1)) else UInt(n-1)
+  val locked  = if(count > 1 || needsHold) Reg(init=Bool(false)) else Bool(false)
+  val lockIdx = if(count > 1 || needsHold) Reg(init=UInt(n-1)) else UInt(n-1)
   val chosen = Wire(UInt(width = log2Up(n)))
 
   for ((g, i) <- grant.zipWithIndex)
@@ -303,25 +342,48 @@ abstract class LockingArbiterLike[T <: Data](gen: T, n: Int, count: Int, needsLo
   io.out.bits := io.in(chosen).bits
   io.chosen := chosen
 
-  if(count > 1){
+  if(count == 1 && needsHold) {
+    when(io.out.valid) {
+      locked := !io.out.ready
+      when(!locked) {
+        lockIdx := chosen
+      }
+    }
+  }
+
+  if(count > 1) {
     val cnt = Reg(init=UInt(0, width = log2Up(count)))
     val cnt_next = cnt + UInt(1)
-    when(io.out.fire()) {
-      when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
-        cnt := cnt_next
+    when(io.out.valid) {
+      if(needsHold) {  // lock the chosen port if need hold
         when(!locked) {
-          locked := Bool(true)
-          lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          lockIdx := chosen
+          locked := !io.out.ready
         }
       }
-      when(cnt_next === UInt(0)) {
-        locked := Bool(false)
+      when(io.out.ready) {
+        when(needsLock.map(_(io.out.bits)).getOrElse(Bool(true))) {
+          cnt := cnt_next
+          locked := !(cnt_next === UInt(0))
+          when(!locked) {
+            lockIdx := Vec(io.in.map{ in => in.fire()}).indexWhere{i: Bool => i}
+          }
+        }.otherwise {
+          locked := Bool(false)
+        }
       }
     }
   }
 }
 
-class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   lazy val last_grant = Reg(init=UInt(0, log2Up(n)))
   override def grant: Seq[Bool] = {
     val ctrl = ArbiterCtrl((0 until n).map(i => io.in(i).valid && UInt(i) > last_grant) ++ io.in.map(_.valid))
@@ -338,7 +400,14 @@ class LockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[
   when (io.out.fire()) { last_grant := chosen }
 }
 
-class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None) extends LockingArbiterLike[T](gen, n, count, needsLock) {
+/** @param gen The type of producers
+  * @param n The number of producers
+  * @param count The size of burst
+  * @param needsLock The lock condition for burst (default is always lock)
+  * @param needsHold Hold the chosen port until it has fired for count times
+  */
+class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None, needsHold: Boolean = false)
+    extends LockingArbiterLike[T](gen, n, count, needsLock, needsHold) {
   def grant: Seq[Bool] = ArbiterCtrl(io.in.map(_.valid))
 
   var choose = UInt(n-1)
@@ -350,25 +419,29 @@ class LockingArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T 
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
   Producers are chosen in round robin order.
-
-  Example usage:
-    {{{ val arb = new RRArbiter(2, UInt())
+  @example
+    {{{ val arb = new Module(RRArbiter(2, UInt())
     arb.io.in(0) <> producer0.io.out
     arb.io.in(1) <> producer1.io.out
     consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
   */
-class RRArbiter[T <: Data](gen:T, n: Int) extends LockingRRArbiter[T](gen, n, 1)
+class RRArbiter[T <: Data](gen:T, n: Int, needsHold: Boolean = false) extends LockingRRArbiter[T](gen, n, 1, None, needsHold)
 
 /** Hardware module that is used to sequence n producers into 1 consumer.
  Priority is given to lower producer
-
- Example usage:
+ @example
    {{{ val arb = Module(new Arbiter(2, UInt()))
    arb.io.in(0) <> producer0.io.out
    arb.io.in(1) <> producer1.io.out
    consumer.io.in <> arb.io.out }}}
+  * @param gen The type of producers
+  * @param n The number of producers
+  * @param needsHold Hold the chosen port until it has fired
  */
-class Arbiter[T <: Data](gen: T, n: Int) extends LockingArbiter[T](gen, n, 1)
+class Arbiter[T <: Data](gen: T, n: Int, needsHold: Boolean = false) extends LockingArbiter[T](gen, n, 1, None, needsHold)
 
 
 object FillInterleaved
@@ -377,13 +450,14 @@ object FillInterleaved
   def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).asUInt
 }
 
-/** A counter module
+/** A counter module, can also be created using [[Chisel.Counter$ Counter]]
   * @param n The maximum value of the counter, does not have to be power of 2
   */
 class Counter(val n: Int) {
-  /** Value of the counter */
+  /** current value of the counter */
   val value = if (n == 1) UInt(0) else Reg(init=UInt(0, log2Up(n)))
-  /** increment the counter */
+  /** increment the counter
+    * @return if the counter is at the max value */
   def inc(): Bool = {
     if (n == 1) Bool(true)
     else {
@@ -394,14 +468,19 @@ class Counter(val n: Int) {
   }
 }
 
-/** Counter Object
-  * Example Usage:
+/** Counter Object for [[Chisel.Counter Counter]]
+  * @example
   * {{{ val countOn = Bool(true) // increment counter every clock cycle
-  * val myCounter = Counter(countOn, n)
-  * when ( myCounter.value === UInt(3) ) { ... } }}}*/
+  * val myCounter = Counter(8)
+  * when ( myCounter.inc() ) {
+  * ... // When counter value is max at 7 do something
+  * } }}}*/
 object Counter
 {
   def apply(n: Int): Counter = new Counter(n)
+  /** Get a counter which takes an input Bool of when to increment
+    * @return a UInt which is the value of the counter and a Bool indicating when the counter resets
+    */
   def apply(cond: Bool, n: Int): (UInt, Bool) = {
     val c = new Counter(n)
     var wrap: Bool = null
@@ -411,30 +490,43 @@ object Counter
 }
 
 /** An I/O Bundle for Queues
+  * @tparam T the type of data to queue (such as UInt)
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue */
 class QueueIO[T <: Data](gen: T, entries: Int) extends Bundle
 {
   /** I/O to enqueue data, is [[Chisel.DecoupledIO]] flipped */
   val enq   = Decoupled(gen.cloneType).flip
-  /** I/O to enqueue data, is [[Chisel.DecoupledIO]]*/
+  /** I/O to dequeue data, is [[Chisel.DecoupledIO]]*/
   val deq   = Decoupled(gen.cloneType)
   /** The current amount of data in the queue */
   val count = UInt(OUTPUT, log2Up(entries + 1))
+  override def cloneType: this.type = new QueueIO(gen, entries).asInstanceOf[this.type]
 }
 
-/** A hardware module implmenting a Queue
+/** A hardware module implementing a Queue
+  * @tparam T the type of data to queue
   * @param gen The type of data to queue
   * @param entries The max number of entries in the queue
-  * @param pipe
-  * @param flow
-  * @param _reset
+  * @param pipe True if a single entry queue can run at full throughput (like a pipeline). The ''ready'' signals are combinationally coupled.
+  * @param flow True if the inputs can be consumed on the same cycle
+(the inputs "flow" through the queue immediately). The ''valid'' signals are coupled.
+  * @param _reset The reset signal to pass to this queue
+  *
+  * @example
+  *    {{{ val q = new Queue(UInt(), 16)
+  *    q.io.enq <> producer.io.out
+  *    consumer.io.in <> q.io.deq }}}
   */
-class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Boolean = false, _reset: Option[Bool] = None) extends Module(_reset=_reset)
+class Queue[T <: Data](gen: T, val entries: Int,
+                       pipe: Boolean = false,
+                       flow: Boolean = false,
+                       _reset: Option[Bool] = None) extends Module(_reset=_reset)
 {
+  /** The I/O for this queue */
   val io = new QueueIO(gen, entries)
 
-  val ram = Mem(gen, entries)
+  val ram = Mem(entries, gen)
   val enq_ptr = Counter(entries)
   val deq_ptr = Counter(entries)
   val maybe_full = Reg(init=Bool(false))
@@ -454,7 +546,7 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   when (do_deq) {
     deq_ptr.inc()
   }
-  when (do_enq != do_deq) {
+  when (do_enq =/= do_deq) {
     maybe_full := do_enq
   }
 
@@ -466,7 +558,11 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   if (isPow2(entries)) {
     io.count := Cat(maybe_full && ptr_match, ptr_diff)
   } else {
-    io.count := Mux(ptr_match, Mux(maybe_full, UInt(entries), UInt(0)), Mux(deq_ptr.value > enq_ptr.value, UInt(entries) + ptr_diff, ptr_diff))
+    io.count := Mux(ptr_match,
+                    Mux(maybe_full,
+                      UInt(entries), UInt(0)),
+                    Mux(deq_ptr.value > enq_ptr.value,
+                      UInt(entries) + ptr_diff, ptr_diff))
   }
 }
 
@@ -474,10 +570,8 @@ class Queue[T <: Data](gen: T, val entries: Int, pipe: Boolean = false, flow: Bo
   the depth of the queues. The width of the queue is determined
   from the inputs.
 
-  Example usage:
-    {{{ val q = new Queue(UInt(), 16)
-    q.io.enq <> producer.io.out
-    consumer.io.in <> q.io.deq }}}
+  @example
+     {{{ consumer.io.in := Queue(producer.io.out, 16) }}}
   */
 object Queue
 {
@@ -544,14 +638,22 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   io.enq.ready := not_full
   io.deq.valid := not_empty
 
-  val mem = Mem(gen, 1 << asize, clock=enq_clk)
+  val mem = Mem(1 << asize, gen, clock=enq_clk)
   when (io.enq.valid && io.enq.ready) {
     mem(wptr_bin(asize-1,0)) := io.enq.bits
   }
   io.deq.bits := mem(rptr_bin(asize-1,0))
 }
 
-/** Similar to a shift register but with handshaking at start */
+/** A hardware module that delays data coming down the pipeline
+  by the number of cycles set by the latency parameter. Functionality
+  is similar to ShiftRegister but this exposes a Pipe interface.
+
+  @example {{{
+    val pipe = new Pipe(UInt())
+    pipe.io.enq <> produce.io.out
+    consumer.io.in <> pipe.io.deq }}}
+  */
 class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
 {
   val io = new Bundle {
@@ -562,14 +664,10 @@ class Pipe[T <: Data](gen: T, latency: Int = 1) extends Module
   io.deq <> Pipe(io.enq, latency)
 }
 
-/** A hardware module that delays data coming down the pipeline
-  by the number of cycles set by the latency parameter. Functionality
-  is similar to ShiftRegister but this exposes a Pipe interface.
+/** Similar to a shift register but with handshaking at start
 
-  Example usage:
-    val pipe = new Pipe(UInt())
-    pipe.io.enq <> produce.io.out
-    consumer.io.in <> pipe.io.deq
+  @example
+    {{{ consumer.io.in := Pipe(producer.io.out, 2) }}}
   */
 object Pipe
 {
@@ -593,19 +691,19 @@ object Pipe
 /** Builds a Mux tree under the assumption that multiple select signals
   can be enabled. Priority is given to the first select signal.
 
-  Returns the output of the Mux tree.
+  @return the output of the Mux tree
   */
 object PriorityMux
 {
-  def apply[T <: Bits](in: Iterable[(Bool, T)]): T = {
+  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Bits](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
-  def apply[T <: Bits](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
+  def apply[T <: Data](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
@@ -635,16 +733,26 @@ object PriorityEncoderOH
   */
 object Wire
 {
-  def apply[T <: Data](t: Option[T] = None, init: Option[T] = None): T = {
+  def apply[T <: Data](t: T = null, init: T = null): T =
+    apply(Option(t), Option(init))
+
+  def apply[T <: Data](t: Option[T], init: Option[T]): T = {
     t match { 
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
     }
-    val res = init match { case Some(p) => val x = p.cloneType ; x := p ; x case None =>
-                 t match { case Some(p) => p.cloneType case None =>
-                   ChiselError.error("cannot infer type of Init.")
-                   UInt().asInstanceOf[T] } }
+    val res = (init, t) match {
+      case (Some(p), _) =>
+        val x = p.cloneType
+        x := p
+        x
+      case (_, Some(p)) =>
+        p.cloneType
+      case _ =>
+        ChiselError.error("cannot infer type of Init.")
+        UInt().asInstanceOf[T]
+    }
     res.setIsWired(true)
     res.asDirectionless
   }
@@ -663,7 +771,7 @@ object DelayBetween {
       if (!visited.contains(node)) {
         if (node._id == end._id) {
           val completePath : List[Node] = visited :+ node
-          paths += completePath.filter(_.isReg).length
+          paths += completePath.filter({case _: Delay => true case _ => false}).length
         } else {
           val nextPath = visited :+ node
           paths ++= nodePathDepthSearch(nextPath, end, new ArrayBuffer[Int])
@@ -685,7 +793,7 @@ object DelayBetween {
       val node = que.dequeue()
       val currentPath = paths.dequeue()
       if (node._id == end._id) {
-        completePaths.append(currentPath.filter(_.isReg).length)
+        completePaths.append(currentPath.filter({case _: Delay => true case _ => false}).length)
         visited = visited diff List(node._id)
       } else {
         node.inputs.foreach(l => if(!visited.contains(l._id)) {
@@ -729,7 +837,7 @@ object DelayBetween {
   private def nodeFindRegOrEnd(visited : List[Node], end : Node, nodes : ArrayBuffer[Node]) : ArrayBuffer[Node] = {
     visited.last.inputs.toList.map(node => {
         if (!visited.contains(node)) {
-          if (node._id == end._id || node.isReg) {
+          if (node._id == end._id || (node match {case _: Delay => true case _ => false})) {
             nodes += node
           } else {
             val nextPath = visited :+ node

@@ -44,7 +44,8 @@ object Flo {
   def apply(dir: IODirection = NODIR): Flo = {
     val res = new Flo();
     res.dir = dir;
-    res.init("", fixWidth(32))
+    // The width is fixed, really fixed.
+    res.init("", 32)
     res
   }
 }
@@ -83,7 +84,9 @@ class Flo extends Bits with Num[Flo] {
   def /  (b: Flo): Flo = newBinaryOp(b, "f/")
   def %  (b: Flo): Flo = newBinaryOp(b, "f%")
   def ===(b: Flo): Bool = newLogicalOp(b, "f==")
+  @deprecated("Use =/= rather than != for chisel comparison", "3")
   def != (b: Flo): Bool = newLogicalOp(b, "f!=")
+  def =/= (b: Flo): Bool = newLogicalOp(b, "f!=")
   def >  (b: Flo): Bool = newLogicalOp(b, "f>")
   def <  (b: Flo): Bool = newLogicalOp(b, "f<")
   def <= (b: Flo): Bool = newLogicalOp(b, "f<=")
@@ -119,7 +122,8 @@ object Dbl {
   def apply(dir: IODirection = NODIR): Dbl = {
     val res = new Dbl();
     res.dir = dir;
-    res.init("", fixWidth(64))
+    // The width is fixed, really fixed.
+    res.init("", 64)
     res
   }
 }
@@ -157,7 +161,9 @@ class Dbl extends Bits with Num[Dbl] {
   def /  (b: Dbl): Dbl = newBinaryOp(b, "d/")
   def %  (b: Dbl): Dbl = newBinaryOp(b, "d%")
   def ===(b: Dbl): Bool = newLogicalOp(b, "d==")
+  @deprecated("Use =/= rather than != for chisel comparison", "3")
   def != (b: Dbl): Bool = newLogicalOp(b, "d!=")
+  def =/= (b: Dbl): Bool = newLogicalOp(b, "d!=")
   def >  (b: Dbl): Bool = newLogicalOp(b, "d>")
   def <  (b: Dbl): Bool = newLogicalOp(b, "d<")
   def <= (b: Dbl): Bool = newLogicalOp(b, "d<=")

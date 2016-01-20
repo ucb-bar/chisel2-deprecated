@@ -1,14 +1,27 @@
 #ifndef __VPI_H
-#define __VPI_h
+#define __VPI_H
 
 #include "vpi_user.h"
 #include "sim_api.h"
 #include <queue>
 
-PLI_INT32 tick_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 tick_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 sim_start_cb(p_cb_data cb_data);
+extern "C" PLI_INT32 sim_end_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
+  vpi_api_t() { }
+  ~vpi_api_t() { }
+
+  virtual void tick() {
+    while(!forces.empty()) {
+      vpi_put_value(forces.front(), NULL, NULL, vpiReleaseFlag);
+      forces.pop();
+    }
+    sim_api_t::tick();
+  }
+
   void init_clks() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
@@ -54,32 +67,70 @@ public:
 
 private:
   vpiHandle top_handle;
+  std::queue<vpiHandle> forces;
+  std::map<vpiHandle, size_t> sizes;
+  std::map<vpiHandle, size_t> chunks;
 
-  void put_value(vpiHandle& sig) {
-    std::string value;
-    for (size_t k = 0 ; k < ((vpi_get(vpiSize, sig) - 1) >> 6) + 1 ; k++) {
-      // 64 bit chunks are given
-      std::string v;
-      std::cin >> v;
-      value += v;
-    }
+  void put_value(vpiHandle& sig, std::string& value, bool force=false) {
     s_vpi_value value_s;
-    value_s.format = vpiHexStrVal;
+    value_s.format    = vpiHexStrVal;
     value_s.value.str = (PLI_BYTE8*) value.c_str();
-    vpi_put_value(sig, &value_s, NULL, vpiNoDelay);
+    vpi_put_value(sig, &value_s, NULL, force ? vpiForceFlag : vpiNoDelay);
+    if (force) forces.push(sig); 
   }
 
-  void get_value(vpiHandle& sig) {
+  size_t put_value(vpiHandle& sig, uint64_t* data, bool force=false) {
+    size_t chunk = get_chunk(sig);
+    s_vpi_value  value_s;
+    s_vpi_vecval vecval_s[2*chunk];
+    value_s.format       = vpiVectorVal;
+    value_s.value.vector = vecval_s; 
+    for (size_t i = 0 ; i < chunk ; i++) {
+      value_s.value.vector[2*i].aval = (int)data[i]; 
+      value_s.value.vector[2*i+1].aval = (int)(data[i]>>32);
+      value_s.value.vector[2*i].bval = 0;
+      value_s.value.vector[2*i+1].bval = 0;
+    }
+    vpi_put_value(sig, &value_s, NULL, force ? vpiForceFlag : vpiNoDelay);
+    if (force) forces.push(sig); 
+    return chunk;
+  }
+
+  inline std::string get_value(vpiHandle& sig) {
     s_vpi_value value_s;
     value_s.format = vpiHexStrVal;
     vpi_get_value(sig, &value_s);
-    std::cerr << value_s.value.str << std::endl;
+    return value_s.value.str;
+  }
+
+  size_t get_value(vpiHandle& sig, uint64_t* data) {
+    size_t size = get_size(sig);
+    s_vpi_value  value_s;
+    s_vpi_vecval vecval_s[size];
+    value_s.format       = vpiVectorVal;
+    value_s.value.vector = vecval_s;
+    vpi_get_value(sig, &value_s);
+    for (size_t i = 0 ; i < size ; i += 2) {
+      data[i>>1] = (uint64_t)value_s.value.vector[i].aval;
+    }
+    for (size_t i = 1 ; i < size ; i += 2) {
+      data[i>>1] |= (uint64_t)value_s.value.vector[i].aval << 32;
+    }
+    return ((size-1)>>1)+1;
+  }
+
+  inline size_t get_size(vpiHandle &sig) {
+    return (size_t) (((vpi_get(vpiSize, sig)-1) >> 5) + 1);
+  }
+
+  inline size_t get_chunk(vpiHandle &sig) {
+    return (size_t) (((vpi_get(vpiSize, sig)-1) >> 6) + 1);
   }
 
   virtual void reset() {
     for (size_t i = 0 ; i < sim_data.resets.size() ; i++) {
       s_vpi_value value_s;
-      value_s.format = vpiHexStrVal;
+      value_s.format    = vpiHexStrVal;
       value_s.value.str = (PLI_BYTE8*) "1";
       vpi_put_value(sim_data.resets[i], &value_s, NULL, vpiNoDelay);
     }
@@ -88,7 +139,7 @@ private:
   virtual void start() {
     for (size_t i = 0 ; i < sim_data.resets.size() ; i++) {
       s_vpi_value value_s;
-      value_s.format = vpiHexStrVal;
+      value_s.format    = vpiHexStrVal;
       value_s.value.str = (PLI_BYTE8*) "0";
       vpi_put_value(sim_data.resets[i], &value_s, NULL, vpiNoDelay);
     }
@@ -146,10 +197,10 @@ private:
         while (vpiHandle net_handle = vpi_scan(net_iter)) {
           std::string netname = vpi_get_str(vpiName, net_handle);
           std::string netpath = modname + "." + netname;
-          size_t netid = (!wire && netname[0] != 'T') || wirename == netname ? 
-            add_signal(net_handle, netpath) : 0;
-          id = netid ? netid : id;
-          if (id > 0) break;
+          if (!wire && netname[0] != 'T' || wirename == netname) {
+            size_t netid = add_signal(net_handle, netpath);
+            if (wire) { id = netid; break; }
+          }
         }
         if (id > 0) break;
 
@@ -158,10 +209,10 @@ private:
         while (vpiHandle reg_handle = vpi_scan(reg_iter)) {
           std::string regname = vpi_get_str(vpiName, reg_handle);
           std::string regpath = modname + "." + regname;
-          size_t regid = !wire || wirename == regname ? 
-            add_signal(reg_handle, regpath) : 0;
-          id = regid ? regid : id;
-          if (id > 0) break;
+          if (!wire || wire == regname) {
+            size_t regid = add_signal(reg_handle, regpath);
+            if (wire) { id = regid; break; }
+          }
         }
         if (id > 0) break;
 
@@ -176,7 +227,7 @@ private:
               std::string elmname = vpi_get_str(vpiName, elm_handle);
               std::string elmpath = modname + "." + elmname;
               size_t elmid = add_signal(elm_handle, elmpath);
-              id = wirename == elmname ? elmid : id;
+              id = wire ? elmid : id;
             }
           }
           if (id > 0) break;
@@ -188,8 +239,8 @@ private:
         vpiHandle udp_iter = vpi_iterate(vpiPrimitive, mod_handle);
         while (vpiHandle udp_handle = vpi_scan(udp_iter)) {
           if (vpi_get(vpiPrimType, udp_handle) == vpiSeqPrim) {
-            id = add_signal(udp_handle, modname);
-            break;
+            size_t udpid = add_signal(udp_handle, modname);
+            if (wire) { id = udpid; break; }
           }
         }
       }

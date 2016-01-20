@@ -51,7 +51,7 @@ object MuxCase {
   /** @param default the default value if none are enabled
     * @param mapping a set of data values with associated enables
     * @return the first value in mapping that is enabled */
-  def apply[T <: Bits] (default: T, mapping: Seq[(Bool, T)]): T = {
+  def apply[T <: Data] (default: T, mapping: Seq[(Bool, T)]): T = {
     var res = default;
     for ((t, v) <- mapping.reverse){
       res = Mux(t, v, res);
@@ -117,7 +117,7 @@ object Mux {
     // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
     if (Driver.minimumCompatibility > "2") {
       if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
-        ChiselError.warning("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+        ChiselError.error("Unable to have mixed type mux CON " + tc + " ALT " + fc)
       }
     }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases

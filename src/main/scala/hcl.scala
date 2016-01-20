@@ -121,10 +121,7 @@ trait proc extends Node {
     traverse(inputs(0))
   }
 
-  protected[Chisel] def nextOpt: Option[Node] = {
-    val node = getNode
-    if (node.inputs.isEmpty) None else Some(node.inputs(0))
-  }
+  protected[Chisel] def nextOpt = if (getNode.inputs.isEmpty) None else Some(getNode.inputs(0).getNode)
   protected[Chisel] def next = nextOpt getOrElse throwException("Input is empty")
   protected def default = if (defaultRequired) null else this
   protected def defaultRequired: Boolean = false
@@ -133,11 +130,16 @@ trait proc extends Node {
   protected def setDefault(src: Node): Unit = muxes.last.inputs(2) = src
 }
 
-trait nameable {
+/** This trait allows an instantiation of something to be given a particular name */
+trait Nameable {
+  /** Name of the instance. */
   var name: String = ""
-  /** _named_ is used to indicates name was set explicitely
-   and should not be overriden by a _nameIt_ generator. */
+  /** named is used to indicate that name was set explicitly and should not be overriden */
   var named = false
+  /** Set the name of this module to the string 'n'
+    * @example {{{ my.io.node.setName("MY_IO_NODE") }}}
+    */
+  def setName(n: String) { name = n ; named = true }
 }
 
 /** This class enables the definition of verilog parameters without having to to string building
@@ -238,8 +240,8 @@ abstract class BlackBox extends Module {
 }
 
 
-class Delay extends Node {
-  override def isReg: Boolean = true
+trait Delay extends Node {
+  override lazy val isInObject: Boolean = true
   def assignReset(rst: => Bool): Boolean = false
   def assignClock(clk: Clock) { clock = Some(clk) }
 }

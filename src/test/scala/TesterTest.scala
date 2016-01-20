@@ -88,8 +88,8 @@ class TesterTest extends TestSuite {
       }
     }
 
-    class VariousPokeTester(m: IOSelector) extends Tester(m) {
-      case class TestVector(inSelect: Int, inValue: BigInt, expectedValue: BigInt) {}
+    trait VariousPokeTests extends Tests {
+      case class TestVector(inSelect: Int, inValue: BigInt, expectedValue: BigInt)
       val testVectors = Array[TestVector](
           TestVector(0, -1, 0x0000000000000000ffL),
           TestVector(1, -1, 0x00000000000000ffffL),
@@ -104,22 +104,28 @@ class TesterTest extends TestSuite {
           TestVector(8, -1, (BigInt(0x0000ffffffffffffffL) << 16)|0x00ffffL),
           TestVector(9, (java.lang.Float.floatToIntBits(-1.0f).toLong & 0x00000000ffffffffL), 0x00bf800000L)
           )
-      for (tv <- testVectors) {
-        tv.inSelect match {
-          case 0 => poke(m.io.in8, tv.inValue)
-          case 1 => poke(m.io.in16, tv.inValue)
-          case 2 => poke(m.io.in24, tv.inValue)
-          case 3 => poke(m.io.in32, tv.inValue)
-          case 4 => poke(m.io.in40, tv.inValue)
-          case 5 => poke(m.io.in48, tv.inValue)
-          case 6 => poke(m.io.in56, tv.inValue)
-          case 7 => poke(m.io.in64, tv.inValue)
-          case 8 => poke(m.io.in72, tv.inValue)
-          case 9 => poke(m.io.infm1, tv.inValue)
+      def tests(m: IOSelector) {
+        for (tv <- testVectors) {
+          tv.inSelect match {
+            case 0 => poke(m.io.in8, tv.inValue)
+            case 1 => poke(m.io.in16, tv.inValue)
+            case 2 => poke(m.io.in24, tv.inValue)
+            case 3 => poke(m.io.in32, tv.inValue)
+            case 4 => poke(m.io.in40, tv.inValue)
+            case 5 => poke(m.io.in48, tv.inValue)
+            case 6 => poke(m.io.in56, tv.inValue)
+            case 7 => poke(m.io.in64, tv.inValue)
+            case 8 => poke(m.io.in72, tv.inValue)
+            case 9 => poke(m.io.infm1, tv.inValue)
+          }
+          poke(m.io.selectIn, tv.inSelect)
+          expect(m.io.out, tv.expectedValue)
         }
-        poke(m.io.selectIn, tv.inSelect)
-        expect(m.io.out, tv.expectedValue)
       }
+    }
+
+    class VariousPokeTester(m: IOSelector) extends Tester(m) with VariousPokeTests {
+      tests(m)
     }
 
     chiselMainTest(Array[String]("--backend", "c",

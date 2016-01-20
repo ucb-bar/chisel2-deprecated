@@ -36,17 +36,35 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   a LFSR, which returns "1" on its first invocation).
   */
 object Mem {
-  def apply[T <: Data](out: T, n: Int, seqRead: Boolean = false,
-                       orderedWrites: Boolean = false,
-                       clock: Clock = null): Mem[T] = {
-    val gen = out.cloneType
+  private def construct[T <: Data](n: Int, t: => T, seqRead: Boolean,
+                       orderedWrites: Boolean,
+                       clock: Clock): Mem[T] = {
+    val gen = t.cloneType
     Reg.validateGen(gen)
     val res = new Mem(() => gen, n, seqRead, orderedWrites)
     if (clock != null) res.clock = Some(clock)
-    Driver.hasMem = true
-    if (Driver.minimumCompatibility > "2" && seqRead)
-      ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
     res
+  }
+
+  def apply[T <: Data](n: Int, t: => T): Mem[T] = {
+    construct(n, t, false, false, null)
+  }
+
+  def apply[T <: Data](n: Int, t: => T, clock: Clock): Mem[T] = {
+    construct(n, t, false, false, clock)
+  }
+
+  def apply[T <: Data](out: => T, n: Int, seqRead: Boolean = false,
+                       orderedWrites: Boolean = false,
+                       clock: Clock = null): Mem[T] = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
+      if (seqRead)
+        ChiselError.error("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
+      if (orderedWrites)
+        ChiselError.error("Mem(..., orderedWrites) is deprecated.")
+    }
+    construct(n, out, seqRead, orderedWrites, clock)
   }
 }
 
@@ -67,6 +85,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   val reads = ArrayBuffer[MemRead]()
   val readwrites = ArrayBuffer[MemReadWrite]()
   val data = gen().toNode
+  def dataType = gen()
 
   inferWidth = Node.fixWidth(data.getWidth)
 
@@ -115,9 +134,16 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
     }
   }
 
-  def write(addr: UInt, data: T, wmask: UInt): Unit =
-    if (!Driver.isInlineMem) doWrite(addr, Module.current.whenCond, data, wmask)
-    else doWrite(addr, Module.current.whenCond, gen().fromBits(data.asUInt & wmask | read(addr).asUInt & ~wmask), None)
+  def write(addr: UInt, data: T, wmask: UInt): Unit = {
+    if (Driver.minimumCompatibility > "2")
+      throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+    doWrite(addr, Module.current.whenCond, data, wmask)
+  }
+
+  def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+    val bitmask = FillInterleaved(gen().asInstanceOf[Vec[Data]].head.getWidth, mask)
+    doWrite(addr, Module.current.whenCond, data, bitmask)
+  }
 
   def apply(addr: UInt): T = {
     val rdata = read(addr)
@@ -138,6 +164,18 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
 
   def cloneType = new Mem(gen, n, seqRead, orderedWrites)
   override def clone = cloneType
+
+  def convertMaskedWrites {
+    if (Driver.isInlineMem) {
+      writes filter (_.isMasked) foreach {write =>
+        val addr = write.addr match {case u: UInt => u}
+        val mask = write.mask match {case u: UInt => u}
+        val data = write.data.asInstanceOf[T]
+        val read = readPortCache getOrElseUpdate (addr, gen().fromNode(new MemRead(this, addr)))
+        write.data = data.toBits & mask | read.toBits & ~mask
+      }
+    } 
+  }
 
   def computePorts = {
     reads --= reads.filterNot(_.used)
@@ -189,9 +227,8 @@ class MemRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
   override def getPortType: String = "cread"
 }
 
-class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) {
+class MemSeqRead(mem: Mem[_ <: Data], addri: Node) extends MemAccess(mem, addri) with Delay {
   val addrReg = addri.asInstanceOf[Reg]
-  override def isReg = true
   override def addr = if (inputs.length > 2) inputs(2) else null
   override def cond = if (inputs.length > 3) inputs(3) else null
 
@@ -250,6 +287,7 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
     val rp = getProducts(r.addrReg.enableSignal)
     wp.find(wc => rp.exists(rc => rc._isComplementOf(wc)))
   }
+  def data_=(d: Bits) { inputs(2) = d }
   def data = inputs(2)
   def mask = inputs(3)
   def isMasked = inputs.length > 3
@@ -260,34 +298,34 @@ class MemWrite(mem: Mem[_ <: Data], condi: Bool, addri: Node, datai: Node, maski
 
 // Chisel3
 object SeqMem {
-  def apply[T <: Data](out: T, n: Int): SeqMem[T] =
-    new SeqMem(out, n)
-}
-
-class SeqMem[T <: Data](out: T, val n: Int) extends Delay with VecLike[T] {
-  private val mem = {
-    // construct a Mem while pretending we aren't in compatibility mode
-    val compat = Driver.minimumCompatibility
-    Driver.minimumCompatibility = "0"
-    val mem = Mem(out, n, true)
-    Driver.minimumCompatibility = compat
-    mem
+  def apply[T <: Data](n: Int, out: => T): SeqMem[T] = {
+    val gen = out.cloneType
+    Reg.validateGen(gen)
+    new SeqMem(n, gen)
   }
 
+  @deprecated("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", "2.29")
+  def apply[T <: Data](out: => T, n: Int): SeqMem[T] = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.")
+    }
+    apply(n, out)
+  }
+}
 
-  def length: Int = n
+class SeqMem[T <: Data](n: Int, out: T) extends Mem[T](() => out, n, true, false) {
+  override def apply(addr: UInt): T = throwException("SeqMem.apply unsupported")
+  override def read(addr: UInt): T = super.read(Reg(next = addr))
+  def read(addr: UInt, enable: Bool): T = super.read(RegEnable(addr, enable))
 
-  def apply(addr: UInt): T = read(addr)
-  def apply(addr: Int): T = apply(UInt(addr))
+  override def write(addr: UInt, data: T, mask: Vec[Bool]) (implicit evidence: T <:< Vec[_]): Unit = {
+    val bitmask = FillInterleaved(out.asInstanceOf[Vec[Data]].head.getWidth, mask)
+    doWrite(addr, Module.current.whenCond, data, bitmask)
+  }
 
-  override val hashCode: Int = _id
-  override def equals(that: Any): Boolean = this eq that.asInstanceOf[AnyRef]
+  override def write(addr: UInt, data: T, mask: UInt): Unit =
+    throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
 
-  def read(addr: UInt): T = mem.read(Reg(next = addr))
-  def read(addr: UInt, enable: Bool): T = mem.read(RegEnable(addr, enable))
-
-  def write(addr: UInt, data: T): Unit = mem.write(addr, data)
-  def write(addr: UInt, data: T, mask: UInt): Unit = mem.write(addr, data, mask)
-
-  override def setName(name: String): Unit = mem.setName(name)
+  @deprecated("setMemName is equivalent to setName and will be removed", "2.0")
+  def setMemName(name: String): Unit = setName(name)
 }

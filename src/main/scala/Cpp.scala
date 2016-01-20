@@ -50,7 +50,6 @@ object CString {
 
 class CppBackend extends Backend {
   import PartitionIslands._
-  val keywords = Set[String]()
   private var hasPrintfs = false
   protected[this] val unoptimizedFiles = HashSet[String]()
   protected[this] val onceOnlyFiles = HashSet[String]()
@@ -107,7 +106,7 @@ class CppBackend extends Backend {
 
   // Emit the value of a literal, instead of a reference to it.
   protected[this] def emitLitVal(n: Node, w: Int): String = {
-    assert(isLit(n))
+    assert(isLit(n), ChiselError.error("Internal Error: Trying to emitLitVal for non-literal %s".format(n)))
     val l = n.asInstanceOf[Literal]
     val lit = l.value
     val value = if (lit < 0) (BigInt(1) << l.needWidth()) + lit else lit
@@ -143,7 +142,7 @@ class CppBackend extends Backend {
           emitLitVal(l, w)
         } else {
           // Otherwise, we'd better have multiwordLiteralInObject so we can return a reference to the specific word.
-          assert(multiwordLiteralInObject)
+          assert(multiwordLiteralInObject, ChiselError.error("Internal Error: multiword literal reference without object to refer to"))
           wordMangle(x, w.toString)
         }
       case _ => 
@@ -336,7 +335,7 @@ class CppBackend extends Backend {
           else if (o.op == "PriEnc" || o.op == "OHToUInt")
             emitLog2(o, true)
           else {
-            assert(false, "operator " + o.op + " unsupported")
+            assert(false, ChiselError.error("operator " + o.op + " unsupported"))
             ""
           })
         } else if (o.op == "+" || o.op == "-") {
@@ -495,7 +494,7 @@ class CppBackend extends Backend {
         } else if (o.op == "d>=") {
             "  " + emitLoWordRef(o) + " = toDouble(" + emitLoWordRef(o.inputs(0)) + ") >= toDouble(" + emitLoWordRef(o.inputs(1)) + ");\n"
         } else {
-          assert(false, "operator " + o.op + " unsupported")
+          assert(false, ChiselError.error("operator " + o.op + " unsupported"))
           ""
         })
       }
@@ -549,12 +548,12 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = emitLoWordRef(a.cond) +
-          (if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) "" 
-           else " || " + Driver.implicitReset.name + ".lo_word()")
+        val cond = 
+          if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
+          else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
-        else if (Driver.isAssertWarn) "  WARN(" + cond + ", " + CString(a.message) + ");\n"
-        else "  ASSERT(" + cond + ", " + CString(a.message) + ");\n"
+        else if (Driver.isAssertWarn) s"  WARN(${cond}, ${CString(a.message)});\n"
+        else s"  ASSERT(${cond}, ${CString(a.message)});\n"
 
       case s: Sprintf =>
         ("#if __cplusplus >= 201103L\n"
@@ -583,7 +582,7 @@ class CppBackend extends Backend {
 	val useShadow = if (allocateOnlyNeededShadowRegisters) {
           needShadow.contains(reg)
         } else {
-          next.isReg
+          next match { case _: Delay => true case _ => false }
         }
         if (useShadow) {
           emitRef(reg) + "__shadow"
@@ -679,11 +678,12 @@ class CppBackend extends Backend {
     node match {
       case reg: Reg => {
         regWritten += node
-        if (reg.next.isReg) {
-          needShadow += node
+        reg.next match {
+          case _: Delay => needShadow += node
+          case _ =>
         }
       }
-      case _ => {}
+      case _ => 
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
@@ -788,6 +788,8 @@ class CppBackend extends Backend {
     }
 
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
+    // Ensure onceOnlyFiles count as unoptimized.
+    unoptimizedFiles ++= onceOnlyFiles
     // Are we compiling multiple cpp files?
     if (compileMultipleCppFiles) {
       // Are we using a Makefile template and parallel makes?
@@ -824,7 +826,7 @@ class CppBackend extends Backend {
         cc(dir, n + "-emulator", allFlags)
         // We should have unoptimized files.
         assert(unoptimizedFiles.size != 0 || onceOnlyFiles.size != 0,
-          "no unoptmized files to compile for '--compileMultipleCppFiles'")
+          ChiselError.error("Internal Error: no unoptmized files to compile for '--compileMultipleCppFiles'"))
         // Compile the O0 files.
         onceOnlyFiles.map(cc(dir, _, allFlags + " " + optim0))
 
@@ -1112,8 +1114,8 @@ class CppBackend extends Backend {
 
       for (clock <- Driver.clocks) {
         val clockNameStr = clkName(clock).toString()
-        out_h.write("  void clock_lo" + clockNameStr + " ( dat_t<1> reset );\n")
-        out_h.write("  void clock_hi" + clockNameStr + " ( dat_t<1> reset );\n")
+        out_h.write(s"  void clock_lo${clockNameStr} ( dat_t<1> reset, bool assert_fire=true );\n")
+        out_h.write(s"  void clock_hi${clockNameStr} ( dat_t<1> reset );\n")
       }
       out_h.write("  int clock ( dat_t<1> reset );\n")
       if (Driver.clocks.length > 1) {
@@ -1396,8 +1398,9 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         // All clock methods take the same arguments and return void.
         val clockArgs = Array[CTypedName](CTypedName("dat_t<1>", Driver.implicitReset.name))
+        val clockLoArgs = clockArgs :+ CTypedName("bool", "assert_fire")
         val clockLoName = "clock_lo" + clkName(clock)
-        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockArgs)
+        val clock_dlo = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
         val clockHiName = "clock_hi" + clkName(clock)
         val clock_ihi = new CMethod(CTypedName("void", clockHiName), clockArgs)
         // For simplicity, we define a dummy method for the clock_hi exec code.
@@ -1417,7 +1420,7 @@ class CppBackend extends Backend {
               islandClkCode += ((islandId, new ClockCodeMethods))
             }
             val clockLoName = "clock_lo" + clkName(clock) + "_I_" + islandId
-            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockArgs)
+            val clock_dlo_I = new CMethod(CTypedName("void", clockLoName), clockLoArgs)
             // Unlike the unpartitioned case, we will generate and call separate
             // initialize and execute clock_hi methods if we're partitioning.
             val clockIHiName = "clock_ihi" + clkName(clock) + "_I_" + islandId
@@ -1510,7 +1513,7 @@ class CppBackend extends Backend {
             writeCppFile(clockIHi.head + clockIHi.body.result)
             // Note, we tacitly assume that the clock_hi initialization and execution
             // code have effectively the same signature and tail.
-            assert(clockIHi.tail == clockXHi.tail)
+            assert(clockIHi.tail == clockXHi.tail, ChiselError.error("Internal Error: clockIHi.tail != clockXHi.tail"))
             writeCppFile(clockXHi.body.result + clockXHi.tail)
           }
         } else {
@@ -1655,7 +1658,9 @@ class CppBackend extends Backend {
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
       genInitSimDataMethod(c) 
-    } else 0
+    } else {
+      0
+    }
 
     // Finally, generate the header - once we know how many methods we'll have.
     genHeader(vcd, islands, nInitMethods, nDumpInitMethods, nDumpMethods, nSimMethods)

@@ -108,7 +108,7 @@ class DelaySuite extends TestSuite {
         val addr = UInt(INPUT, width=32)
         val out = UInt(OUTPUT)
       }
-      val mem= Mem(UInt(width=32), 8)
+      val mem= Mem(8, UInt(width=32))
       io.out := mem(io.addr)
     }
     chiselMain(Array[String]("--v", "--inlineMem",
@@ -125,7 +125,7 @@ class DelaySuite extends TestSuite {
         val addr = UInt(INPUT, width=32)
         val out = UInt(OUTPUT)
       }
-      val mem = Mem(UInt(width=32), 8)
+      val mem = Mem(8, UInt(width=32))
       mem(io.addr) := mem(io.addr) + UInt(1)
       io.out := mem(io.addr)
     }
@@ -144,7 +144,7 @@ class DelaySuite extends TestSuite {
         val addr = UInt(INPUT, width=32)
         val out = UInt(OUTPUT)
       }
-      val mem= Mem(UInt(width=32), 8)
+      val mem= Mem(8, UInt(width=32))
       when( io.enable ) {
         mem(io.addr) := mem(io.addr) + UInt(1)
       }
@@ -167,7 +167,7 @@ class DelaySuite extends TestSuite {
         val addr = UInt(INPUT, width=32)
         val out = UInt(OUTPUT)
       }
-      val mem= Mem(UInt(width=32), 8)
+      val mem= Mem(8, UInt(width=32))
       when( io.enable ) {
         mem.write(io.addr, mem(io.addr), UInt(0xff00))
       }

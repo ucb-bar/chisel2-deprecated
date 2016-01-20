@@ -1,40 +1,7 @@
-ReleaseNotes for Chisel v2.2.28
+ReleaseNotes for Chisel v2.2.31
 
-This release of Chisel adds support for Chisel3 requirements. All
-currently valid Chisel code should compile unchanged.
+This release of Chisel is largely a maintenance release.
+See the associated Changelog for issues resolved with this release.
 
-Two new options have been added
+We will be removing support for Scala 2.10 in future Chisel releases. Please verify your code compiles and runs correctly under Scala 2.11.
 
- * --minimumCompatibility xx.yy.zz
- * --wError
-
---minimumCompatibility will issue warnings for usage that is
-incompatible with the specified version. To issue warnings for
-currently valid code that will be incompatible with Chisel3, add the
-following option to your Chisel compilation command:
-
-    --minimumCompatibility 3.0.0
-
-This will report warnings for the following Chisel3 issues -
-
- - Vec(Reg) should be replaced with Reg(Vec),
- - type-only vals (no associated data) must be wrapped in a Wire() if
-   they will be the destination of a wiring operation (":=" or "<>"),
- - masked bit patterns ('b??') should be created using BitPat(), not
-   UInt() or Bits(),
- - the "clone" method required for parameterized Bundles has been
-   renamed "cloneType".
- - the con and alt inputs to a Mux must be type-compatible - both
-   signed or both unsigned.
-
-In order to improve the association of line numbers with warnings, you
-should also enable the --lineNumbers option.
-
---wError will turn all compiler warnings into errors. This in
-combination with the --minimumCompatibility option will help determine
-if your code is ready for Chisel3.
-
-Look at the [Chisel tests](https://github.com/ucb-bar/chisel/tree/master/src/test/scala/) for
-examples of these changes.
-
-See the ChangeLog for additional changes and bug fixes.

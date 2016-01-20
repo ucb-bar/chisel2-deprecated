@@ -148,9 +148,9 @@ object Node {
   are used to traverse the directed graph respectively backward (from
   output to input) and forward (from input to output).
   */
-abstract class Node extends nameable {
-  private[Chisel] var sccIndex = -1
-  private[Chisel] var sccLowlink = -1
+abstract class Node extends Nameable {
+  private[Chisel] var sccIndex: Option[Int] = None
+  private[Chisel] var sccLowlink: Option[Int] = None
   private[Chisel] var depth = 0
   var prune = false
   var driveRand = false
@@ -158,7 +158,7 @@ abstract class Node extends nameable {
   /* Assigned in Binding and Mod.reset */
   private[Chisel] var compOpt: Option[Module] = Module.getComponent
   /** Use the function componentOf instead*/
-  def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") } 
+  private[Chisel] def component: Module = compOpt getOrElse { throwException("< " + this + " > doesn't have its component, yet.") }
   /** Get the module that this node is a part of or the top module if not assigned yet
     * @return The module that this node is a part of
     */
@@ -191,8 +191,17 @@ abstract class Node extends nameable {
   }
   private[Chisel] def widthW: Width = {
     val selfresult = if (Driver.isInGetWidth) inferWidth(this) else width_
-    if(!selfresult.isKnown && isTypeNode && !inputs.isEmpty) getNode.widthW
-    else selfresult
+    if(!selfresult.isKnown && isTypeNode && !inputs.isEmpty) {
+      val gNode = getNode
+      if (gNode == this) {
+        ChiselError.error("unknown width cannot be inferred for node %s".format(gNode))
+        selfresult
+      } else {
+        gNode.widthW
+      }
+    } else {
+      selfresult
+    }
   }
 
   /** Sets the width of a Node. */
@@ -207,15 +216,8 @@ abstract class Node extends nameable {
     // See the comments in infer
   }
 
-  /** Set the name of a node when elaborated
-    * {{{ my.io.node.setName("MY_IO_NODE") }}}
-    * @param n The name to set the node to
-    */
-  def setName(n: String) { name = n ; named = true }
-
-  // TODO: set to private[Chisel] in favour of setName?
   /** An internal method to name nodes, use setName instead */
-  def nameIt (path: String, isNamingIo: Boolean) {
+  private[Chisel] def nameIt (path: String, isNamingIo: Boolean) {
     try {
       if (!named && (!isIo || isNamingIo)) {
         /* If the name was set explicitly through *setName*,
@@ -280,7 +282,6 @@ abstract class Node extends nameable {
   def isIo = _isIo
   def isIo_=(isIo: Boolean) = _isIo = isIo
   /** @return this node is a Register */
-  def isReg: Boolean = false
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
   // TODO: should be private[Chisel]?
@@ -339,12 +340,12 @@ abstract class Node extends nameable {
 
   private[Chisel] lazy val isInObject =
     (isIo && (Driver.isIoDebug || component == Module.topMod)) || 
-    (component.debugs contains this) || (Driver.backend isInObject this) ||
-    isReg || isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
+    component.debugs(this) || (Driver.backend isInObject this) ||
+    isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
   private[Chisel] lazy val isInVCD = Driver.isVCD && name != "reset" && needWidth() > 0 &&
      (named || Driver.emitTempNodes) &&
-     ((isIo && isInObject) || isReg || Driver.isDebug)
+     ((isIo && isInObject) || (this match {case _: Delay => true case _ => false}) || Driver.isDebug)
 
   /** Prints all members of a node and recursively its inputs up to a certain depth level
     * This method is purely used for debugging */
@@ -364,8 +365,8 @@ abstract class Node extends nameable {
       }
       case any => writer.println(indent + this)
     }
-    writer.println("sccIndex: " + sccIndex)
-    writer.println("sccLowlink: " + sccLowlink)
+    writer.println("sccIndex: " + (sccIndex getOrElse -1))
+    writer.println("sccLowlink: " + (sccLowlink getOrElse -1))
     writer.println("component: " + component)
     writer.println("isTypeNode: " + isTypeNode)
     writer.println("depth: " + depth)
@@ -441,7 +442,7 @@ abstract class Node extends nameable {
   private[Chisel] def addConsumers() {
     for ((i, off) <- inputs.zipWithIndex) {
       /* By construction we should not end-up with null inputs. */
-      assert(i != null, ChiselError.error("input " + off
+      assert(i != null, ChiselError.error("Internal Error: input " + off
         + " of " + inputs.length + " for node " + this + " is null"))
       i.consumers += this
     }
@@ -464,7 +465,13 @@ abstract class Node extends nameable {
     */
   override def equals(that: Any): Boolean = that match {
     case n: Node => this eq n
-    case _ => ChiselError.error("can't compare Node " + this + " and non-Node " + that); false
+    case _ => {
+      // Comparison against null is legal and returns false.
+      if (that != null) {
+        ChiselError.error("can't compare Node " + this + " and non-Node " + that)
+      }
+      false
+    }
   }
 
   def canCSE: Boolean = false

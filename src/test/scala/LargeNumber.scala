@@ -222,6 +222,37 @@ class LargeNumberSuite extends TestSuite {
     launchCppTester((c: Rsh) => new RshTests(c))
   }
 
+  // regression test for github #576
+  @Test def testRshA576() {
+    class RightShift extends Module {
+      val W = 64
+
+      val io = new Bundle {
+        val a = SInt(INPUT, W)
+        val b = UInt(INPUT, log2Up(W))
+        val signed = Bool(INPUT)
+        val out = SInt(OUTPUT, W)
+      }
+
+      val toshift = Cat(io.a(W - 1) & io.signed, io.a).toSInt
+      io.out := toshift >> io.b
+    }
+
+    class RightShiftTester(c: RightShift) extends Tester(c) {
+      val test = BigInt("-8000000000000000", 16)
+
+      poke(c.io.a, test)
+      poke(c.io.signed, 1)
+
+      for (i <- 0 until 8) {
+        poke(c.io.b, i)
+        step(1)
+        expect(c.io.out, test >> i)
+      }
+    }
+    launchCppTester((c:RightShift) => new RightShiftTester(c))
+  }
+
   @Test def testRshExt() {
     class Rsh extends Module {
       val io = new Bundle {
@@ -428,8 +459,8 @@ class LargeNumberSuite extends TestSuite {
         val z_s = Bool(OUTPUT)
         val z_u = Bool(OUTPUT)
       }
-      io.z_s := io.x_s != io.y_s
-      io.z_u := io.x_u != io.y_u
+      io.z_s := ( io.x_s =/= io.y_s )
+      io.z_u := ( io.x_u =/= io.y_u )
     }
 
     class NeqTests(c : Neq) extends Tester(c) {
