@@ -244,7 +244,7 @@ class VcdBackend(top: Module) extends Backend {
         write(emitDefInline(rom, offset, baseIdx + offset))
       baseIdx += rom.n
     }
-    write("  fprintf(f, \"#%d\\n\", (t << 1) + 1);\n")
+    write("  fprintf(f, \"#%lu\\n\", (t << 1) + 1);\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
       write(emitDefInline(clk, i, true))
     }
@@ -271,7 +271,7 @@ class VcdBackend(top: Module) extends Backend {
         write(emitDef1(rom, offset, baseIdx + offset))
       baseIdx += rom.n
     }
-    write("  fprintf(f, \"#%d\\n\", (t << 1) + 1);\n")
+    write("  fprintf(f, \"#%lu\\n\", (t << 1) + 1);\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
       write(emitDef1(clk, i, true))
     }

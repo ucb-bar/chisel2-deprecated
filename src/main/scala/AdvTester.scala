@@ -37,7 +37,7 @@ import Chisel._
 import scala.collection.mutable.ArrayBuffer
 
 trait AdvTests extends Tests {
-  def cycles: Int
+  def cycles: Long
   def wire_poke(port: Bits,      target: Boolean):       Unit
   def wire_poke(port: Bits,      target: Int):           Unit
   def wire_poke(port: Bits,      target: Long):          Unit
@@ -47,15 +47,15 @@ trait AdvTests extends Tests {
   def reg_poke(port: Aggregate,  target: Array[BigInt]): Unit
   def takestep(work: => Unit = {}): Unit
   def takesteps(n: Int)(work: =>Unit = {}): Unit
-  def until(pred: =>Boolean, maxCycles: Int = 0)(work: =>Unit): Boolean
-  def eventually(pred: =>Boolean, maxCycles: Int = 0): Boolean
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = 0): Boolean 
+  def until(pred: =>Boolean, maxCycles: Long = 0L)(work: =>Unit): Boolean
+  def eventually(pred: =>Boolean, maxCycles: Long = 0L): Boolean
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = 0L): Boolean 
 
 }
 
 class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16) extends Tester[T](dut, isTrace, _base) {
-  val defaultMaxCycles = 1024
-  var cycles = 0
+  val defaultMaxCycles = 1024L
+  var cycles = 0L
 
   // List of scala objects that need to be processed along with the test benches, like sinks and sources
   val preprocessors = new ArrayBuffer[Processable]()
@@ -108,8 +108,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   }
 
   // Functions to step depending on predicates
-  def until(pred: =>Boolean, maxCycles: Int = defaultMaxCycles)(work: =>Unit): Boolean = {
-    var timeout_cycles = 0
+  def until(pred: =>Boolean, maxCycles: Long = defaultMaxCycles)(work: =>Unit): Boolean = {
+    var timeout_cycles = 0L
     while(!pred && (timeout_cycles < maxCycles)) {
       takestep(work)
       timeout_cycles += 1
@@ -118,16 +118,17 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
       "until timed out after %d cycles".format(timeout_cycles))
     pred
   }
-  def eventually(pred: =>Boolean, maxCycles: Int = defaultMaxCycles) = {until(pred, maxCycles){}}
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = defaultMaxCycles): Boolean = {
+  def eventually(pred: =>Boolean, maxCycles: Long = defaultMaxCycles) = {until(pred, maxCycles){}}
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = defaultMaxCycles): Boolean = {
     takestep(work)
     until(pred, maxCycles){work}
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    ok &= expr
-    failureTime = cycles
-    if(!expr && errMsg != "") { println("ASSERT FAILED: " + errMsg) }
+    if (!expr && errMsg != "") { 
+      println("ASSERT FAILED: " + errMsg) 
+      fail
+    }
     expr
   }
 

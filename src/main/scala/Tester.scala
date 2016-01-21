@@ -42,7 +42,7 @@ import ExecutionContext.Implicits.global
 
 // Provides a template to define tester transactions
 trait Tests {
-  def t: Int 
+  def t: Long 
   def delta: Int 
   def rnd: Random
   def setClocks(clocks: Iterable[(Clock, Int)]): Unit
@@ -92,7 +92,9 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
 class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int = 16) extends FileSystemUtilities {
-  var t = 0 // simulation time
+  implicit def longToInt(x: Long) = x.toInt
+  def t = _t
+  var _t = 0L // simulation time
   var delta = 0
   private val _pokeMap = HashMap[Bits, BigInt]()
   private val _peekMap = HashMap[Bits, BigInt]()
@@ -531,7 +533,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def step(n: Int) {
     if (isTrace) println(s"STEP ${n} -> ${t+n}")
     (0 until n) foreach (_ => takeStep)
-    t += n
+    _t += n
   }
 
   /** Convert a Boolean to BigInt */
@@ -544,10 +546,10 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def int(x: Bits):    BigInt = x.litValue()
 
   /** Indicate a failure has occurred.  */
-  var failureTime = -1
-  var ok = true
-  def fail {
-    if (failureTime == -1) failureTime = t
+  private var failureTime = -1L
+  private var ok = true
+  def fail = if (ok) {
+    failureTime = t
     ok = false
   }
 
@@ -739,7 +741,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     inChannel.release
     outChannel.release
     cmdChannel.release
-    t = 0
+    _t = 0
     mwhile(!recvOutputs) { }
     // reset(5)
     for (i <- 0 until 5) {

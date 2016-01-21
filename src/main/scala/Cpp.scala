@@ -1135,7 +1135,7 @@ class CppBackend extends Backend {
         }
         out_h.write(" public:\n")
       }
-      out_h.write("  void dump ( FILE* f, int t, dat_t<1> reset=LIT<1>(0) );\n")
+      out_h.write("  void dump ( FILE* f, val_t t, dat_t<1> reset=LIT<1>(0) );\n")
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
@@ -1284,13 +1284,13 @@ class CppBackend extends Backend {
 
     def genDumpMethod(vcd: VcdBackend): Int = {
       val method = CMethod(CTypedName("void", "dump"), 
-        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t"), CTypedName("dat_t<1>", "reset")))
+        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
         val codePrefix = List(
-          "  if (t == 0) return dump_init(f);\n",
-          "  fprintf(f, \"#%d\\n\", t << 1);\n") mkString ""
+          "  if (t == 0L) return dump_init(f);\n",
+          "  fprintf(f, \"#%lu\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
