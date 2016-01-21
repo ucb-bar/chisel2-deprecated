@@ -1740,14 +1740,14 @@ class mod_t {
 
   virtual void print ( FILE* f ) { };
   virtual void print ( std::ostream& s ) { };
-  virtual void dump ( FILE* f, int t ) { };
+  virtual void dump ( FILE* f, int t , dat_t<1> reset=LIT<1>(0) ) { };
 
   void set_dumpfile(FILE* f) { dumpfile = f; }
 
   size_t timestep;
 
-  void dump () {
-    if (dumpfile != NULL) dump(dumpfile, timestep);
+  void dump ( dat_t<1> reset=LIT<1>(0) ) {
+    if (dumpfile != NULL) dump(dumpfile, timestep, reset);
     timestep += 1;
   }
 
