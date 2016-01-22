@@ -7,7 +7,7 @@ void DelaySuite_ROMModule_1_t::init ( val_t rand_init ) {
   { T1.put(1, 0, 0x2L);}
   { T1.put(2, 0, 0x3L);}
   clk.len = 1;
-  clk.cnt = clk.len;
+  clk.cnt = 0;
   clk.values[0] = 0;
 }
 int DelaySuite_ROMModule_1_t::clock ( dat_t<1> reset ) {
@@ -25,7 +25,7 @@ void DelaySuite_ROMModule_1_t::print ( std::ostream& s ) {
 }
 void DelaySuite_ROMModule_1_t::dump_init ( FILE* f ) {
 }
-void DelaySuite_ROMModule_1_t::dump ( FILE* f, int t ) {
+void DelaySuite_ROMModule_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
 }
 void DelaySuite_ROMModule_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0;
