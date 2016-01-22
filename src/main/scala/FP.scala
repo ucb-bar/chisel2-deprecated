@@ -44,7 +44,8 @@ object Flo {
   def apply(dir: IODirection = NODIR): Flo = {
     val res = new Flo();
     res.dir = dir;
-    res.init("", fixWidth(32))
+    // The width is fixed, really fixed.
+    res.init("", 32)
     res
   }
 }
@@ -121,7 +122,8 @@ object Dbl {
   def apply(dir: IODirection = NODIR): Dbl = {
     val res = new Dbl();
     res.dir = dir;
-    res.init("", fixWidth(64))
+    // The width is fixed, really fixed.
+    res.init("", 64)
     res
   }
 }

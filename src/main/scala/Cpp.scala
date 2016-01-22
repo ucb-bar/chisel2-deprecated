@@ -642,16 +642,19 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock => List(x.srcClock match {
-        case None => 
-          "  " + emitRef(node) + ".len = %d;\n".format(x.period.round)
-        case Some(src) => 
-          val initStr = emitRef(src) + ".len" + (if (src.period > x.period) 
-            " / " + (src.period / x.period).round else 
-            " * " + (x.period / src.period).round)
-          "  " + emitRef(node) + ".len = " + initStr + ";\n"}, 
-          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ".len;\n",
-          "  " + emitRef(node) + ".values[0] = 0;\n") mkString ""
+      case x: Clock => List(
+        x.srcClock match {
+          case None => 
+            s"  ${emitRef(node)}.len = ${x.period.round};\n"
+          case Some(src) => 
+            s"  ${emitRef(node)}.len = ${emitRef(src)}.len ${
+                if (src.period > x.period)
+                "/ " + (src.period / x.period).round else 
+                "* " + (x.period / src.period).round
+              };\n"
+        }, 
+        s"  ${emitRef(node)}.cnt = 0;\n",
+        s"  ${emitRef(node)}.values[0] = 0;\n") mkString ""
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -732,36 +735,33 @@ class CppBackend extends Backend {
 
   protected[this] def genHarness(c: Module, name: String) {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val harness  = createOutputFile(n + "-emulator.cpp");
-    harness.write("#include \"" + n + ".h\"\n\n");
+    val harness  = createOutputFile(n + "-emulator.cpp")
+    harness.write(s"""#include "${n}.h"\n\n""")
     if (Driver.clocks.length > 1) {
-      harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
-      var i = 0;
-      for (clock <- Driver.clocks) {
-        if (clock.srcClock == None) {
-          harness.write("  " + emitRef(clock) + ".len = periods[" + i + "];\n")
-          harness.write("  " + emitRef(clock) + ".cnt = periods[" + i + "];\n")
-          i += 1;
-        }
+      harness.write(s"void ${c.name}_t::setClocks ( std::vector< int > &periods ) {\n")
+      (Driver.clocks filter (_.srcClock == None)).zipWithIndex foreach {case (clk, i) =>
+        harness.write(s"  ${emitRef(clk)}.len = periods[${i}];\n")
+        harness.write(s"  ${emitRef(clk)}.cnt = periods[${i}];\n")
       }
-      harness.write("}\n\n");
+      harness.write("}\n\n")
     }
-    harness.write(s"""int main (int argc, char* argv[]) {\n""");
-    harness.write(s"""  ${name}_t module;\n""");
-    harness.write(s"""  ${name}_api_t api(&module);\n""");
-    harness.write(s"""  module.init();\n""");
-    harness.write(s"""  api.init_sim_data();\n""");
+    harness.write(s"""int main (int argc, char* argv[]) {\n""")
+    harness.write(s"""  ${name}_t module;\n""")
+    harness.write(s"""  ${name}_api_t api(&module);\n""")
+    harness.write(s"""  module.init();\n""")
+    harness.write(s"""  api.init_sim_data();\n""")
     if (Driver.isVCD) {
-      val basedir = Driver.targetDir
-      harness.write(s"""  FILE *f = fopen("${basedir}/${name}.vcd", "w");\n""");
+      harness.write(s"""  FILE *f = fopen("${Driver.targetDir}/${name}.vcd", "w");\n""")
     } else {
-      harness.write(s"""  FILE *f = NULL;\n""");
+      harness.write(s"""  FILE *f = NULL;\n""")
     }
-    harness.write(s"""  module.set_dumpfile(f);\n""");
-    harness.write(s"""  while(!api.exit()) api.tick();\n""");
-    harness.write(s"""  if (f) fclose(f);\n""");
-    harness.write(s"""}\n""");
-    harness.close();
+    harness.write(s"""  module.set_dumpfile(f);\n""")
+    Driver.clocks foreach {clk => 
+      harness write s"  module.${emitRef(clk)}.cnt = module.${emitRef(clk)}.len;\n"}
+    harness.write(s"""  while(!api.exit()) api.tick();\n""")
+    harness.write(s"""  if (f) fclose(f);\n""")
+    harness.write(s"""}\n""")
+    harness.close()
   }
 
   override def compile(c: Module, flagsIn: Option[String]) {
@@ -1127,8 +1127,9 @@ class CppBackend extends Backend {
         assertUnique(emitDec(clock), "redeclaration in header for clock")
         out_h.write(emitDec(clock))
       }
+      if (Driver.isVCD) out_h.write("  dat_t<1> reset__prev;\n") // also records reset
 
-      out_h.write("\n");
+      out_h.write("\n")
 
       // If we're generating multiple init methods, wrap them in private/public.
       if (nInitMethods > 1) {
@@ -1171,7 +1172,7 @@ class CppBackend extends Backend {
         }
         out_h.write(" public:\n")
       }
-      out_h.write("  void dump ( FILE* f, int t );\n")
+      out_h.write("  void dump ( FILE* f, int t, dat_t<1> reset=LIT<1>(0) );\n")
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
@@ -1237,12 +1238,8 @@ class CppBackend extends Backend {
       }
       val method = CMethod(CTypedName("void", "init"), Array[CTypedName](CTypedName("val_t", "rand_init")))
       val llm = new LineLimitedMethod(method, "  this->__srand(rand_init);\n")
-      for (m <- Driver.orderedNodes) {
-        llm.addString(emitInit(m))
-      }
-      for (clock <- Driver.clocks) {
-        llm.addString(emitInit(clock))
-      }
+      Driver.orderedNodes foreach (llm addString emitInit(_))
+      Driver.clocks foreach (llm addString emitInit(_))
       llm.done()
       val nMethods = llm.bodies.length
       writeCppFile(llm.getBodies)
@@ -1268,6 +1265,7 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
+      if (Driver.isVCD) writeCppFile("  mod_t::dump( reset );\n")
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
       }
@@ -1322,7 +1320,8 @@ class CppBackend extends Backend {
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CMethod(CTypedName("void", "dump"), Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t")))
+      val method = CMethod(CTypedName("void", "dump"), 
+        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.

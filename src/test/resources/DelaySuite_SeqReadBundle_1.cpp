@@ -5,7 +5,7 @@ void DelaySuite_SeqReadBundle_1_t::init ( val_t rand_init ) {
   DelaySuite_SeqReadBundle_1__R9.randomize(&__rand_seed);
   DelaySuite_SeqReadBundle_1__mem.randomize(&__rand_seed);
   clk.len = 1;
-  clk.cnt = clk.len;
+  clk.cnt = 0;
   clk.values[0] = 0;
 }
 int DelaySuite_SeqReadBundle_1_t::clock ( dat_t<1> reset ) {
@@ -23,7 +23,7 @@ void DelaySuite_SeqReadBundle_1_t::print ( std::ostream& s ) {
 }
 void DelaySuite_SeqReadBundle_1_t::dump_init ( FILE* f ) {
 }
-void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t ) {
+void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
 }
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0[2];
