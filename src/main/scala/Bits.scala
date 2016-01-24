@@ -76,6 +76,10 @@ abstract class Bits extends Data with proc {
   def toUInt(): UInt = chiselCast(this){UInt()}
   override def getNode: Node = if (procAssigned) this else super.getNode
 
+  // Chisel3 - rename these to make the reinterpret cast more explicit
+  final def asUInt = toUInt
+  final def asSInt = toSInt
+
   // internal, non user exposed connectors
   private var assigned = false
   private def checkAssign(src: Node) = {
