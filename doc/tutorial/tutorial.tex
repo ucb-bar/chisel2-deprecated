@@ -115,6 +115,8 @@ reusable, you will find it important to leverage the underlying power
 of the Scala language. We recommend you consult one of the excellent
 Scala books to become more expert in Scala programming.
 
+% MS: maybe infancy can now be dropped. Chisel has proven
+% to be mature enough for serious designs.
 Chisel is still in its infancy and you are likely to encounter some
 implementation bugs, and perhaps even a few conceptual design
 problems.  However, we are actively fixing and improving the language,
@@ -196,7 +198,7 @@ domain-specific languages.
 % necessary.
 % \end{commentary}
 
-This version of Chisel also only supports binary logic, and does not
+This version of Chisel only supports binary logic, and does not
 support tri-state signals.
 \begin{commentary}
 We focus on binary logic designs as they constitute the vast majority
@@ -219,7 +221,7 @@ types \code{SInt} and \code{UInt} respectively. Signed fixed-point
 numbers, including integers, are represented using two's-complement
 format.  Boolean values are represented as type \code{Bool}.  Note
 that these types are distinct from Scala's builtin types such as
-\code{Int}.  Additionally, Chisel defines {\em Bundles} for making
+\code{Int} or \code{Boolean}.  Additionally, Chisel defines {\em Bundles} for making
 collections of values with named fields (similar to {\em structs} in
 other languages), and {\em Vecs} for indexable collections of
 values.  Bundles and Vecs will be covered later.
@@ -288,7 +290,7 @@ a hardware operator that has zero or more inputs and that drives one
 output.  A literal, introduced above, is a degenerate kind of node
 that has no inputs and drives a constant value on its output.  One way
 to create and wire together nodes is using textual expressions.  For
-example, we could express a simple combinational logic circuit
+example, we can express a simple combinational logic circuit
 using the following expression:
 
 \begin{scala}
@@ -358,7 +360,7 @@ UInt, and Bool. Returns Bool.} \\
 \hline
 \hline
 \verb@val equ = x === y@ & Equality \\
-\verb@val neq = x != y@ & Inequality \\
+\verb@val neq = x =/= y@ & Inequality \\
 \hline
 \hline
 \multicolumn{2}{|l|}{Shifts. Valid on SInt and UInt.} \\
@@ -444,13 +446,15 @@ Except for right shifts by known constant amounts, the bit-width
 inference rules specify output bit widths that are never smaller than
 the input bit widths, and thus, output bit widths either grow or stay
 the same.  Furthermore, the width of a register must be specified by
-the user either explicitly or from the bitwidth of the reset value.
+the user either explicitly or from the bitwidth of the reset value or
+the \emph{next} parameter.
 From these two requirements, we can show that the bit-width inference
 process will converge to a fixpoint.
 
 \begin{commentary}
 Our choice of operator names was constrained by the Scala language.
-We have to use triple equals \code{===} for equality to allow the
+We have to use triple equals \code{===} for equality and \code{=/=}
+for inequality to allow the
 native Scala equals operator to remain usable.
 
 We are also planning to add further operators that constrain bitwidth
@@ -464,7 +468,7 @@ we later reuse multiple times in a design.  For example, we can wrap
 up our earlier example of a simple combinational logic block as
 follows:
 \begin{scala}
-def clb(a: UInt, b: UInt, c: UInt, d: UInt) = 
+def clb(a: UInt, b: UInt, c: UInt, d: UInt): UInt = 
   (a & b) | (~c & d)
 \end{scala}
 
