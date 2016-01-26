@@ -204,7 +204,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val w = dtype.needWidth()
     dtype match {
       /* Any "signed" node */
-      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
+      case _: SInt | _ : Flo | _: Dbl | _: Fixed => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
       /* anything else (i.e., UInt) */
       case _ => (rv)
     }
