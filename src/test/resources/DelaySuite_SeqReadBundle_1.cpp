@@ -23,7 +23,7 @@ void DelaySuite_SeqReadBundle_1_t::print ( std::ostream& s ) {
 }
 void DelaySuite_SeqReadBundle_1_t::dump_init ( FILE* f ) {
 }
-void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
+void DelaySuite_SeqReadBundle_1_t::dump ( FILE* f, val_t t, dat_t<1> reset ) {
 }
 void DelaySuite_SeqReadBundle_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0[2];

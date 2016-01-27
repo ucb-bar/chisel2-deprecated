@@ -63,9 +63,9 @@ void NameSuite_DebugComp_1_t::dump_init ( FILE* f ) {
     dat_dump<1>(f, clk, 0x21);
   }
 }
-void NameSuite_DebugComp_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
-  if (t == 0) return dump_init(f);
-  fprintf(f, "#%d\n", t << 1);
+void NameSuite_DebugComp_1_t::dump ( FILE* f, val_t t, dat_t<1> reset ) {
+  if (t == 0L) return dump_init(f);
+  fprintf(f, "#%lu\n", t << 1);
   if (clk.cnt == 0)  goto L0;
 K0:  if (reset != reset__prev)  goto L1;
 K1:  if (NameSuite_DebugComp_1__io_ctrl_wb_wen != NameSuite_DebugComp_1__io_ctrl_wb_wen__prev)  goto L2;
@@ -74,7 +74,7 @@ K3:  if (NameSuite_DebugComp_1_dpath__reset != NameSuite_DebugComp_1_dpath__rese
 K4:  if (NameSuite_DebugComp_1_dpath__wb_reg_ll_wb != NameSuite_DebugComp_1_dpath__wb_reg_ll_wb__prev)  goto L5;
 K5:  if (NameSuite_DebugComp_1_dpath__io_ctrl_out != NameSuite_DebugComp_1_dpath__io_ctrl_out__prev)  goto L6;
 K6:  if (NameSuite_DebugComp_1__io_ctrl_out != NameSuite_DebugComp_1__io_ctrl_out__prev)  goto L7;
-K7:  fprintf(f, "#%d\n", (t << 1) + 1);
+K7:  fprintf(f, "#%lu\n", (t << 1) + 1);
   if (clk.cnt == 0)  goto Z0;
 C0:  return;
 L0:
