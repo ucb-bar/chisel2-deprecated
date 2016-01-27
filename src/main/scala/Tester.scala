@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.{ArrayBuffer, HashMap, Queue => ScalaQueue}
+import scala.collection.mutable.{ArrayBuffer, HashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import scala.util.Random
 import java.nio.channels.FileChannel
@@ -87,11 +87,94 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
-  * @param _base base for prints, default 16 (hex)
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int = 16) extends FileSystemUtilities {
+class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
+  // Define events
+  abstract class Event
+  case class StartEvent(seed: Long, cmd: String) extends Event
+  case class FinishEvent(t: Long, pass: Boolean, fail_t: Long) extends Event
+  case class MuteEvent() extends Event
+  case class UnmuteEvent() extends Event
+  case class ResetEvent(n: Int) extends Event
+  case class StepEvent(n: Int, t: Long) extends Event
+  case class PokeEvent(b: Bits, v: BigInt) extends Event
+  case class PokeMemEvent[T <: Data](m: Mem[T], off: Int, v: BigInt) extends Event
+  case class PokeFloEvent(b: Flo, v: Float) extends Event
+  case class PokeDblEvent(b: Dbl, v: Double) extends Event
+  case class PeekEvent(b: Bits, v: Option[BigInt]) extends Event
+  case class PeekMemEvent[T <: Data](m: Mem[T], off: Int, v: BigInt) extends Event
+  case class PeekFloEvent(b: Flo, v: Float) extends Event
+  case class PeekDblEvent(b: Dbl, v: Double) extends Event
+  case class ExpectMsgEvent(good: Boolean, msg: String) extends Event
+  case class ExpectEvent(b: Bits, got: BigInt, expected: BigInt, msg: String) extends Event
+  case class ExpectFloEvent(b: Bits, got: Float, expected: Float, msg: String) extends Event
+  case class ExpectDblEvent(b: Dbl, got: Double, expected: Double, msg: String) extends Event
+  case class DumpEvent(msg: String) extends Event
+  case class NoIdEvent(path: String) extends Event
+  // Define observer
+  abstract class Observer(base: Int = 16, file: java.io.PrintStream = System.out) {
+    private var lock = false
+    private def convt(x: BigInt) = base match {
+      case 2  if x < 0 => s"-0b${(-x).toString(base)}"
+      case 16 if x < 0 => s"-0x${(-x).toString(base)}"
+      case 2  => s"0b${x.toString(base)}"
+      case 16 => s"0x${x.toString(base)}"
+      case _ => x.toString(base)
+    }
+    def apply(event: Event): Unit = event match {
+      case StartEvent(seed, cmd) =>
+        file.println(s"SEED ${seed}")
+        file.println(s"STARTING ${cmd}")
+      case FinishEvent(t, pass, fail_t) =>
+        file.println(s"""RAN ${t} CYCLES ${if (pass) "PASSED" else s"FAILED FIRST AT CYCLE ${fail_t}"}""")
+      case MuteEvent() => lock = true
+      case UnmuteEvent() => lock = false
+      case StepEvent(n, t) if !lock => println(s"STEP ${n} -> ${t+n}")
+      case ResetEvent(n) if !lock => println(s"RESET ${n}")
+      case PokeEvent(b, v) if !lock =>
+        if (b.getNode.isInstanceOf[Delay] || b.isTopLevelIO && b.dir == INPUT) {
+          file.println(s"  POKE ${dumpName(b)} <- ${convt(v)}")
+        } else {
+          file.println(s"  POKE ${dumpName(b)} <- NOT ALLOWED")
+        }
+      case PokeMemEvent(m, off, v) if !lock =>
+        file.println(s"  POKE ${dumpName(m)}[${off}] <- ${convt(v)}")
+      case PokeFloEvent(b, v) if !lock =>
+        file.println(s"  POKE ${dumpName(b)} <- ${v}")
+      case PokeDblEvent(b, v) if !lock =>
+        file.println(s"  POKE ${dumpName(b)} <- ${v}")
+      case PeekEvent(b, None) if !lock => 
+        file.println(s"  PEEK ${dumpName(b)} -> No initial values")
+      case PeekEvent(b, Some(v)) if !lock => 
+        file.println(s"  PEEK ${dumpName(b)} <- ${convt(v)}")
+      case PeekMemEvent(m, off, v) if !lock => 
+        file.println(s"  PEEK ${dumpName(m)}[${off}] -> ${convt(v)}")
+      case PeekFloEvent(b, v) if !lock =>
+        file.println(s"  PEEK ${dumpName(b)} -> ${v}")
+      case PeekDblEvent(b, v) if !lock =>
+        file.println(s"  PEEK ${dumpName(b)} -> ${v}")
+      case ExpectMsgEvent(good, msg) if !lock =>
+        file.println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
+      case ExpectEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+        s"${msg}  EXPECT ${dumpName(b)} -> ${convt(got)} == ${convt(exp)}"))
+      case ExpectFloEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+        s"${msg}  EXPECT ${dumpName(b)} -> ${got} == ${exp}"))
+      case ExpectDblEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+        s"${msg}  EXPECT ${dumpName(b)} -> ${got} == ${exp}"))
+      case DumpEvent(msg) if !lock && !msg.isEmpty =>
+        file.println(msg)
+      case NoIdEvent(path) => file.println(s"Can't find id for '${path}'")
+      case _ => // silent
+    }  
+  }
+  class BasicObserver extends Observer // defulat: prints hex to the screen
+  private val observers = ArrayBuffer[Observer]()
+  def addObserver(o: Observer) { observers += o }
+  def addEvent(e: Event) { observers foreach (_(e)) }
+  if (isTrace) addObserver(new BasicObserver)
+
   implicit def longToInt(x: Long) = x.toInt
   def t = _t
   var _t = 0L // simulation time
@@ -129,7 +212,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       } else {
         "test application exit"
       } + " - exit code %d".format(exitCode)
-      println(newTestOutputString)
+      addEvent(new DumpEvent(newTestOutputString))
       throw new TestApplicationException(exitCode, errorString)
     }
   }
@@ -230,7 +313,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def peekPath(path: String): BigInt = {
     val id = _signalMap getOrElseUpdate (path, getId(path))
     if (id == -1) {
-      println("Can't find id for '%s'".format(path))
+      addEvent(new NoIdEvent(path))
       id
     } else {
       peek(id, _chunks getOrElseUpdate (path, getChunk(id)))
@@ -248,24 +331,18 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @param off Offset in memory to look at */
   def peekAt[T <: Bits](data: Mem[T], off: Int): BigInt = {
     val value = peekNode(data, Some(off))
-    if (isTrace) println(s"  PEEK ${dumpName(data)}[${off}] -> ${value.toString(_base)}")
+    addEvent(new PeekMemEvent(data, off, value))
     value
   }
   /** Peek at the value of some bits
     * @return a BigInt representation of the bits */
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = 
-      if (data.isLit) data.litValue()
-      else if (data.isTopLevelIO && data.dir == INPUT) (_pokeMap get data) match {
-        case Some(p) => p
-        case None => 
-          if (isTrace) println(s" No initial values for ${dumpName(data)}")
-          BigInt(rnd.nextInt)
-      }
-      else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
-    value
+    val value = if (data.isLit) Some(data.litValue())
+      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap get data
+      else Some(signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode))))
+    addEvent(new PeekEvent(data, value))
+    value getOrElse BigInt(rnd.nextInt)
   }
   /** Peek at Aggregate data
     * @return an Array of BigInts representing the data */
@@ -274,20 +351,18 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
   /** Interpret data as a single precision float */
   def peek(data: Flo): Float = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
-    isTrace = _isTrace
-    value
+    addEvent(new UnmuteEvent())
+    addEvent(new PeekFloEvent(data, value))
+    value 
   }
   /** Interpret the data as a double precision float */
   def peek(data: Dbl): Double = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
-    isTrace = _isTrace
+    addEvent(new UnmuteEvent())
+    addEvent(new PeekDblEvent(data, value))
     value
   }
 
@@ -305,7 +380,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def pokePath(path: String, v: BigInt, force: Boolean = false) {
     val id = _signalMap getOrElseUpdate (path, getId(path)) 
     if (id == -1) {
-      println("Can't find id for '%s'".format(path))
+      addEvent(new NoIdEvent(path))
     } else {
       poke(id, _chunks getOrElseUpdate (path, getChunk(id)), v, force)
     }
@@ -325,7 +400,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @param off The offset representing the index to write to memory
     */
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit = {
-    if (isTrace) println(s"  POKE ${dumpName(data)}[${off}] <- ${value.toString(_base)}")
+    addEvent(new PokeMemEvent(data, off, value))
     pokeNode(data, value, Some(off))
   }
   /** Set the value of some 'data' Node */
@@ -340,17 +415,15 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       val cnt = (data.needWidth() - 1) >> 6
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
+    addEvent(new PokeEvent(data, value))
     data.getNode match {
       case _: Delay =>
-        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         pokeNode(data.getNode, value)
         isStale = true
       case _ if data.isTopLevelIO && data.dir == INPUT =>
-        if (isTrace) println(s"  POKE ${dumpName(data)} <- ${value.toString(_base)}")
         _pokeMap(data) = value
         isStale = true
       case _ =>
-        if (isTrace) println(s"  NOT ALLOWED POKE ${dumpName(data)}")
     }
   }
   /** Set the value of Aggregate data */
@@ -360,19 +433,17 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
   /** Set the value of a hardware single precision floating point representation */
   def poke(data: Flo, x: Float): Unit = {
-    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new PokeFloEvent(data, x))
+    addEvent(new MuteEvent())
     poke(data.asInstanceOf[Bits], BigInt(floatToIntBits(x)))
-    isTrace = _isTrace
+    addEvent(new UnmuteEvent())
   }
   /** Set the value of a hardware double precision floating point representation */
   def poke(data: Dbl, x: Double): Unit = {
-    if (isTrace) println(s"  POKE ${dumpName(data)} <- ${x}")
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new PokeDblEvent(data, x))
+    addEvent(new MuteEvent())
     poke(data.asInstanceOf[Bits], BigInt(doubleToLongBits(x)))
-    isTrace = _isTrace
+    addEvent(new UnmuteEvent())
   }
 
   private def sendCmd(data: Int) = {
@@ -467,7 +538,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   /** Send reset to the hardware
     * @param n number of cycles to hold reset for, default 1 */
   def reset(n: Int = 1) {
-    if (isTrace) println(s"RESET ${n}")
+    addEvent(new ResetEvent(n))
     for (i <- 0 until n) {
       mwhile(!sendCmd(SIM_CMD.RESET)) { }
       mwhile(!recvOutputs) { }
@@ -494,7 +565,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    if (isTrace) println(newTestOutputString)
+    observers map (_(new DumpEvent(newTestOutputString)))
     isStale = false
   }
 
@@ -531,7 +602,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * See [[Chisel.Clock$ Clock]]
     */
   def step(n: Int) {
-    if (isTrace) println(s"STEP ${n} -> ${t+n}")
+    addEvent(new StepEvent(n, t))
     (0 until n) foreach (_ => takeStep)
     _t += n
   }
@@ -553,35 +624,27 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     ok = false
   }
 
-  // Prepend an optional string - issue #534
-  private def prependOptionalString(preString: String, postString: String): String = {
-    if (preString.length() > 0) {
-      preString + " " + postString
-    } else {
-      postString
-    }
-  }
-
   /** Expect a value to be true printing a message if it passes or fails
     * @param good If the test passed or not
     * @param msg The message to print out
     */
   def expect (good: Boolean, msg: => String): Boolean = {
-    if (isTrace) println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
+    addEvent(new ExpectMsgEvent(good, msg))
     if (!good) fail
     good
   }
 
   /** Expect the value of data to have the same bits as a BigInt */
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val mask = (BigInt(1) << data.needWidth) - 1
     val got = peek(data) & mask
     val exp = expected & mask
-    isTrace = _isTrace
-    expect(got == exp, prependOptionalString(msg, 
-      s"  EXPECT ${dumpName(data)} <- ${got.toString(_base)} == ${exp.toString(_base)}"))
+    val good = got == exp
+    addEvent(new UnmuteEvent())
+    addEvent(new ExpectEvent(data, got, exp, msg))
+    if (!good) fail
+    good
   }
   def expect (data: Bits, expected: BigInt): Boolean = {
     expect(data, expected, "")
@@ -615,11 +678,13 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Flo, expected: Float, msg: => String): Boolean = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val got = peek(data)
-    isTrace = _isTrace
-    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
+    val good = got == expected
+    addEvent(new UnmuteEvent())
+    addEvent(new ExpectFloEvent(data, got, expected, msg))
+    if (!good) fail
+    good
   }
   def expect (data: Flo, expected: Float): Boolean = {
     expect(data, expected, "")
@@ -628,11 +693,13 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   /** Expect the value of 'data' to be 'expected'
     * @return the test passed */
   def expect (data: Dbl, expected: Double, msg: => String): Boolean = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val got = peek(data)
-    isTrace = _isTrace
-    expect(got == expected, prependOptionalString(msg, s"  EXPECT ${dumpName(data)} <- ${got} == ${expected}"))
+    val good = got == expected
+    addEvent(new UnmuteEvent())
+    addEvent(new ExpectDblEvent(data, got, expected, msg))
+    if (!good) fail
+    good
   }
   def expect (data: Dbl, expected: Double): Boolean = {
     expect(data, expected, "")
@@ -644,11 +711,10 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   /** A tolerant expect for Float
     * Allows for a single least significant bit error in the floating point representation */
   def expect (data: Bits, expected: Float, msg: => String): Boolean = {
-    val _isTrace = isTrace
-    isTrace = false
+    addEvent(new MuteEvent())
     val gotBits = peek(data).toInt
-    val expectedBits = java.lang.Float.floatToIntBits(expected)
     var gotFLoat = java.lang.Float.intBitsToFloat(gotBits)
+    val expectedBits = java.lang.Float.floatToIntBits(expected)
     var expectedFloat = expected
     if (gotFLoat != expectedFloat) {
       val gotDiff = gotBits - expectedBits
@@ -657,9 +723,11 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         expectedFloat = gotFLoat
       }
     }
-    isTrace = _isTrace
-    expect(gotFLoat == expectedFloat, prependOptionalString(msg, 
-      s"  EXPECT ${dumpName(data)} <- ${gotFLoat} == ${expectedFloat}"))
+    val good = gotFLoat == expectedFloat
+    addEvent(new UnmuteEvent())
+    addEvent(new ExpectFloEvent(data, gotFLoat, expected, msg))
+    if (!good) fail
+    good
   }
   def expect (data: Bits, expected: Float): Boolean = {
     expect(data, expected, "")
@@ -713,8 +781,6 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         process.exitValue
       }
     }
-    println("SEED " + Driver.testerSeed)
-    println("STARTING " + cmd)
     // Wait for the startup message
     // NOTE: There may be several messages before we see our startup message.
     val simStartupMessageStart = "sim start on "
@@ -743,6 +809,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     cmdChannel.release
     _t = 0
     mwhile(!recvOutputs) { }
+    addEvent(new StartEvent(Driver.testerSeed, cmd))
     // reset(5)
     for (i <- 0 until 5) {
       mwhile(!sendCmd(SIM_CMD.RESET)) { }
@@ -753,15 +820,14 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   /** Complete the simulation and inspect all tests */
   def finish {
     mwhile(!sendCmd(SIM_CMD.FIN)) { }
-    if (isTrace) println(newTestOutputString)
-    val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
-    println(s"RAN ${t} CYCLES ${passMsg}")
+    addEvent(new DumpEvent(newTestOutputString))
+    addEvent(new FinishEvent(t, ok, failureTime))
     process.destroy
     _logs.clear
     inChannel.close
     outChannel.close
     cmdChannel.close
-    if(!ok) throwException("Module under test FAILED at least one test vector.")
+    if (!ok) throwException("Module under test FAILED at least one test vector.")
   }
 
   // Once everything has been prepared, we can start the communications.
