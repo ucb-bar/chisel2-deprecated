@@ -408,9 +408,11 @@ class ExtractSuite extends TestSuite {
   @Test def extractDynamicVal_t() {
     println("\nextractDynamicVal_t ...")
     class ExtractDynamic(w: Int) extends Module {
+      val wTop = w/2
+      val wBottom = w - wTop
       val io = new Bundle {
-        val in1 = UInt(INPUT, width = w/2)
-        val in2 = UInt(INPUT, width = w/2)
+        val inTop = UInt(INPUT, width = wTop)
+        val inBottom = UInt(INPUT, width = wBottom)
         val data = UInt(OUTPUT)
         val hi = UInt(INPUT, width = 16)
         val lo = UInt(INPUT, width = 16)
@@ -426,20 +428,22 @@ class ExtractSuite extends TestSuite {
         hi := io.hi
         lo := io.lo
       }
-      val in = Cat(io.in1, io.in2)
+      val in = Cat(io.inTop, io.inBottom)
       io.data := in(hi, lo)
     }
 
     class TestExtractDynamicVal_t(m: ExtractDynamic, maxWidth: Int, nRuns: Int) extends Tester(m) {
       for ((hi, lo) <- genHiLo(rnd, maxWidth, nRuns)) {
         val width = hi - lo + 1
-        val halfWidth = maxWidth/2
+        val wTop = maxWidth/2
+        val wBottom = maxWidth - wTop
         val data = BigInt(maxWidth, rnd)
         val mask = (BigInt(1) << width) - 1
-        val halfMask = (BigInt(1) << halfWidth) - 1
-        println("width: %d, hw: %d, data: 0x%x, hi: %d, lo: %d, mask: 0x%x".format(maxWidth, halfWidth, data, hi, lo, mask))
-        poke(m.io.in2, data & halfMask)
-        poke(m.io.in1, (data >> halfWidth) & halfMask)
+        val maskTop = (BigInt(1) << wTop) - 1
+        val maskBottom = (BigInt(1) << wBottom) - 1
+        println("maxWidth: %d, data: 0x%x, hi: %d, lo: %d, mask: 0x%x, wTop: %d, maskTop 0x%x, wBottom: %d, maskBottom: 0x%x".format(maxWidth, data, hi, lo, mask, wTop, maskTop, wBottom, maskBottom))
+        poke(m.io.inBottom, data & maskBottom)
+        poke(m.io.inTop, (data >> wBottom) & maskTop)
         poke(m.io.hi, hi)
         poke(m.io.lo, lo)
         step(1)
@@ -449,7 +453,7 @@ class ExtractSuite extends TestSuite {
 
     class TestExtractDynamic(rnd: Random, maxWidth: Int, nTests: Int, nRuns: Int) {
 
-     // Pick a random power of 2 from 4 to maxWidth
+      // Pick a random power of 2 from 4 to maxWidth
       for (inputWidth <- genMaxWidths(rnd, maxWidth, nTests)) {
         for (tester <- Array("c", "v")) {
           if (tester == "v" && !Driver.isVCSAvailable) {
