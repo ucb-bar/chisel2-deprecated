@@ -34,6 +34,7 @@ import org.junit.Test
 import org.junit.Ignore
 
 import Chisel._
+import org.scalatest.tags.Slow
 
 class ExtractSuite extends TestSuite {
   val maxWidth = 1024
@@ -180,7 +181,7 @@ class ExtractSuite extends TestSuite {
   }
 
   // Test dynamic hi, lo.
-  @Test def extractDynamic() {
+  @Test @Slow def extractDynamic() {
     println("\nextractDynamic ...")
     class ExtractDynamic(w: Int) extends Module {
       val io = new Bundle {
@@ -238,7 +239,7 @@ class ExtractSuite extends TestSuite {
   }
 
   // Test dynamic hi, static lo.
-  @Test def extractDynamicHi() {
+  @Slow @Test def extractDynamicHi() {
     println("\nextractDynamicHi ...")
     class ExtractDynamic(w: Int, lo: Int) extends Module {
       val io = new Bundle {
@@ -294,7 +295,7 @@ class ExtractSuite extends TestSuite {
   }
 
   // Test static hi, dynmic lo.
-  @Test def extractDynamicLo() {
+  @Slow @Test def extractDynamicLo() {
     println("\nextractDynamicLo ...")
     class ExtractDynamic(w: Int, hi: Int) extends Module {
       val io = new Bundle {
@@ -351,7 +352,7 @@ class ExtractSuite extends TestSuite {
   }
 
   // Test dynamic onebit (hi == lo).
-  @Test def extractDynamicOneBit() {
+  @Slow @Test def extractDynamicOneBit() {
     println("\nextractDynamicOneBit ...")
     class ExtractDynamic(w: Int) extends Module {
       val io = new Bundle {
@@ -405,7 +406,7 @@ class ExtractSuite extends TestSuite {
   }
 
   // Test dynamic val_t (extract bits from a created temporary).
-  @Test def extractDynamicVal_t() {
+  @Slow @Test def extractDynamicVal_t() {
     println("\nextractDynamicVal_t ...")
     class ExtractDynamic(w: Int) extends Module {
       val wTop = w/2

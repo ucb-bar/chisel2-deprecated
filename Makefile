@@ -25,7 +25,7 @@ publish-local:
 	$(SBT) $(SBT_FLAGS) publish-local
 
 smoke:
-	$(SBT) $(SBT_FLAGS) "testOnly $(SMOKE_TESTS)"
+	$(SBT) $(SBT_FLAGS) "test-only $(SMOKE_TESTS) -- -l org.scalatest.tags.Slow"
 
 style:
 	$(SBT) $(SBT_FLAGS) scalastyle
