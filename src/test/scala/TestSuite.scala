@@ -79,6 +79,26 @@ abstract class TestSuite extends JUnitSuite {
     }
   }
 
+  def assertVCDFile( filename: String ) {
+    val masterPath = getClass.getResource(filename)
+    // Did we find the resource?
+    if (masterPath == null) {
+      println("assertFile: \"%s\" not found".format(filename))
+      // Make sure we don't inadvertently pass this test.
+      assertResult(filename) { "" }
+      return
+    }
+    val reffile = scala.io.Source.fromURL(masterPath)
+    val refText = reffile.getLines.filter(_ != "").toArray
+    reffile.close()
+    val testPath = dir.getPath + "/" + filename
+    val testfile = scala.io.Source.fromFile(testPath, "utf-8")
+    val testText = testfile.getLines.filter(_ != "").toArray
+    testfile.close()
+    val comparator = new VCDComparator(masterPath.getPath(), testPath)
+    val result = comparator.compare(refText.toIterator, testText.toIterator)
+    assert(result == None)
+  }
 
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
