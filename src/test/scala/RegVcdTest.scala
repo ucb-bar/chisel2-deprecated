@@ -37,7 +37,8 @@ import Chisel._
 
 class RegVcdSuite extends TestSuite {
 
-  @Test def testRegVcd() {
+  // We currently ignore this test until assertVCDFile is updated to deal with redundant signal values.
+  @Ignore @Test def testRegVcd() {
     println("\ntestRegVcd...")
     class RegVcdTest(size: Int) extends Module {
       val io = new Bundle {
