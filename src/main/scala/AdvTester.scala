@@ -53,9 +53,14 @@ trait AdvTests extends Tests {
 
 }
 
-class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Tester[T](dut, isTrace) {
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, testCmd: Option[String] = Driver.testCommand) extends Tester[T](dut, isTrace, testCmd) {
   val defaultMaxCycles = 1024L
-  var cycles = 0L
+  var _cycles = 0L
+  def cycles = _cycles
+  override def incTime(n: Int) {
+    _cycles += n
+    super.incTime(n)
+  }
 
   // List of scala objects that need to be processed along with the test benches, like sinks and sources
   val preprocessors = new ArrayBuffer[Processable]()
@@ -95,7 +100,6 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false) extends Test
 
   // This function replaces step in the advanced tester and makes sure all tester features are clocked in the appropriate order
   def takestep(work: => Unit = {}): Unit = {
-    cycles += 1
     step(1)
     do_registered_updates()
     preprocessors.foreach(_.process()) // e.g. sinks

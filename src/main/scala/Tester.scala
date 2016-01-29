@@ -87,10 +87,11 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
+  * @param testCmd command to run the emulator
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtilities {
+class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String] = Driver.testCommand) extends FileSystemUtilities {
   // Define events
   abstract class Event
   case class StartEvent(seed: Long, cmd: String) extends Event
@@ -114,7 +115,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   case class DumpEvent(msg: String) extends Event
   case class NoIdEvent(path: String) extends Event
   // Define observer
-  abstract class Observer(base: Int = 16, file: java.io.PrintStream = System.out) {
+  class Observer(base: Int = 16, file: java.io.PrintStream = System.out) {
     private var lock = false
     private def convt(x: BigInt) = base match {
       case 2  if x < 0 => s"-0b${(-x).toString(base)}"
@@ -131,8 +132,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
         file.println(s"""RAN ${t} CYCLES ${if (pass) "PASSED" else s"FAILED FIRST AT CYCLE ${fail_t}"}""")
       case MuteEvent() => lock = true
       case UnmuteEvent() => lock = false
-      case StepEvent(n, t) if !lock => println(s"STEP ${n} -> ${t+n}")
-      case ResetEvent(n) if !lock => println(s"RESET ${n}")
+      case StepEvent(n, t) if !lock => file.println(s"STEP ${n} -> ${t+n}")
+      case ResetEvent(n) if !lock => file.println(s"RESET ${n}")
       case PokeEvent(b, v) if !lock =>
         if (b.getNode.isInstanceOf[Delay] || b.isTopLevelIO && b.dir == INPUT) {
           file.println(s"  POKE ${dumpName(b)} <- ${convt(v)}")
@@ -176,6 +177,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   if (isTrace) addObserver(new BasicObserver)
 
   implicit def longToInt(x: Long) = x.toInt
+  def incTime(n: Int) { _t += n }
   def t = _t
   var _t = 0L // simulation time
   var delta = 0
@@ -604,7 +606,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   def step(n: Int) {
     addEvent(new StepEvent(n, t))
     (0 until n) foreach (_ => takeStep)
-    _t += n
+    incTime(n)
   }
 
   /** Convert a Boolean to BigInt */
@@ -754,7 +756,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true) extends FileSystemUtil
   val targetSubDir = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
   val target = s"${Driver.targetDir}/${targetSubDir}"
   // If the caller has provided a specific command to execute, use it.
-  val cmd = Driver.testCommand match {
+  val cmd = testCmd match {
     case Some(cmd) => cmd
     case None => Driver.backend match {
       case b: FloBackend =>
