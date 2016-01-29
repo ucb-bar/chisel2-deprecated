@@ -42,6 +42,7 @@ trait AdvTests extends Tests {
   def wire_poke(port: Bits,      target: Int):           Unit
   def wire_poke(port: Bits,      target: Long):          Unit
   def wire_poke(port: Bits,      target: BigInt):        Unit
+  def wire_poke(port: Dbl,       target: Double):        Unit
   def wire_poke(port: Aggregate, target: Array[BigInt]): Unit
   def reg_poke(port: Bits,       target: BigInt):        Unit
   def reg_poke(port: Aggregate,  target: Array[BigInt]): Unit
@@ -71,6 +72,11 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   def wire_poke(port: Bits,      target: Int)           = { super.poke(port, int(target)) }
   def wire_poke(port: Bits,      target: Long)          = { super.poke(port, int(target)) }
   def wire_poke(port: Bits,      target: BigInt)        = { super.poke(port, target) }
+  def wire_poke(port: Dbl,       target: Double)        = {
+    import java.lang.Double.{longBitsToDouble, doubleToLongBits}
+    if (isTrace) println(s"  POKE ${dumpName(port)} <- ${target}")
+    super.poke(port.asInstanceOf[Bits], BigInt(doubleToLongBits(target)))
+  }
   def wire_poke(port: Aggregate, target: Array[BigInt]) = { super.poke(port, target) }
 
   override def poke(port: Bits, target: BigInt) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
