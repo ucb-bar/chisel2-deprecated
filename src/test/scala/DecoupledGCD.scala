@@ -29,10 +29,21 @@
 */
 
 import Chisel._
-import Chisel.testers.{DecoupledTester, UnitTester}
+import Chisel.testers.{TesterDriver, SteppedHWIOTester, OrderedDecoupledHWIOTester}
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
+
+object GCDCalculator {
+  def computeGcdResultsAndCycles(a: Int, b: Int, depth: Int = 1): (Int, Int) = {
+    if(b == 0) {
+      (a, depth)
+    }
+    else {
+      computeGcdResultsAndCycles(b, a%b, depth+1 )
+    }
+  }
+}
 
 // Test the Chisel3 UnitTester interface.
 class GCDDecoupledTest extends TestSuite {
@@ -101,19 +112,15 @@ class GCDDecoupledTest extends TestSuite {
   //  io_info.show_ports("".r)
   //}
   
-  class RealGCDTests extends UnitTester {
-    val c = Module( new RealGCD )
-  
-    def compute_gcd_results_and_cycles(a: Int, b: Int, depth: Int = 1): Tuple2[Int, Int] = {
-      if(b == 0) (a, depth)
-      else compute_gcd_results_and_cycles(b, a%b, depth+1 )
-    }
+  class RealGCDTests extends SteppedHWIOTester {
+    val device_under_test = Module( new RealGCD )
+    val c = device_under_test
   
     val inputs = List( (48, 32), (7, 3), (100, 10) )
     val outputs = List( 16, 1, 10)
   
     for( (input_1, input_2) <- inputs) {
-      val (output, cycles) = compute_gcd_results_and_cycles(input_1, input_2)
+      val (output, cycles) = GCDCalculator.computeGcdResultsAndCycles(input_1, input_2)
   
       poke(c.io.in.bits.a, input_1)
       poke(c.io.in.bits.b, input_2)
@@ -127,32 +134,9 @@ class GCDDecoupledTest extends TestSuite {
       step(cycles-2)
       expect(c.io.out.bits, output)
     }
-  
-    //  var i = 0
-    //  do {
-    //    var transfer = false
-    //    do {
-    //      poke(c.io.in.bits.a, inputs(i)._1)
-    //      poke(c.io.in.bits.b, inputs(i)._2)
-    //      poke(c.io.in.valid,  1)
-    //      transfer = (peek(c.io.in.ready) == 1)
-    //      step(1)
-    //    } while (t < 100 && !transfer)
-    //
-    //    do {
-    //      poke(c.io.in.valid, 0)
-    //      step(1)
-    //    } while (t < 100 && (peek(c.io.out.valid) == 0))
-    //
-    //    expect(c.io.out.bits, outputs(i))
-    //    i += 1;
-    //  } while (t < 100 && i < 3)
-    //  if (t >= 100) ok = false
-  
-    install(c)
   }
   
-  class DecoupledRealGCDTestHandCodedExample extends DecoupledTester {
+  class DecoupledRealGCDTestHandCodedExample extends OrderedDecoupledHWIOTester {
     val device_under_test = Module(new RealGCD())
     val c = device_under_test
   
@@ -199,7 +183,7 @@ class GCDDecoupledTest extends TestSuite {
     //  io_info.show_ports("".r)
   }
   
-  class DecoupledRealGCDTests4 extends DecoupledTester {
+  class DecoupledRealGCDTests4 extends OrderedDecoupledHWIOTester {
     val device_under_test = Module(new RealGCD())
     val c = device_under_test
 
@@ -207,35 +191,15 @@ class GCDDecoupledTest extends TestSuite {
       i <- Array(12, 33)
       j <- Array(24, 24)
     } {
-      input_event(Array(c.io.in.bits.a -> i, c.io.in.bits.b -> j))
+      val (gcd_value, cycles) = GCDCalculator.computeGcdResultsAndCycles(i, j)
+
+      inputEvent(c.io.in.bits.a -> i, c.io.in.bits.b -> j)
+      outputEvent(c.io.out.bits -> gcd_value)
     }
-    output_event(Array(c.io.out.bits -> 12))
-    output_event(Array(c.io.out.bits -> 12))
-    output_event(Array(c.io.out.bits -> 3))
-    output_event(Array(c.io.out.bits -> 3))
-  
-    val a_values = Vec(Array(UInt(12, width = 16), UInt(33, width = 16)))
-    val b_values = Vec(Array(UInt(24, width = 16), UInt(24, width = 16)))
-  
-    val ti = Reg(init=UInt(0, width = 16))
-    val pc = Reg(init=UInt(0, width = 16))
-    val oc = Reg(init=UInt(0, width = 16))
-  
-    val in_done  = Reg(init=Bool(false))
-    val out_done = Reg(init=Bool(false))
-  
-    ti := ti + UInt(1)
-//    printf("DecoupledRealGCDTests4: ti %d\n", ti)
-    when(ti >= UInt(40)) { stop() }
-    when(in_done && out_done) { stop() }
-  
-    finish()
-    io_info.show_ports("".r)
   }
   
-  val tester = new UnitTester
   implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
-  tester.execute { new DecoupledRealGCDTests4 }
+  TesterDriver.execute { () => new DecoupledRealGCDTests4 }
  }
 }
 

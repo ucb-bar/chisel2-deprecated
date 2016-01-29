@@ -29,41 +29,44 @@
 */
 
 package Chisel.testers
+
 import Chisel._
 
-// In Chisel2, the BasicTester has an IO interface which it uses to communicate with the Chisel2 Tester Scala code.
-class BasicTester extends Module {
+import scala.util.Random
 
-  val io = new Bundle {
+// scalastyle:off regex
+// scalastyle:off method.name
+/**
+  * provide common facilities for step based testing and decoupled interface testing
+  */
+abstract class HWIOTester extends BasicTester {
+  val device_under_test:     Module
+  var io_info:               IOAccessor = null
+  def finish():              Unit
+
+  def int(x: Bits):    BigInt = x.litValue()
+
+  override val io = new Bundle {
     val running       = Bool(INPUT)
     val error         = Bool(OUTPUT)
     val pc            = UInt(OUTPUT, 32)
     val done          = Bool(OUTPUT)
   }
+  io.done  := setDone
+  io.error := setError
 
-  val setDone = Reg(init = Bool(false))
-  val setError = Reg(init = Bool(false))
+  val rnd = new scala.util.Random(Driver.testerSeed)
 
-  def popCount(n: Long): Int = n.toBinaryString.count(_=='1')
+  var enable_scala_debug     = false
+  var enable_printf_debug    = false
+  var enable_all_debug       = false
 
-  /** Ends the test reporting success.
-    *
-    * Does not fire when in reset (defined as the encapsulating Module's
-    * reset). If your definition of reset is not the encapsulating Module's
-    * reset, you will need to gate this externally.
-    */
-  def stop() {
-    when (!reset) {
-      setDone := Bool(true)
-      printf("STOP %d\n", io.done)
-    }
+  def logScalaDebug(msg: => String): Unit = {
+    //noinspection ScalaStyle
+    if(enable_all_debug || enable_scala_debug) println(msg)
   }
 
-  def error(message: String = "") {
-    setError := Bool(true)
-    printf("ERROR: %s\n".format(message))
-    stop()
+  def logPrintfDebug(fmt: String, args: Bits*): Unit = {
+    if(enable_all_debug || enable_scala_debug) printf(fmt, args :_*)
   }
-
-  def finish(): Unit = {}
 }

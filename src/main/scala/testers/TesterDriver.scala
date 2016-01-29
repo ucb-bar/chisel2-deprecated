@@ -29,41 +29,66 @@
 */
 
 package Chisel.testers
+
 import Chisel._
+import scala.io.Source
+import scala.sys.process._
+import java.io._
 
-// In Chisel2, the BasicTester has an IO interface which it uses to communicate with the Chisel2 Tester Scala code.
-class BasicTester extends Module {
+// Wrapper to run Chisel3-style testers in Chisel2.
 
-  val io = new Bundle {
-    val running       = Bool(INPUT)
-    val error         = Bool(OUTPUT)
-    val pc            = UInt(OUTPUT, 32)
-    val done          = Bool(OUTPUT)
-  }
+object Chisel2State {
+  var args = Array[String]()
+}
 
-  val setDone = Reg(init = Bool(false))
-  val setError = Reg(init = Bool(false))
 
-  def popCount(n: Long): Int = n.toBinaryString.count(_=='1')
+trait UnitTestRunners {
+}
 
-  /** Ends the test reporting success.
-    *
-    * Does not fire when in reset (defined as the encapsulating Module's
-    * reset). If your definition of reset is not the encapsulating Module's
-    * reset, you will need to gate this externally.
-    */
-  def stop() {
-    when (!reset) {
-      setDone := Bool(true)
-      printf("STOP %d\n", io.done)
+object TesterDriver {
+  def execute(t: () => BasicTester)(implicit optionArgs: Array[String]): Boolean = {
+    Chisel2State.args = optionArgs
+    try {
+      // Construct the combined circuit, containing all the required
+      //  poke()'s and expect()'s as arrays of data.
+      val mod = Driver(Chisel2State.args, finishWrapper(t), false)
+      if (Driver.isTesting) {
+        // Initialize a tester with tracing turned on.
+        val c = new Tester(mod, true)
+        // Run the testing circuit until we see io.done.
+        while(c.peek(mod.io.done) == 0) {
+          c.step(1)
+        }
+        val error = c.peek(mod.io.error)
+        val pc = c.peek(mod.io.pc)
+        if (error != 0) {
+          c.fail
+        }
+
+  // Do an additional step to get any printf output.
+        c.step(1)
+        c.finish
+      }
+      true
+    } catch {
+      case e: Throwable =>
+        println(e)
+        false
     }
   }
 
-  def error(message: String = "") {
-    setError := Bool(true)
-    printf("ERROR: %s\n".format(message))
-    stop()
+  def elaborate(t: () => BasicTester): Module = {
+    val removeArgs = Array("--compile", "--test", "--genHarness")
+    val filteredArgs = Chisel2State.args.filterNot(removeArgs.contains(_))
+    val mod = Driver(filteredArgs ++ Array("--compile", "--genHarness"), finishWrapper(t), false)
+    mod
   }
 
-  def finish(): Unit = {}
+  def finishWrapper(test: () => BasicTester): () => BasicTester = {
+    () => {
+      val tester = test()
+      tester.finish()
+      tester
+    }
+  }
 }

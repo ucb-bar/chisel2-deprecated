@@ -29,7 +29,7 @@
 */
 
 import Chisel._
-import Chisel.testers.UnitTester
+import Chisel.testers.{TesterDriver, SteppedHWIOTester}
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
@@ -61,7 +61,7 @@ class GCDUnitTest extends TestSuite {
   // We need to not only compute the GCD for test verification,
   //  we need to calculate the number of cycles it will take so we can
   //  structure out step()'s and expect()'s appropriately.
-  class GCDUnitTester extends UnitTester {
+  class GCDUnitTester extends SteppedHWIOTester {
     def compute_gcd(a: Int, b: Int): Tuple2[Int, Int] = {
       var x = a
       var y = b
@@ -79,7 +79,8 @@ class GCDUnitTest extends TestSuite {
     }
 
     // Instantiate the GCD circuit.
-    val gcd = Module(new GCD)
+    val device_under_test = Module(new GCD)
+    val gcd = device_under_test
   
     for {
       value_1 <- 4 to 8
@@ -97,13 +98,9 @@ class GCDUnitTest extends TestSuite {
       expect(gcd.io.z, expected_gcd)
       expect(gcd.io.v, 1 )
     }
-
-    install(gcd)
-
   }
   
-  val tester = new UnitTester
   implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
-  tester.execute { new GCDUnitTester }
+  TesterDriver.execute { () => new GCDUnitTester }
  }
 }
