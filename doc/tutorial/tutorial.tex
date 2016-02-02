@@ -937,23 +937,29 @@ the connection after \verb!pcReg! and \verb!addOut! are defined.
 
 \subsection{Conditional Updates}
 
-In our previous examples using registers, we simply wired their inputs
-to combinational logic blocks.  When describing the operation of state
+In our previous examples using registers, we simply wired the
+combinational logic blocks to the inputs of the registers.
+When describing the operation of state
 elements, it is often useful to instead specify when updates to the
 registers will occur and to specify these updates spread across
 several separate statements.  Chisel provides conditional update rules
 in the form of the \code{when} construct to support this style of
 sequential logic description. For example,
+% MS: the following is not working (anymore), it results in a single bit register
+% with the incrementing code.
+% val r = Reg(UInt(16))
+% MS: is there any meaning having a single, unnamed parameter for Reg()?
+% MS: should this be allowed?
 \begin{scala}
-val r = Reg(UInt(16))
-when (c === UInt(0) ) {
+val r = Reg(init = UInt(0, 16))
+when (cond) {
   r := r + UInt(1)
 }
 \end{scala}
 
 \noindent
 where register \code{r} is updated at the end of the current clock
-cycle only if \verb+c+ is zero.  The argument to \code{when} is a
+cycle only if \verb+cond+ is \code{true}.  The argument to \code{when} is a
 predicate circuit expression that returns a \code{Bool}.  The update
 block following \code{when} can only contain update statements using
 the assignment operator \verb+:=+, simple expressions, and named wires
@@ -997,7 +1003,7 @@ Figure~\ref{fig:condupdates} shows how each conditional update can be
 viewed as inserting a mux before the input of a register to select
 either the update expression or the previous input according to the
 \code{when} predicate.  In addition, the predicate is OR-ed into a
-firing signal that drives the load enable of the register.  The
+enable signal that drives the load enable of the register.  The
 compiler places initialization values at the beginning of the chain so
 that if no conditional updates fire in a clock cycle, the load enable
 of the register will be deasserted and the register value will not
@@ -1155,8 +1161,8 @@ class Parity extends Module {
 \end{scala}
 
 \noindent
-where \verb+Enum(UInt(), 2)+ generates two \verb+UInt+ literals and
-where the states are updated when \verb+in+ is true.  It is worth
+where \verb+Enum(UInt(), 2)+ generates two \verb+UInt+ literals.
+States are updated when \verb+in+ is true.  It is worth
 noting that all of the mechanisms for FSMs are built upon registers,
 wires, and conditional updates.
 
@@ -1286,7 +1292,10 @@ from external memory generators provided by foundry or IP vendors.
 
 Chisel supports random-access memories via the \code{Mem} construct.
 Writes to Mems are positive-edge-triggered and reads are either
-combinational or positive-edge-triggered.
+combinational or positive-edge-triggered.\footnote{Current FPGA technology
+does not support combinational (asynchronous) reads (anymore). The read address
+needs to be registered.}
+
 
 \begin{scala}
 object Mem {
@@ -1313,8 +1322,8 @@ val dout2 = rf(waddr2)
 \end{scala}
 
 If the optional parameter \code{seqRead} is set, Chisel will attempt to infer
-sequential read ports when the read address is a Reg.  A one-read,
-one-write SRAM might be described as follows:
+sequential read ports when the read address is a \code{Reg}.  A one-read port,
+one-write port SRAM might be described as follows:
 
 \begin{scala}
 val ram1r1w =
@@ -1337,11 +1346,11 @@ when (wen) { ram1p(waddr) := wdata }
 val rdata = ram1p(reg_raddr)
 \end{scala}
 
-If the same Mem address is both written and sequentially read on the same clock
+If the same \code{Mem} address is both written and sequentially read on the same clock
 edge, or if a sequential read enable is cleared, then the read data is
 undefined.
 
-Mem also supports write masks for subword writes.  A given bit is written if
+\code{Mem} also supports write masks for subword writes.  A given bit is written if
 the corresponding mask bit is set.
 
 \begin{scala}
@@ -1371,7 +1380,7 @@ when (wen) { ram.write(waddr, wdata, wmask) }
 \label{sec:interfaces}
 
 For more sophisticated modules it is often useful to define and
-instantiate interface classes while defining module IO.  First and
+instantiate interface classes while defining the IO for a module.  First and
 foremost, interface classes promote reuse allowing users to capture
 once and for all common interfaces in a useful form.  Secondly,
 interfaces allow users to dramatically reduce wiring by supporting
@@ -1971,6 +1980,7 @@ communicating using an AsyncFifo with each module on separate clocks:
 
 \subsubsection{C++}
 
+%MS: looks like the generated clock code is now a little bit different.
 In the C++ backend, for every clock \verb+i+ there is a
 \begin{itemize}
 \item \verb+uint64_t clk_i+ field representing the clock \verb+i+'s period,
