@@ -1002,7 +1002,7 @@ c1 & c2  &  r & \\
 Figure~\ref{fig:condupdates} shows how each conditional update can be
 viewed as inserting a mux before the input of a register to select
 either the update expression or the previous input according to the
-\code{when} predicate.  In addition, the predicate is OR-ed into a
+\code{when} predicate.  In addition, the predicate is OR-ed into an
 enable signal that drives the load enable of the register.  The
 compiler places initialization values at the beginning of the chain so
 that if no conditional updates fire in a clock cycle, the load enable
@@ -1983,8 +1983,7 @@ communicating using an AsyncFifo with each module on separate clocks:
 %MS: looks like the generated clock code is now a little bit different.
 In the C++ backend, for every clock \verb+i+ there is a
 \begin{itemize}
-\item \verb+uint64_t clk_i+ field representing the clock \verb+i+'s period,
-\item \verb+uint63_t clk_i_cnt+ field representing the clock \verb+i+'s current count,
+\item \verb+size_t clk+.len field representing the clock \verb+i+'s period,
 \item \verb+clock_lo_i+ and \verb+clock_hi_i+, 
 \item \verb+int reset()+ function which ensures that all \verb+clock_lo+ and \verb+clock_hi+ functions are called at least once, and
 \item \verb+int clock(reset)+ function which computes min delta, invokes appropriate \verb+clock_lo+ and \verb+clock_hi+'s and returns min delta used.
