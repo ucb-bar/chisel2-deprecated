@@ -100,7 +100,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
   case class UnmuteEvent() extends Event
   case class ResetEvent(n: Int) extends Event
   case class StepEvent(n: Int, t: Long) extends Event
-  case class PokeEvent(b: Bits, v: BigInt) extends Event
+  case class PokeEvent(b: Bits, v: BigInt, good: Boolean = true) extends Event
   case class PokeMemEvent[T <: Data](m: Mem[T], off: Int, v: BigInt) extends Event
   case class PokeFloEvent(b: Flo, v: Float) extends Event
   case class PokeDblEvent(b: Dbl, v: Double) extends Event
@@ -117,13 +117,14 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
   // Define observer
   class Observer(base: Int = 16, file: java.io.PrintStream = System.out) {
     private var lock = false
-    private def convt(x: BigInt) = base match {
+    protected def convt(x: BigInt) = base match {
       case 2  if x < 0 => s"-0b${(-x).toString(base)}"
       case 16 if x < 0 => s"-0x${(-x).toString(base)}"
       case 2  => s"0b${x.toString(base)}"
       case 16 => s"0x${x.toString(base)}"
       case _ => x.toString(base)
     }
+    def locked = lock
     def apply(event: Event): Unit = event match {
       case StartEvent(seed, cmd) =>
         file.println(s"SEED ${seed}")
@@ -132,39 +133,36 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
         file.println(s"""RAN ${t} CYCLES ${if (pass) "PASSED" else s"FAILED FIRST AT CYCLE ${fail_t}"}""")
       case MuteEvent() => lock = true
       case UnmuteEvent() => lock = false
-      case StepEvent(n, t) if !lock => file.println(s"STEP ${n} -> ${t+n}")
-      case ResetEvent(n) if !lock => file.println(s"RESET ${n}")
-      case PokeEvent(b, v) if !lock =>
-        if (b.getNode.isInstanceOf[Delay] || b.isTopLevelIO && b.dir == INPUT) {
-          file.println(s"  POKE ${dumpName(b)} <- ${convt(v)}")
-        } else {
-          file.println(s"  POKE ${dumpName(b)} <- NOT ALLOWED")
-        }
-      case PokeMemEvent(m, off, v) if !lock =>
+      case StepEvent(n, t) if !locked => file.println(s"STEP ${n} -> ${t+n}")
+      case ResetEvent(n) if !locked => file.println(s"RESET ${n}")
+      case PokeEvent(b, v, good) if !locked =>
+        val value = if (good) convt(v) else "NOT ALLOWED"
+        file.println(s"  POKE ${dumpName(b)} <- ${value}")
+      case PokeMemEvent(m, off, v) if !locked =>
         file.println(s"  POKE ${dumpName(m)}[${off}] <- ${convt(v)}")
-      case PokeFloEvent(b, v) if !lock =>
+      case PokeFloEvent(b, v) if !locked =>
         file.println(s"  POKE ${dumpName(b)} <- ${v}")
-      case PokeDblEvent(b, v) if !lock =>
+      case PokeDblEvent(b, v) if !locked =>
         file.println(s"  POKE ${dumpName(b)} <- ${v}")
-      case PeekEvent(b, None) if !lock => 
+      case PeekEvent(b, None) if !locked => 
         file.println(s"  PEEK ${dumpName(b)} -> No initial values")
-      case PeekEvent(b, Some(v)) if !lock => 
+      case PeekEvent(b, Some(v)) if !locked => 
         file.println(s"  PEEK ${dumpName(b)} <- ${convt(v)}")
-      case PeekMemEvent(m, off, v) if !lock => 
+      case PeekMemEvent(m, off, v) if !locked => 
         file.println(s"  PEEK ${dumpName(m)}[${off}] -> ${convt(v)}")
-      case PeekFloEvent(b, v) if !lock =>
+      case PeekFloEvent(b, v) if !locked =>
         file.println(s"  PEEK ${dumpName(b)} -> ${v}")
-      case PeekDblEvent(b, v) if !lock =>
+      case PeekDblEvent(b, v) if !locked =>
         file.println(s"  PEEK ${dumpName(b)} -> ${v}")
-      case ExpectMsgEvent(good, msg) if !lock =>
+      case ExpectMsgEvent(good, msg) if !locked =>
         file.println(s"""${msg} ${if (good) "PASS" else "FAIL"}""")
-      case ExpectEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+      case ExpectEvent(b, got, exp, msg) if !locked => apply(new ExpectMsgEvent(got == exp,
         s"${msg}  EXPECT ${dumpName(b)} -> ${convt(got)} == ${convt(exp)}"))
-      case ExpectFloEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+      case ExpectFloEvent(b, got, exp, msg) if !locked => apply(new ExpectMsgEvent(got == exp,
         s"${msg}  EXPECT ${dumpName(b)} -> ${got} == ${exp}"))
-      case ExpectDblEvent(b, got, exp, msg) if !lock => apply(new ExpectMsgEvent(got == exp,
+      case ExpectDblEvent(b, got, exp, msg) if !locked => apply(new ExpectMsgEvent(got == exp,
         s"${msg}  EXPECT ${dumpName(b)} -> ${got} == ${exp}"))
-      case DumpEvent(msg) if !lock && !msg.isEmpty =>
+      case DumpEvent(msg) if !msg.isEmpty =>
         file.println(msg)
       case NoIdEvent(path) => file.println(s"Can't find id for '${path}'")
       case _ => // silent
@@ -417,15 +415,17 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
       val cnt = (data.needWidth() - 1) >> 6
       ((0 to cnt) foldLeft BigInt(0))((res, i) => res | (int((x >> (64 * i)).toLong) << (64 * i)))
     }
-    addEvent(new PokeEvent(data, value))
     data.getNode match {
       case _: Delay =>
+        addEvent(new PokeEvent(data, value))
         pokeNode(data.getNode, value)
         isStale = true
       case _ if data.isTopLevelIO && data.dir == INPUT =>
+        addEvent(new PokeEvent(data, value))
         _pokeMap(data) = value
         isStale = true
       case _ =>
+        addEvent(new PokeEvent(data, value, false))
     }
   }
   /** Set the value of Aggregate data */
@@ -820,7 +820,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
   }
 
   /** Complete the simulation and inspect all tests */
-  def finish {
+  def finish: Boolean = {
     mwhile(!sendCmd(SIM_CMD.FIN)) { }
     addEvent(new DumpEvent(newTestOutputString))
     addEvent(new FinishEvent(t, ok, failureTime))
@@ -830,6 +830,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
     outChannel.close
     cmdChannel.close
     if (!ok) throwException("Module under test FAILED at least one test vector.")
+    ok
   }
 
   // Once everything has been prepared, we can start the communications.
