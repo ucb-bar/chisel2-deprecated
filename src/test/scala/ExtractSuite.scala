@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -29,42 +29,60 @@
 */
 
 import scala.util.Random
-import org.junit.Assert._
-import org.junit.Test
-import org.junit.Ignore
+import org.scalatest.Args
+import org.scalatest.tagobjects.Slow
 
 import Chisel._
-import org.scalatest.tags.Slow
 
-class ExtractSuite extends TestSuite {
+// We use the ScalaTest Suite non-JUint classes in order to be able to tag the more extensive tests as Slow.
+//  Trying to tag them with the @Slow annotation does not seem to work.
+class ExtractSuite extends FunTestSuite {
   val maxWidth = 1024
-  val (staticTests, staticRuns) = (4, 4)
-  val (dynamicTests, dynamicRuns) = (4, 4)
-  val (dynamicHiTests, dynamicHiRuns) = (4, 4)
-  val (dynamicLoTests, dynamicLoRuns) = (4, 4)
+  var testMultiplier = 4
+  var runMultiplier = 4
+  lazy val testCount = 1 * testMultiplier
+  lazy val runCount = 1 * runMultiplier
 
-  // Generate a list of test widths from 1 to maxWidth
+  // Provide a run method so we can access the arguments (specifically the filter)
+  //  used when running the tests.
+  override def run(testName: Option[String], args: Args): org.scalatest.Status = {
+    // If we're excluding Slow tests, reduce the test and run multipliers.
+    if (args.filter.tagsToExclude.contains("org.scalatest.tags.Slow")) {
+      testMultiplier = 1
+      runMultiplier = 1
+    }
+    super.run(testName, args)
+  }
+
+  // Generate a list of test widths from 1 to maxWidth.
+  // If we're generating enough values, use variations (-1, 0, +1) on the special powers of 2 for the 2nd through 4th elements.
   def genMaxWidths(rnd: Random, maxWidth: Int, nTests: Int): List[Int] = {
+    val specialPow2 = rnd.shuffle(List(8, 16, 32, 64, 128, 256)).head
     // Pick a random power of 2 from 4 to maxWidth - 1
     val range = 4 to maxWidth
     for {
-      t <- List.range(1, nTests)
-      offset <- List(-1, 0, +1)
-      pow2 = range(rnd.nextInt(range.length))
-      inputWidth = pow2 + offset
+      t <- List.range(0, nTests)
+      pow2 = t match {
+        case 1 if (nTests > 2) => specialPow2 - 1
+        case 2 => specialPow2
+        case 3 => specialPow2 + 1
+        case _ => range(rnd.nextInt(range.length))
+      }
+      inputWidth = pow2
     }
       yield inputWidth
   }
 
   // Generate a list of hi, lo specs where hi >= lo and (hi - lo + 1) <= inputWidth.
-  //  The first element in the list will have hi == lo, and the second will have lo = 0, hi = inputWidth - 1
+  //  The second element in the list will have hi == lo, and the third will have lo = 0, hi = inputWidth - 1
+  //  All other elements (including the first) will have random values.
   def genHiLo(rnd: Random, inputWidth: Int, nTests: Int): List[(Int, Int)] = {
     for {
-      t <- List.range(1, nTests)
+      t <- List.range(0, nTests)
       extractWidth = t match {
         case 1 => 1
         case 2 => inputWidth
-        case _ => rnd.nextInt(inputWidth - 1) + 1
+        case _ => rnd.nextInt(inputWidth - 1) + 1 // first and remaining cases.
       }
       lo = t match {
         case 2 => 0
@@ -80,14 +98,14 @@ class ExtractSuite extends TestSuite {
   def genExtractWidths(rnd: Random, inputWidth: Int, nTests: Int): List[Int] = {
     var l1 = false
     var lmax = false
-    val l1Test = nTests
-    val lmaxTest = nTests - 1
+    val l1Test = nTests - 1
+    val lmaxTest = nTests - 2
     val result = for {
-        t <- List.range(1, nTests)
+        t <- List.range(0, nTests)
         extractWidth = {
           val ni = t match {
-            case `l1Test` if (!l1) => 1
-            case `lmaxTest` if (!lmax) => inputWidth
+            case `l1Test` if (!l1 && nTests > l1Test + 1) => 1
+            case `lmaxTest` if (!lmax && nTests > lmaxTest + 2) => inputWidth
             case _ => rnd.nextInt(inputWidth) + 1
           }
           ni match {
@@ -106,7 +124,7 @@ class ExtractSuite extends TestSuite {
   /** Bad Width Inference in Extract #621
    *
    */
-  @Test def extractWidthInfer() {
+  test("extractWidthInfer") {
     println("\nextractWidthInfer ...")
     class ExtractWidthInfer extends Module {
       val io = new Bundle {
@@ -126,17 +144,20 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    for (tester <- Array("c", "v")) {
-      if (tester == "v" && !Driver.isVCSAvailable) {
+    for (backend <- Array("c", "v")) {
+      if (backend == "v" && !Driver.isVCSAvailable) {
         println("vcs unavailable - skipping Verilog test")
       } else {
-        launchTester(tester, (m: ExtractWidthInfer) => new TestExtractWidthInfer(m))
+        chiselMainTest(chiselEnvironmentArguments() ++ Array[String]("--backend", backend, "--compile", "--genHarness", "--test", "--targetDir", dir.getPath.toString()),
+          () => Module(new ExtractWidthInfer)) {
+            c => new TestExtractWidthInfer(c)
+        }
       }
     }
   }
 
   // Test static hi, lo.
-  @Test def extractStatic() {
+  test("extractStatic") {
     println("\nextractStatic ...")
     class ExtractStatic(w: Int, hi: Int, lo: Int) extends Module {
       val io = new Bundle {
@@ -177,11 +198,11 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractStatic(new Random(Driver.testerSeed), maxWidth, staticTests, staticRuns)
+    val t = new TestExtractStatic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 
   // Test dynamic hi, lo.
-  @Test @Slow def extractDynamic() {
+  test("extractDynamic", Slow) {
     println("\nextractDynamic ...")
     class ExtractDynamic(w: Int) extends Module {
       val io = new Bundle {
@@ -235,11 +256,11 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicTests, dynamicRuns)
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 
   // Test dynamic hi, static lo.
-  @Slow @Test def extractDynamicHi() {
+  test("extractDynamicHi", Slow) {
     println("\nextractDynamicHi ...")
     class ExtractDynamic(w: Int, lo: Int) extends Module {
       val io = new Bundle {
@@ -291,11 +312,11 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicHiTests, dynamicHiRuns)
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 
   // Test static hi, dynmic lo.
-  @Slow @Test def extractDynamicLo() {
+  test("extractDynamicLo", Slow) {
     println("\nextractDynamicLo ...")
     class ExtractDynamic(w: Int, hi: Int) extends Module {
       val io = new Bundle {
@@ -348,11 +369,11 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicLoTests, dynamicLoRuns)
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 
   // Test dynamic onebit (hi == lo).
-  @Slow @Test def extractDynamicOneBit() {
+  test("extractDynamicOneBit") {
     println("\nextractDynamicOneBit ...")
     class ExtractDynamic(w: Int) extends Module {
       val io = new Bundle {
@@ -402,11 +423,11 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicLoTests, dynamicLoRuns)
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 
   // Test dynamic val_t (extract bits from a created temporary).
-  @Slow @Test def extractDynamicVal_t() {
+  test("extractDynamicVal_t") {
     println("\nextractDynamicVal_t ...")
     class ExtractDynamic(w: Int) extends Module {
       val wTop = w/2
@@ -469,6 +490,6 @@ class ExtractSuite extends TestSuite {
       }
     }
 
-    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, dynamicLoTests, dynamicLoRuns)
+    val t = new TestExtractDynamic(new Random(Driver.testerSeed), maxWidth, testCount, runCount)
   }
 }
