@@ -88,10 +88,13 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
   * @param testCmd command to run the emulator
+  * @param dumpFile vcd/vpd file name
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String] = Driver.testCommand) extends FileSystemUtilities {
+class Tester[+T <: Module](c: T, isTrace: Boolean = true, 
+    testCmd: Option[String] = Driver.testCommand, 
+    dumpFile: Option[String] = None) extends FileSystemUtilities {
   // Define events
   abstract class Event
   case class StartEvent(seed: Long, cmd: String) extends Event
@@ -760,18 +763,20 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, testCmd: Option[String
     case Some(cmd) => cmd
     case None => Driver.backend match {
       case b: FloBackend =>
-        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
+        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", 
+          ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
         if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
         command.mkString(" ")
-      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
-        if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
-        if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
-      case _ => target
+      case b: VerilogBackend =>
+        val vpd = dumpFile getOrElse s"${Driver.targetDir}/${c.name}.vpd"
+        List(target, "-q", "+vcs+initreg+0", 
+          if (Driver.isVCD) s"+vpdfile=${vpd}" else "",
+          if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
+      case _ => List(target, dumpFile map (vcd => s"+vcdfile=${vcd}") getOrElse "") mkString " "
     }
   }
-
   val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
     val processBuilder = Process(cmd) 
     val processLogger = ProcessLogger(_logs += _)

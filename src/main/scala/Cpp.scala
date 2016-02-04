@@ -713,8 +713,14 @@ class CppBackend extends Backend {
     harness.write(s"""  ${name}_api_t api(&module);\n""")
     harness.write(s"""  module.init();\n""")
     harness.write(s"""  api.init_sim_data();\n""")
+    harness.write(s"""  std::vector<std::string> args(argv+1, argv+argc);\n""")
+    harness.write(s"""  std::string vcdfile = "${Driver.targetDir}/${name}.vcd";\n""")
+    harness.write(s"""  std::vector<std::string>::const_iterator it;\n""")
+    harness.write(s"""  for (it = args.begin() ; it != args.end() ; it++) {\n""")
+    harness.write(s"""    if (it->find("+vcdfile=") == 0) vcdfile = it->c_str()+9;\n""")
+    harness.write(s"""  }\n""")
     if (Driver.isVCD) {
-      harness.write(s"""  FILE *f = fopen("${Driver.targetDir}/${name}.vcd", "w");\n""")
+      harness.write(s"""  FILE *f = fopen(vcdfile.c_str(), "w");\n""")
     } else {
       harness.write(s"""  FILE *f = NULL;\n""")
     }
@@ -732,7 +738,7 @@ class CppBackend extends Backend {
     val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
     val cppFlags = CPPFLAGS + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = List(cppFlags, cxxFlags).mkString(" ")
-    val dir = Driver.targetDir + "/"
+    val dir = Driver.targetDir
     val parallelMakeJobs = Driver.parallelMakeJobs
 
     def make(args: String) {

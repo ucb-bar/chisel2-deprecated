@@ -53,7 +53,9 @@ trait AdvTests extends Tests {
 
 }
 
-class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, testCmd: Option[String] = Driver.testCommand) extends Tester[T](dut, isTrace, testCmd) {
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, 
+    testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None) 
+    extends Tester[T](dut, isTrace, testCmd, dumpFile) {
   val defaultMaxCycles = 1024L
   var _cycles = 0L
   def cycles = _cycles
