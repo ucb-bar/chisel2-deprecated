@@ -49,7 +49,7 @@ object VCDVerifySuite {
 class VCDVerifySuite extends TestSuite {
 
   // We currently ignore this test until assertVCDFile is updated to deal with redundant signal values.
-  @Ignore @Test def verifyVCD1() {
+  @Test def verifyVCD1() {
     class Hz extends Module {
       val io = new Bundle {
               val input = Bool(INPUT)
