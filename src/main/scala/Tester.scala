@@ -492,7 +492,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    if (isTrace) print(newTestOutputString)
+    if (isTrace && newTestOutputString != "") println(newTestOutputString)
     isStale = false
   }
 
