@@ -243,7 +243,7 @@ static void rsha_n (val_t d[], const val_t s0[], const unsigned int amount, cons
       // set the sign extended part of this word
       d[i] = d[i] | (val_all_ones() << (boundary - idx));
       // set the bits above w to zero as they are beyond the length of s0
-      d[nw-1] = d[nw-1] & (val_all_ones() >> (w - (nw-1)*val_n_bits()));
+      d[nw-1] = d[nw-1] & (val_all_ones() >> (nw*val_n_bits() - w));
       return;
     }
   }
@@ -1740,14 +1740,14 @@ class mod_t {
 
   virtual void print ( FILE* f ) { };
   virtual void print ( std::ostream& s ) { };
-  virtual void dump ( FILE* f, int t ) { };
+  virtual void dump ( FILE* f, int t , dat_t<1> reset=LIT<1>(0) ) { };
 
   void set_dumpfile(FILE* f) { dumpfile = f; }
 
   size_t timestep;
 
-  void dump () {
-    if (dumpfile != NULL) dump(dumpfile, timestep);
+  void dump ( dat_t<1> reset=LIT<1>(0) ) {
+    if (dumpfile != NULL) dump(dumpfile, timestep, reset);
     timestep += 1;
   }
 

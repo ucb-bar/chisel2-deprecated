@@ -32,7 +32,7 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
-import sys.process.stringSeqToProcess
+import sys.process.{BasicIO,stringSeqToProcess}
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -535,7 +535,11 @@ object Driver extends FileSystemUtilities{
 
   // Indicate if an external command is available.
   def isCommandAvailable(cmd: String): Boolean = {
-    Seq("bash", "-c", "which %s".format(cmd)).! == 0
+    // Eat any output.
+    val sb = new StringBuffer
+    val ioToDevNull = BasicIO(false, sb, None)
+
+    Seq("bash", "-c", "which %s".format(cmd)).run(ioToDevNull).exitValue == 0
   }
   
   lazy val isVCSAvailable = isCommandAvailable("vcs")

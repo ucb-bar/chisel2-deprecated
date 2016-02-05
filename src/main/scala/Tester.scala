@@ -204,7 +204,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val w = dtype.needWidth()
     dtype match {
       /* Any "signed" node */
-      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
+      case _: SInt | _ : Flo | _: Dbl | _: Fixed => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
       /* anything else (i.e., UInt) */
       case _ => (rv)
     }
@@ -255,7 +255,12 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     if (isStale) update
     val value = 
       if (data.isLit) data.litValue()
-      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
+      else if (data.isTopLevelIO && data.dir == INPUT) (_pokeMap get data) match {
+        case Some(p) => p
+        case None => 
+          if (isTrace) println(s" No initial values for ${dumpName(data)}")
+          BigInt(rnd.nextInt)
+      }
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
     if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
     value
@@ -487,7 +492,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    if (isTrace) println(newTestOutputString)
+    if (isTrace && newTestOutputString != "") println(newTestOutputString)
     isStale = false
   }
 
@@ -745,7 +750,16 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
 
   /** Complete the simulation and inspect all tests */
   def finish {
-    mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    try {
+      mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    }
+    catch {
+      // Depending on load and timing, we may get a TestApplicationException
+      //  when the test application exits. 
+      //  Check the exit value.
+      //  Anything other than 0 is an error.
+      case e: TestApplicationException => if (e.exitVal != 0) fail
+    }
     if (isTrace) println(newTestOutputString)
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")

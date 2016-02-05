@@ -25,6 +25,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   dat_t<1> NameSuite_DebugComp_1_dpath__io_ctrl_out__prev;
   dat_t<1> NameSuite_DebugComp_1__io_ctrl_out__prev;
   clk_t clk;
+  dat_t<1> reset__prev;
 
   void init ( val_t rand_init = 0 );
   void clock_lo ( dat_t<1> reset, bool assert_fire=true );
@@ -32,7 +33,7 @@ class NameSuite_DebugComp_1_t : public mod_t {
   int clock ( dat_t<1> reset );
   void print ( FILE* f );
   void print ( std::ostream& s );
-  void dump ( FILE* f, int t );
+  void dump ( FILE* f, int t, dat_t<1> reset=LIT<1>(0) );
   void dump_init ( FILE* f );
 
 };
