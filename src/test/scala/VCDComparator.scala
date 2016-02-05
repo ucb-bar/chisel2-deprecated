@@ -38,21 +38,31 @@ import TextComparator._
 import VCDComparator._
 
 object VCDComparator {
+  val moduleDefRegex = """\$scope module (\S+) \$end""".r
   val signalDefRegex = """\$var wire (\d+) (\S+) (\S+) \$end""".r
   val signalValRegex = """b(\d+) (\S+)""".r
   val VCDSignalValueBase = 2
 
-  /** Return a map of short names to long names.
+  /** Generate a signal name from a module name and a signal name
+    * @param moduleName The name of the module containing the signal.
+    * @param internalSignalName The name of the signal internal to the module.
+    * @return The combined (unique) signal name.
     */
-  def buildSignalDefs(si: Iterator[String]): Map[String, String] = {
+  def generateUniqueSignalName(moduleName: String, internalSignalName: String): String = "%s.%s".format(moduleName, internalSignalName)
+
+  /** Return a map of short signal names to long (unique) signal names, and a list of module names.
+    */
+  def buildSignalDefs(si: Iterator[String]): Tuple2[Map[String, String], List[String]] = {
     val tSignalMap = scala.collection.mutable.HashMap[String, String]()
+    val moduleNames = ArrayBuffer[String]()
     for (s <- si ) {
       s match {
-        case signalDefRegex(width, rep, name) => tSignalMap.put(rep, name)
+        case moduleDefRegex(name) => moduleNames += name
+        case signalDefRegex(width, rep, name) => tSignalMap.put(rep, generateUniqueSignalName(moduleNames.last, name))
         case _ => {}
       }
     }
-    tSignalMap.toMap
+    (tSignalMap.toMap, moduleNames.toList)
   }
 
   def compareFiles(masters: Array[String], tests: Array[String]): Option[ComparatorError] = {
@@ -91,23 +101,25 @@ class VCDComparator(masterPath: String, testPath: String) {
     // Partition the incoming stream into two sequences - definitions and data.
     val (defs, data) = lines.partition(_.startsWith("$"))
     // Generate the map from short signal names to long ones from the definition lines.
-    val shortToLong = buildSignalDefs(defs)
+    val (shortToLong: Map[String, String], moduleNames: List[String]) = buildSignalDefs(defs)
     // Generate the inverse map.
     val longToShort = shortToLong.map(_.swap)
     // Create the signal state map, initialized to unknown signal values.
-    val signalStates: SignalStates = shortToLong.keys.map(k => (k, None))(collection.breakOut)
+    // Use the long (original) signal names as the keys
+    // Minor changes to the generated code could shuffle the short signal names
+    //  and we want to compare values for the original (long) signals
+    val signalStates: SignalStates = shortToLong.values.map(k => (k, None))(collection.breakOut)
     var clockTick = -1
-
     // Is there more data to be checked?
-    def more: Boolean = data.hasNext
+    def hasNext: Boolean = data.hasNext
 
     /** Step one cycle.
       *  Read data lines updating the signal state until we see a clock change.
       */
     def step() {
       val startingTick = clockTick
-      // Loop while we have more data and we haven't changed the clock
-      while (more && clockTick == startingTick) {
+      // Loop while we have hasNext data and we haven't changed the clock
+      while (hasNext && clockTick == startingTick) {
         val line = data.next()
         // Is this a clock tick or a signal change?
         line(0) match {
@@ -116,9 +128,9 @@ class VCDComparator(masterPath: String, testPath: String) {
             clockTick += 1
           }
           case 'b' => {
-            // Extract the signal name and new value and update the signal state map.
+            // Extract the signal name (short) and new value and update the signal state map for the original (long) named signal.
             line match {
-              case signalValRegex(value, name) => signalStates(name) = Some(value)
+              case signalValRegex(value, shortName) => signalStates(shortToLong(shortName)) = Some(value)
               case _ => throw new ComparatorError("unrecognized line '%s'".format(line))
             }
           }
@@ -131,15 +143,14 @@ class VCDComparator(masterPath: String, testPath: String) {
       *  @param name The name of the signal.
       *  @param value The desired signal value.
       */
-    def seek(name: String, value: BigInt) {
-      val shortName = longToShort(name)
+    def seek(longName: String, value: BigInt) {
       do {
         // If we've hit the end of the stream, indicate failure.
-        if (!more) {
-          throw new ComparatorError("can't find %s with value %d.".format(name, value))
+        if (!hasNext) {
+          throw new ComparatorError("can't find %s with value %d.".format(longName, value))
         }
         step()
-      } while (BigInt(signalStates(shortName).get, VCDSignalValueBase) != value)
+      } while (BigInt(signalStates(longName).get, VCDSignalValueBase) != value)
     }
 
     /** Read and update the signal states until we see reset de-asserted.
@@ -148,8 +159,9 @@ class VCDComparator(masterPath: String, testPath: String) {
     def init() {
       step()  // Position to the start of the first cycle.
       // Find the reset signal
-      if (longToShort.contains("reset")) {
-        seek("reset", 0)
+      val reset = generateUniqueSignalName(moduleNames.head, "reset")
+      if (signalStates.contains(reset)) {
+        seek(reset, 0)
       }
     }
 
@@ -178,18 +190,21 @@ class VCDComparator(masterPath: String, testPath: String) {
         sim.init()
       }
       // Verify both define the same set of signals.
-      vcdStates("master").signalStates.keySet.toList.sorted == vcdStates("test").signalStates.keySet.toList.sorted
+      val differentSignals = vcdStates("master").signalStates.keySet &~ vcdStates("test").signalStates.keySet
+      if (!differentSignals.isEmpty) {
+        throw new ComparatorError("master and test differ on %s".format(differentSignals.mkString(", ")))
+      }
 
-      // Step through the files ensuring signals are the same at each cycle, stopping when both files contain no more data.
+      // Step through the files ensuring signals are the same at each cycle, stopping when both files contain no hasNext data.
       do {
         if (!(vcdStates("master") sameSignalValues vcdStates("test"))) {
           val clockTick = vcdStates("master").clockTick
-          val signal = vcdStates("master").shortToLong((vcdStates("master").signalStates.find{ case (k, v) => vcdStates("test").signalStates(k) != v }).get._1)
-          throw new ComparatorError("%s and %s differ for signal %s at clockTick %d".format(masterPath, testPath, signal, clockTick))
+          val signals = vcdStates("master").signalStates.filter{ case (k, v) => vcdStates("test").signalStates(k) != v }.keys.mkString(", ")
+          throw new ComparatorError("%s and %s differ for signal %s at clockTick %d".format(masterPath, testPath, signals, clockTick))
         }
         vcdStates("master").step()
         vcdStates("test").step()
-      } while (vcdStates("master").more || vcdStates("test").more)
+      } while (vcdStates("master").hasNext || vcdStates("test").hasNext)
     } catch {
       case e: ComparatorError => result = Some(e)
     }
