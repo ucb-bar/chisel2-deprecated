@@ -294,9 +294,12 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   // Perhaps should return ready rather than dat?
   /** enqueue data 'dat' by setting valid and bits */
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
-  valid := Bool(false);
-  for (io <- bits.flatten.map(x => x._2))
-    io := UInt(0)
+  def init() {
+    valid := Bool(false);
+    for (io <- bits.flatten.map(x => x._2))
+      io := UInt(0)
+  }
+  init()
   override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
@@ -304,7 +307,10 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
-  ready := Bool(false);
+  def init() {
+    ready := Bool(false);
+  }
+  init()
   /* Strange that this requires a Boolean argument
    * Change to deq() : (T, Bool) = { ready := Bool(true); (bits, valid) }
    */
