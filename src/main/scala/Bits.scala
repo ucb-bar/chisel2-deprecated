@@ -74,9 +74,6 @@ abstract class Bits extends Data with proc {
   def fromInt(x: Int): this.type
   def toSInt(): SInt = chiselCast(this){SInt()}
   def toUInt(): UInt = chiselCast(this){UInt()}
-  // Chisel3 compatibility - "Use asUInt/asSInt, which makes the reinterpret cast more explicit"
-  def asSInt(): SInt = chiselCast(this){SInt()}
-  def asUInt(): UInt = chiselCast(this){UInt()}
   override def getNode: Node = if (procAssigned) this else super.getNode
 
   // Chisel3 - rename these to make the reinterpret cast more explicit
