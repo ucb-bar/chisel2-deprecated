@@ -292,7 +292,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
     val w = dtype.needWidth()
     dtype match {
       /* Any "signed" node */
-      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
+      case _: SInt | _ : Flo | _: Dbl | _: Fixed => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
       /* anything else (i.e., UInt) */
       case _ => (rv)
     }
@@ -827,6 +827,16 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
   /** Complete the simulation and inspect all tests */
   def finish: Boolean = {
     mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    try {
+      mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    }
+    catch {
+      // Depending on load and timing, we may get a TestApplicationException
+      //  when the test application exits. 
+      //  Check the exit value.
+      //  Anything other than 0 is an error.
+      case e: TestApplicationException => if (e.exitVal != 0) fail
+    }
     addEvent(new DumpEvent(newTestOutputString))
     addEvent(new FinishEvent(t, ok, failureTime))
     process.destroy
