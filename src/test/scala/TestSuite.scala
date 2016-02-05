@@ -28,9 +28,10 @@
  MODIFICATIONS.
 */
 
-import org.scalatest.junit.JUnitSuite//import org.scalatest.Assertions
+import org.scalatest.junit.JUnitSuite
 import org.scalatest._
 import org.junit.Before
+import org.scalatest._
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
 import Chisel._
@@ -44,7 +45,8 @@ object TestSuite {
 }
 
 abstract class TestSuite extends JUnitSuite with TestHelpers {
-
+  // This functionality has been replace by the static TestHelper object
+  //  and should be elminated.
   @Before def initialize() {
   }
 

@@ -1,0 +1,102 @@
+$timescale 1ps $end
+$scope module RegVcdSuite_RegVcdTest_1 $end
+$var wire 1 ! clk $end
+$var wire 1 " reset $end
+$var wire 1 # io_ready $end
+$var wire 1 $ io_full $end
+$var wire 1 % io_write $end
+$var wire 1 & io_read $end
+$var wire 1 ' stateReg $end
+$var wire 1 ( io_stateReg $end
+$var wire 8 ) io_din $end
+$var wire 8 * dataReg $end
+$var wire 8 + io_dout $end
+$upscope $end
+$enddefinitions $end
+$dumpvars
+$end
+#0
+b1 !
+b1 "
+b1 #
+b0 $
+b0 %
+b0 &
+b0 '
+b0 (
+b00000001 )
+b00000000 *
+b00000000 +
+#1
+b0 !
+#2
+b1 !
+b1 "
+#3
+b0 !
+#4
+b1 !
+#5
+b0 !
+#6
+b1 !
+#7
+b0 !
+#8
+b1 !
+#9
+b0 !
+#10
+b1 !
+b0 "
+b10101011 )
+#11
+b0 !
+#12
+b1 !
+b1 %
+b00010010 )
+#13
+b0 !
+#14
+b1 !
+b0 #
+b1 $
+b0 %
+b1 '
+b1 (
+b00110100 )
+b00010010 *
+b00010010 +
+#15
+b0 !
+#16
+b1 !
+b1 &
+#17
+b0 !
+#18
+b1 !
+b1 #
+b0 $
+b0 &
+b0 '
+b0 (
+#19
+b0 !
+#20
+b1 !
+b1 %
+b01010110 )
+#21
+b0 !
+#22
+b1 !
+b0 #
+b1 $
+b1 '
+b1 (
+b01010110 *
+b01010110 +
+#23
+b0 !
