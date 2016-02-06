@@ -84,6 +84,10 @@ trait Tests {
 
 case class TestApplicationException(exitVal: Int, lastMessage: String) extends RuntimeException(lastMessage)
 
+object Tester {
+  implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
+}
+
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
@@ -774,7 +778,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
         List(target, "-q", "+vcs+initreg+0", 
           if (Driver.isVCD) s"+vpdfile=${vpd}" else "",
           if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
-      case _ => List(target, dumpFile map (vcd => s"+vcdfile=${vcd}") getOrElse "") mkString " "
+      case c: CppBackend => 
+        List(target, dumpFile map (vcd => s"+vcdfile=${vcd}") getOrElse "") mkString " "
+      case _ => target
     }
   }
   val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {

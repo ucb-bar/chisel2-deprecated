@@ -53,6 +53,10 @@ trait AdvTests extends Tests {
 
 }
 
+object AdvTester {
+  implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
+}
+
 class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, 
     testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None) 
     extends Tester[T](dut, isTrace, testCmd, dumpFile) {
