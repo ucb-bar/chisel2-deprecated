@@ -47,7 +47,7 @@ object Driver extends FileSystemUtilities{
       }
     }
   }
-  
+
   // If we encountered errors, and re-running with --lineNumbers may help
   //  diagnose the problem, indicate we should do so.
   def wantLineNumbers: Boolean = {
@@ -117,7 +117,7 @@ object Driver extends FileSystemUtilities{
   def setTopComponent(mod: Module) {
     topComponent = Some(mod)
     implicitReset.compOpt = topComponent
-    implicitClock.compOpt = topComponent 
+    implicitClock.compOpt = topComponent
     mod._reset = Some(implicitReset)
     mod._clock = Some(implicitClock)
     mod.hasExplicitReset = true
@@ -232,7 +232,7 @@ object Driver extends FileSystemUtilities{
         case Some(r) if r != implicitReset => pushInitialNode(r.getNode)
         case _ =>
       }
-      for (pin <- c.resets.values) 
+      for (pin <- c.resets.values)
         pushInitialNode(pin)
     }
     val stack = inputs ++ res
@@ -382,7 +382,7 @@ object Driver extends FileSystemUtilities{
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
-        case "--testCommand" => 
+        case "--testCommand" =>
           var cmd = ""
           while(i + 1 < args.size && args(i + 1).substring(0,2) != "--") {
             cmd += args(i + 1) + " " ; i += 1 }
@@ -476,7 +476,7 @@ object Driver extends FileSystemUtilities{
   var isVCDinline = false
   var isSupportW0W = false
   var backend: Backend = new CppBackend
-  var topComponent: Option[Module] = None 
+  var topComponent: Option[Module] = None
   var moduleNamePrefix = ""
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
@@ -541,6 +541,6 @@ object Driver extends FileSystemUtilities{
 
     Seq("bash", "-c", "which %s".format(cmd)).run(ioToDevNull).exitValue == 0
   }
-  
+
   lazy val isVCSAvailable = isCommandAvailable("vcs")
 }

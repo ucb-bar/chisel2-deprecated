@@ -150,12 +150,12 @@ class CppBackend extends Backend {
           assert(multiwordLiteralInObject, ChiselError.error("Internal Error: multiword literal reference without object to refer to"))
           wordMangle(x, w.toString)
         }
-      case _ => 
+      case _ =>
         wordMangle(x, w.toString)
     }
   }
 
-  protected[this] def isLit(node: Node): Boolean = 
+  protected[this] def isLit(node: Node): Boolean =
     node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
 
   def emitWordRef(node: Node, w: Int): String = {
@@ -585,7 +585,7 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = 
+        val cond =
           if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
           else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
@@ -644,15 +644,15 @@ class CppBackend extends Backend {
     node match {
       case x: Clock => List(
         x.srcClock match {
-          case None => 
+          case None =>
             s"  ${emitRef(node)}.len = ${x.period.round};\n"
-          case Some(src) => 
+          case Some(src) =>
             s"  ${emitRef(node)}.len = ${emitRef(src)}.len ${
                 if (src.period > x.period)
-                "/ " + (src.period / x.period).round else 
+                "/ " + (src.period / x.period).round else
                 "* " + (x.period / src.period).round
               };\n"
-        }, 
+        },
         s"  ${emitRef(node)}.cnt = 0;\n",
         s"  ${emitRef(node)}.values[0] = 0;\n") mkString ""
       case x: Reg =>
@@ -723,7 +723,7 @@ class CppBackend extends Backend {
           case _ =>
         }
       }
-      case _ => 
+      case _ =>
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
@@ -756,7 +756,7 @@ class CppBackend extends Backend {
       harness.write(s"""  FILE *f = NULL;\n""")
     }
     harness.write(s"""  module.set_dumpfile(f);\n""")
-    Driver.clocks foreach {clk => 
+    Driver.clocks foreach {clk =>
       harness write s"  module.${emitRef(clk)}.cnt = module.${emitRef(clk)}.len;\n"}
     harness.write(s"""  while(!api.exit()) api.tick();\n""")
     harness.write(s"""  if (f) fclose(f);\n""")
@@ -942,7 +942,7 @@ class CppBackend extends Backend {
       val genCall = "%s(%s);\n".format(name.name, callArgs)
       val prototype = "%s %s( %s );\n".format(name.ctype, name.name, argumentList)
     }
-    
+
     // Split a large method up into a series of calls to smaller methods.
     // We assume the following:
     //  - all state is maintained in the class object (there is no local state
@@ -1058,7 +1058,7 @@ class CppBackend extends Backend {
         writeCppFile(methodBody)
         accumlation += nLinesApprox
       }
-      
+
       def done() {
         // First, close off any accumulated method.
         if (accumlation > 0) {
@@ -1066,7 +1066,7 @@ class CppBackend extends Backend {
         }
       }
     }
- 
+
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless the current file has been closed or we've hit the line limit.
@@ -1320,7 +1320,7 @@ class CppBackend extends Backend {
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CMethod(CTypedName("void", "dump"), 
+      val method = CMethod(CTypedName("void", "dump"),
         Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
@@ -1361,11 +1361,11 @@ class CppBackend extends Backend {
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
       var id = 0
       Driver.orderedNodes.map {
-        case m: Mem[_] => 
+        case m: Mem[_] =>
           Driver.signalMap(m) = id
           id += m.n
         case node if node.prune || node.driveRand =>
-        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => 
+        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject =>
           Driver.signalMap(node) = id
           id += 1
         case _ =>
@@ -1382,7 +1382,7 @@ class CppBackend extends Backend {
             "    sim_data.signal_map[%s_path+\"[\"+itos(i,false)+\"]\"] = %d+i;\n".format(emitRef(mem), id), "  }\n")
         case (node, id) => List(
           "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
-          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) 
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node)))
       } mkString "")
       llm addString (Driver.clocks map { clk =>
         "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
@@ -1617,7 +1617,7 @@ class CppBackend extends Backend {
             }
             writeCppFile(clock_xhi.tail)
           }
-          
+
           // Put the accumulated method definitions where the header
           // generation code can find them.
           for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods) {
@@ -1693,7 +1693,7 @@ class CppBackend extends Backend {
         val trimLength = ".cpp".length()
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
-      genInitSimDataMethod(c) 
+      genInitSimDataMethod(c)
     } else {
       0
     }

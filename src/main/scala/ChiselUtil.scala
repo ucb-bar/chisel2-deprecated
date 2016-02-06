@@ -172,7 +172,7 @@ object ShiftRegister
       in
     }
   }
-  
+
   /** @param in input to delay
     * @param init reset value to use
     * @param n number of cycles to delay */
@@ -743,7 +743,7 @@ object Wire
     apply(Option(t), Option(init))
 
   def apply[T <: Data](t: Option[T], init: Option[T]): T = {
-    t match { 
+    t match {
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
@@ -817,7 +817,7 @@ object DelayBetween {
   /** Finds to shortest path between two nodes using a multi-stage depth first search */
   private def nodeShortestPathSearch(startList : List[Node], end : Node) : Int = {
     // We what this to operate in two different stages, first is to find either a register or the end
-    // if the end is found return the value, otherwise start the search again from the registers 
+    // if the end is found return the value, otherwise start the search again from the registers
     var searchNodes = startList
     val visited = new ArrayBuffer[Int]
     var count = -1
@@ -831,7 +831,7 @@ object DelayBetween {
           val delayLevel = nodeFindRegOrEnd(List(node), end, new ArrayBuffer[Node]).toList
           found = delayLevel.contains(end)
           delayLevel.foreach(n => nodesToSearch.append(n))
-        } 
+        }
       }
       searchNodes = nodesToSearch.toList
     }

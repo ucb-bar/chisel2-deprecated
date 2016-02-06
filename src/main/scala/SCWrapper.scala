@@ -345,7 +345,7 @@ class ComponentDef(a_type: String, a_name: String) {
 
 case class CStruct(val name: String, val fields: Array[(String, Bits)]) {
    override def toString(): String = {
-     "struct " + name + 
+     "struct " + name +
      " {\n" +
      fields.map { case (name, bits) => "  dat_t<" + bits.width + "> " + name + ";" }.mkString("\n") +
      "\n};\n"

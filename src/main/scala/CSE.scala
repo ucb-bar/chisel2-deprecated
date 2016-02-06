@@ -83,6 +83,6 @@ object CSE {
 
   def inputsEqual(x: Node, y: Node): Boolean = {
     if (x.widthW != y.widthW || x.inputs.length != y.inputs.length) false
-    else (x.inputs zip y.inputs) forall {case (a, b) => a == b} 
+    else (x.inputs zip y.inputs) forall {case (a, b) => a == b}
   }
 }

@@ -148,7 +148,7 @@ class WhenSuite extends TestSuite {
         io <> sub.io /* connect only io.in to sub.io.in */
       }
     }
-    
+
     def noWerror(srcArgs: Array[String]): Array[String] = {
       srcArgs.filterNot(_ == "--wError")
     }

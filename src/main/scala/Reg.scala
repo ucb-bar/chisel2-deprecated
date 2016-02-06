@@ -65,7 +65,7 @@ object Reg {
     XXX Can't specify return type. There is a conflict. It is either
     (Node) => (Int) or Int depending which execution path you believe.
     */
-  def regWidth(r: => Node) = r.litOpt match { 
+  def regWidth(r: => Node) = r.litOpt match {
     case Some(rl) if rl.hasInferredWidth => regMaxWidth _
     case _ => Node.fixWidth(r.getWidth)
   }
@@ -83,8 +83,8 @@ object Reg {
     apply(Option(outType), Option(next), Option(init), Option(clock))
 
   def apply[T <: Data](outType: Option[T], next: Option[T], init: Option[T], clock: Option[Clock]): T = {
-    val gen = (outType match {case Some(t) => t case None => 
-      next match { case Some(t) => t case None => 
+    val gen = (outType match {case Some(t) => t case None =>
+      next match { case Some(t) => t case None =>
       init match { case Some(t) => t case None =>
         throwException("cannot infer type of Reg.")}}}).cloneType
     validateGen(gen)

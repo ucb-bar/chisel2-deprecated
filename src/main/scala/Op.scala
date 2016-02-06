@@ -186,12 +186,12 @@ object Op {
     def error {
       ChiselError.error("Operator " + name + " with inputs " + a + ", " + b + " does not support literals with ?")
     }
-    def default = { 
-      (a.litOpt, b.litOpt) match { 
+    def default = {
+      (a.litOpt, b.litOpt) match {
         case (Some(al), Some(bl)) if al.isZ && bl.isZ => error
-        case _ => 
+        case _ =>
       }
-      val res = makeObj(name) ; res.init("", widthInfer, a, b) ; res 
+      val res = makeObj(name) ; res.init("", widthInfer, a, b) ; res
     }
 
     def zEquals(a: Node, b: Literal) = {
@@ -206,7 +206,7 @@ object Op {
       case (Some(al), _) if (name == "<<" || name == ">>" || name == "s>>") && al.value == 0 => Literal(0)
       case (_, Some(bl)) if name == "==" && bl.isZ => zEquals(a, bl)
       case (_, Some(bl)) if name == "!=" && bl.isZ => !zEquals(a, bl)
-      // isZ is unsupported for all other operators. 
+      // isZ is unsupported for all other operators.
       case (Some(al), _) if al.isZ => error ; Literal(0)
       case (_, Some(bl)) if bl.isZ => error ; Literal(0)
 
@@ -283,7 +283,7 @@ object Op {
       }
       case _ => CppFloOp
     }
-    
+
     def signAbs(x: Node): (Bool, UInt) = {
       val f = x.asInstanceOf[SInt]
       val s = f < SInt(0)
@@ -338,12 +338,12 @@ object Op {
     }
     a.litOpt match {
       case Some(al) if name == "~" =>
-        val wa = al.needWidth() 
+        val wa = al.needWidth()
         Literal((-al.value-1)&((BigInt(1) << wa)-1), wa)
       case _ => a match {
-        case _: Flo => a.litOpt match { 
-          case Some(al) => 
-            val fa_val = al.floLitValue 
+        case _: Flo => a.litOpt match {
+          case Some(al) =>
+            val fa_val = al.floLitValue
             name match {
               case "fsin" => Flo(Math.sin(fa_val).toFloat)
               case "fcos" => Flo(Math.cos(fa_val).toFloat)
@@ -362,8 +362,8 @@ object Op {
           case None => default
         }
         case _: Dbl => a.litOpt match {
-          case Some(al) => 
-            val fa_val = al.dblLitValue 
+          case Some(al) =>
+            val fa_val = al.dblLitValue
             name match {
               case "dsin" => Dbl(Math.sin(fa_val))
               case "dcos" => Dbl(Math.cos(fa_val))
@@ -378,7 +378,7 @@ object Op {
               case "dround" => Dbl(Math.round(fa_val))
               case "dToFix" => Literal(fa_val.toInt)
               case _ => default
-            } 
+            }
           case None => default
         }
         case _ => default

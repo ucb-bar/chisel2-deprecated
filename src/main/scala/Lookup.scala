@@ -35,7 +35,7 @@ object ListLookup {
     val map = mapping.map {
       case (x: BitPat, y) => (addr === x, y)
       case (x: UInt,   y) => (addr === x, y)
-      case _ => throwException("Not allowed type for mapping") 
+      case _ => throwException("Not allowed type for mapping")
     }
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))

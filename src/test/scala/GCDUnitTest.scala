@@ -81,7 +81,7 @@ class GCDUnitTest extends TestSuite {
     // Instantiate the GCD circuit.
     val device_under_test = Module(new GCD)
     val gcd = device_under_test
-  
+
     for {
       value_1 <- 4 to 8
       value_2 <- 2 to 4
@@ -91,15 +91,15 @@ class GCDUnitTest extends TestSuite {
       poke(gcd.io.e, 1)
       step(1)
       poke(gcd.io.e, 0)
-  
+
       val (expected_gcd, steps) = compute_gcd(value_1, value_2)
-  
+
       step(steps-1) // -1 is because we step(1) already to toggle the enable
       expect(gcd.io.z, expected_gcd)
       expect(gcd.io.v, 1 )
     }
   }
-  
+
   implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
   TesterDriver.execute { () => new GCDUnitTester }
  }

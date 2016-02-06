@@ -41,7 +41,7 @@ class RegWithAgregateDefaultSuite extends TestSuite {
 
   @Test def testRegWithAgregateDefault() {
     println("\ntestRegWithAgregateDefault...")
-    
+
     class RegWithAgregateDefaultModule extends Module {
       val io = new Bundle {
         val outU = UInt(OUTPUT, myWidth)

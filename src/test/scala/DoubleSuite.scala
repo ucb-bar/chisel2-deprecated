@@ -58,7 +58,7 @@ class DoubleSuite extends TestSuite {
         for (i <- 0 to 100) {
           val dbl1 = rnd.nextDouble
           val dbl2 = rnd.nextDouble
-          
+
           poke(m.io.in1, dbl1)
           poke(m.io.in2, dbl2)
           expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)

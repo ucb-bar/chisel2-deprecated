@@ -45,7 +45,7 @@ class CWTRegStatus extends Bundle {
   val im0 = UInt(width = 2)
   val im1 = UInt(width = 2)
 }
-    
+
 // Generic wiring module used in following tests.
 case class GenWiring[SB <: Bundle](val newStatusInstance: () => SB) extends Module {
   val io = new Bundle {
@@ -58,7 +58,7 @@ case class GenWiring[SB <: Bundle](val newStatusInstance: () => SB) extends Modu
     wire_status := newStatusInstance().fromBits(io.wdata)
   }
   io.status := wire_status
-  
+
   // Since we're parameterized, we need a clone method.
   def cloneType = {
     new GenWiring[SB](newStatusInstance).asInstanceOf[this.type]
@@ -110,7 +110,7 @@ class ConnectWireSuite extends TestSuite {
           val im0 = Wire(UInt(width = 2))
           val im1 = Wire(UInt(width = 2))
         }
-    
+
         val io = new Bundle {
           val wen   = Bool(INPUT)
           val wdata = UInt(INPUT, 4)
@@ -136,7 +136,7 @@ class ConnectWireSuite extends TestSuite {
           val im0 = UInt(0, 2)
           val im1 = UInt(1, 2)
         }
-    
+
         val io = new Bundle {
           val wen   = Bool(INPUT)
           val wdata = UInt(INPUT, 4)
@@ -145,7 +145,7 @@ class ConnectWireSuite extends TestSuite {
         val subModule = new GenWiring[WireStatus](WireStatus)
         io <> subModule.io
       }
-      chiselMain(Array[String]("--backend", "c", "--compile", 
+      chiselMain(Array[String]("--backend", "c", "--compile",
         "--targetDir", dir.getPath.toString()),
         () => Module(new WireHookReassignmentToWire()))
     } catch {
@@ -168,7 +168,7 @@ class ConnectWireSuite extends TestSuite {
         }
         io.status := reg_status
       }
-  
+
       class RegisterHookTests(m: RegHook) extends Tester(m) {
         List(1,     2,     4,     6,     8,     12,    15,   15).zip(
         List(false, true,  true,  false, true,  false, true, false)).zip(
@@ -212,8 +212,8 @@ class ConnectWireSuite extends TestSuite {
           io.status := subModule.io.status.asInput
         }
       }
-  
-  
+
+
       class WireHookTests(m: WireHook) extends Tester(m) {
         List(1,     2,     4,     6,     8,     12,    15,   15).zip(
         List(false, true,  true,  false, true,  false, true, false)).zip(
@@ -361,7 +361,7 @@ class ConnectWireSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new BindingTest()))
-    
+
     assertFile("ConnectWireSuite_BindingTest_1.v")
   }
 }

@@ -186,10 +186,10 @@ abstract class Bits extends Data with proc {
         case (INPUT, OUTPUT) if p == q && !isTypeNode => other assign this //passthrough
         case (INPUT, OUTPUT) if p.parent == q.parent || isTypeNode => q match { //producer - consumer
           // includes when a child is a blackbox
-          case _: BlackBox => this assign other 
+          case _: BlackBox => this assign other
           // only do assignment if output has stuff connected to it
-          case _ if !other.inputs.isEmpty => this assign other 
-          case _ => 
+          case _ if !other.inputs.isEmpty => this assign other
+          case _ =>
         }
         case (INPUT, OUTPUT) =>
           ChiselError.error("Undefined connections between " + this + " and " + other)
@@ -203,13 +203,13 @@ abstract class Bits extends Data with proc {
           case _ if !inputs.isEmpty => other assign this
           case _ =>
         }
-        case (OUTPUT, INPUT) => 
+        case (OUTPUT, INPUT) =>
             ChiselError.error("Undefined connection between " + this + " and " + other)
 
         // input <> input conections
         case (INPUT, INPUT) if p == q.parent => other assign this // parent <> child
         case (INPUT, INPUT) if p.parent == q => this assign other //child <> parent
-        case (INPUT, INPUT) => 
+        case (INPUT, INPUT) =>
           ChiselError.error("Can't connect Input " + this + " Input " + other)
 
         // output <> output connections
@@ -217,14 +217,14 @@ abstract class Bits extends Data with proc {
           // includes when a child is a black box
           case _: BlackBox => this assign other
           // only do connection if child is assigning to that output
-          case _ if !other.inputs.isEmpty => this assign other 
+          case _ if !other.inputs.isEmpty => this assign other
           case _ =>
         }
         case (OUTPUT, OUTPUT) if p.parent == q => p match { // child <> parent
           // includes when a child is a black box
           case _: BlackBox => other assign this
           // only do connection if child (me) is assinging that output
-          case _ if !inputs.isEmpty => other assign this 
+          case _ if !inputs.isEmpty => other assign this
           case _ =>
         }
         case (OUTPUT, OUTPUT) if isTypeNode && other.isTypeNode => //connecting two type nodes together
@@ -269,7 +269,7 @@ abstract class Bits extends Data with proc {
           ChiselError.error("Connecting Input " + this + " to IO without direction " + src)
         case OUTPUT =>
           ChiselError.error("Connecting Output " + this + " to an IO withouth direction " + src)
-        case NODIR =>        
+        case NODIR =>
           ChiselError.error("Undefined connection between " + this + " and " + src)
       }
     }

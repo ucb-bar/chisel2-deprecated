@@ -102,11 +102,11 @@ class Extract(hi: Node, lo: Node) extends Node {
   def validateIndex(x: Node) {
     val w0 = inputs(0).widthW
     x.litOpt match {
-      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(), 
+      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(),
         ChiselError.error("Extract(" + l.value + ")" +
           " out of range [0," + (w0.needWidth()-1) + "]" +
           " of " + inputs(0), line))
-      case _ => 
+      case _ =>
     }
   }
 

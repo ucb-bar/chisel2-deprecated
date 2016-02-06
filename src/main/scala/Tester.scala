@@ -42,8 +42,8 @@ import ExecutionContext.Implicits.global
 
 // Provides a template to define tester transactions
 trait Tests {
-  def t: Int 
-  def delta: Int 
+  def t: Int
+  def delta: Int
   def rnd: Random
   def setClocks(clocks: Iterable[(Clock, Int)]): Unit
   def peek(data: Bits): BigInt
@@ -56,15 +56,15 @@ trait Tests {
   def poke(data: Bits, x: Long): Unit
   def poke(data: Bits, x: BigInt): Unit
   def poke(data: Aggregate, x: Array[BigInt]): Unit
-  def poke(data: Flo, x: Float): Unit 
+  def poke(data: Flo, x: Float): Unit
   def poke(data: Dbl, x: Double): Unit
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
   def reset(n: Int = 1): Unit
   def step(n: Int): Unit
-  def int(x: Boolean): BigInt 
-  def int(x: Int):     BigInt 
-  def int(x: Long):    BigInt 
-  def int(x: Bits):    BigInt 
+  def int(x: Boolean): BigInt
+  def int(x: Int):     BigInt
+  def int(x: Long):    BigInt
+  def int(x: Bits):    BigInt
   def expect (good: Boolean, msg: => String): Boolean
   def expect (data: Bits, expected: BigInt): Boolean
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean
@@ -131,7 +131,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       throw new TestApplicationException(exitCode, errorString)
     }
   }
-  private object SIM_CMD extends Enumeration { 
+  private object SIM_CMD extends Enumeration {
     val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN = Value }
   implicit def cmdToId(cmd: SIM_CMD.Value) = cmd.id
 
@@ -152,7 +152,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
 [info]   at Chisel.Driver$.apply(Driver.scala:65)
 [info]   at Chisel.chiselMain$.apply(hcl.scala:63)
 [info]   ...
-       */ 
+       */
       val size = channel.size
       assert(size > 16, "channel.size is bogus: %d".format(size))
       channel map (FileChannel.MapMode.READ_WRITE, 0, size)
@@ -169,7 +169,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     def produce { buffer put (3, 1) }
     def consume { buffer put (3, 0) }
     def update(idx: Int, data: Long) { buffer putLong (8*idx+4, data) }
-    def update(base: Int, data: String) { 
+    def update(base: Int, data: String) {
       data.zipWithIndex foreach {case (c, i) => buffer put (base+i+4, c) }
       buffer put (base+data.size+4, 0)
     }
@@ -179,9 +179,9 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     new java.io.File(name).delete
   }
 
-  private lazy val inChannel  = new Channel(inChannelName)  
+  private lazy val inChannel  = new Channel(inChannelName)
   private lazy val outChannel = new Channel(outChannelName)
-  private lazy val cmdChannel = new Channel(cmdChannelName) 
+  private lazy val cmdChannel = new Channel(cmdChannelName)
 
   def dumpName(data: Node): String = Driver.backend match {
     case _: FloBackend => data.getNode.name
@@ -253,11 +253,11 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @return a BigInt representation of the bits */
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = 
+    val value =
       if (data.isLit) data.litValue()
       else if (data.isTopLevelIO && data.dir == INPUT) (_pokeMap get data) match {
         case Some(p) => p
-        case None => 
+        case None =>
           if (isTrace) println(s" No initial values for ${dumpName(data)}")
           BigInt(rnd.nextInt)
       }
@@ -289,7 +289,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     value
   }
 
-  private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
+  private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) {
     val cmd = if (!force) SIM_CMD.POKE else SIM_CMD.FORCE
     mwhile(!sendCmd(cmd)) { }
     mwhile(!sendCmd(id)) { }
@@ -301,7 +301,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
     */
   def pokePath(path: String, v: BigInt, force: Boolean = false) {
-    val id = _signalMap getOrElseUpdate (path, getId(path)) 
+    val id = _signalMap getOrElseUpdate (path, getId(path))
     if (id == -1) {
       println("Can't find id for '%s'".format(path))
     } else {
@@ -455,7 +455,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         _peekMap(out) = ((0 until chunk) foldLeft BigInt(0))(
           (res, i) => res | (int(outChannel(off+i)) << (64*i)))
         off + chunk
-      }        
+      }
       outChannel.consume
     }
     outChannel.release
@@ -482,7 +482,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private def calcDelta = {
     val min = (_clockCnts.values foldLeft Int.MaxValue)(math.min(_, _))
     _clockCnts.keys foreach (_clockCnts(_) -= min)
-    (_clockCnts filter (_._2 == 0)).keys foreach (k => _clockCnts(k) = _clockLens(k)) 
+    (_clockCnts filter (_._2 == 0)).keys foreach (k => _clockCnts(k) = _clockLens(k))
     min
   }
 
@@ -578,7 +578,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val got = peek(data) & mask
     val exp = expected & mask
     isTrace = _isTrace
-    expect(got == exp, prependOptionalString(msg, 
+    expect(got == exp, prependOptionalString(msg,
       s"  EXPECT ${dumpName(data)} <- ${got.toString(_base)} == ${exp.toString(_base)}"))
   }
   def expect (data: Bits, expected: BigInt): Boolean = {
@@ -656,7 +656,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       }
     }
     isTrace = _isTrace
-    expect(gotFLoat == expectedFloat, prependOptionalString(msg, 
+    expect(gotFLoat == expectedFloat, prependOptionalString(msg,
       s"  EXPECT ${dumpName(data)} <- ${gotFLoat} == ${expectedFloat}"))
   }
   def expect (data: Bits, expected: Float): Boolean = {
@@ -664,17 +664,17 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
 
   _signalMap ++= Driver.signalMap flatMap {
-    case (m: Mem[_], id) => 
+    case (m: Mem[_], id) =>
       (0 until m.n) map (idx => "%s[%d]".format(dumpName(m), idx) -> (id + idx))
     case (node, id) => Seq(dumpName(node) -> id)
   }
 
-  Driver.dfs { 
-    case m: Mem[_] => (0 until m.n) foreach {idx => 
+  Driver.dfs {
+    case m: Mem[_] => (0 until m.n) foreach {idx =>
       val name = s"${dumpName(m)}[${idx}]"
       _chunks(name) = (m.needWidth-1)/64 + 1
     }
-    case node if node.isInObject => 
+    case node if node.isInObject =>
       _chunks(dumpName(node)) = (node.needWidth-1)/64 + 1
     case _ =>
   }
@@ -693,7 +693,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
         command.mkString(" ")
-      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
+      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0",
         if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
         if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
       case _ => target
@@ -701,7 +701,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
 
   val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
-    val processBuilder = Process(cmd) 
+    val processBuilder = Process(cmd)
     val processLogger = ProcessLogger(_logs += _)
     val process = processBuilder run processLogger
 
@@ -755,7 +755,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     }
     catch {
       // Depending on load and timing, we may get a TestApplicationException
-      //  when the test application exits. 
+      //  when the test application exits.
       //  Check the exit value.
       //  Anything other than 0 is an error.
       case e: TestApplicationException => if (e.exitVal != 0) fail
@@ -793,12 +793,12 @@ class MapTester[+T <: Module](c: T, val testNodes: Seq[Node]) extends Tester(c, 
     step(1)
     if (isTrace) println("OUTPUTS")
     outs forall { out =>
-      val value = out match { 
+      val value = out match {
         case io: Bits if io.isTopLevelIO => peek(io)
         case _ => peekNode(out)
       }
       (ovars get out) match {
-        case None => 
+        case None =>
           ovars(out) = Literal(value)
           if (isTrace) println("  READ " + dumpName(out) + " = " + value)
           true

@@ -52,7 +52,7 @@ class SeqMemSuite extends TestSuite {
       val rdata = mem.read(io.addr, io.rEnable)
       io.out := rdata
     }
-    
+
     class CreateSeqMemTester(c: CreateSeqMem, size: Int) extends Tester(c) {
       for (t <- 0 until 4) {
         val test_addr = rnd.nextInt(size)
