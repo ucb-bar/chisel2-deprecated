@@ -114,9 +114,9 @@ class WhenSuite extends TestSuite {
           poke(m.io.en0, int(en0))
           poke(m.io.en1, int(en1))
           poke(m.io.in0, i)
-          poke(m.io.in1, i+1)
+          poke(m.io.in1, i + 1)
           step(1)
-          expect(m.io.out, if(en0) i else if(en1) i+1 else 0)
+          expect(m.io.out, if(en0) i else if(en1) i + 1 else 0)
       }
     }
 

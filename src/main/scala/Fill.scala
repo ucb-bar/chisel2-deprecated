@@ -60,11 +60,11 @@ object NodeFill {
           Multiplex(mod, Literal((BigInt(1) << x) - 1, x), Literal(0, x))
         } else {
           /* Build up a Concatenate tree for more ILP in simulation. */
-          val p2 = Array.ofDim[Node](log2Up(x+1))
+          val p2 = Array.ofDim[Node](log2Up(x + 1))
           p2(0) = mod
           for (i <- 1 until p2.length)
-            p2(i) = Concatenate(p2(i-1), p2(i-1))
-          Concatenate((0 until log2Up(x+1)).filter(i => (x & (1 << i)) != 0).map(p2(_)))
+            p2(i) = Concatenate(p2(i-1), p2(i - 1))
+          Concatenate((0 until log2Up(x + 1)).filter(i => (x & (1 << i)) != 0).map(p2(_)))
         }
       case _ => throw new IllegalArgumentException(s"n (=$n) must be nonnegative integer.")
     }

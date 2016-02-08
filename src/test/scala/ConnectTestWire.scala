@@ -96,7 +96,7 @@ class ConnectWireSuite extends TestSuite {
         step(1)
         expect(m.io.out.valid, int(true))
         expect(m.io.in.ready,  int(true))
-        expect(m.io.out.bits,  i+1)
+        expect(m.io.out.bits,  i + 1)
       }
     }
     launchCppTester((m: UsesShimParent) => new ShimConnectionsTests(m))

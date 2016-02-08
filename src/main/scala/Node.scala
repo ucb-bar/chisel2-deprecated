@@ -56,7 +56,7 @@ object Node {
       m.inputs(i).widthW
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected (" + i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
           if (!ChiselError.contains(error) && !Driver.isInGetWidth) {
             ChiselError.error(error)
           }

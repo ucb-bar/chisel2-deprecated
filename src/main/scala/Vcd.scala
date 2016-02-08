@@ -133,14 +133,14 @@ class VcdBackend(top: Module) extends Backend {
     baseIdx += 1
     for ((node, i) <- sortedNodes.zipWithIndex if c == node.component && !node.name.isEmpty) {
       write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
-        node.needWidth, varName(baseIdx+i), top.stripComponent(emitRef(node))))
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
     baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.component == c && !mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
           write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
-            mem.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(mem)), offset))
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -149,7 +149,7 @@ class VcdBackend(top: Module) extends Backend {
       if (rom.component == c && !rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
           write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
-            rom.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(rom)), offset))
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n
@@ -163,14 +163,14 @@ class VcdBackend(top: Module) extends Backend {
     var baseIdx = Driver.clocks.size + 1
     for ((node, i) <- sortedNodes.zipWithIndex if node.name.isEmpty) {
       write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
-        node.needWidth, varName(baseIdx+i), top.stripComponent(emitRef(node))))
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
     baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
           write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
-            mem.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(mem)), offset))
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -179,7 +179,7 @@ class VcdBackend(top: Module) extends Backend {
       if (rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
           write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
-            rom.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(rom)), offset))
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n

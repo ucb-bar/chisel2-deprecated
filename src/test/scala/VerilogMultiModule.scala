@@ -70,7 +70,7 @@ class VerilogMultiModule extends TestSuite {
           // Do we have a following section?
           if (s < nSections) {
             val q = Module(new Queue(Flo(), 4))
-  //          q.name = "q" + s.toString + (s+1).toString
+  //          q.name = "q" + s.toString + (s + 1).toString
             q.io.enq <> f.io.out
             lastin = q.io.deq
           } else {

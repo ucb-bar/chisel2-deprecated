@@ -51,7 +51,7 @@ class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Delay {
   def args = inputs
   override lazy val isInObject: Boolean = true
   def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
-  def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
+  def decFloSize(m: Int, e: Int) = (2 + decIntSize(m) + 2 + decIntSize(e))
 
   private var formats = ""
   private val lengths = new HashMap[Char, (Int => Int)]

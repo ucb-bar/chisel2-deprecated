@@ -54,8 +54,8 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   def do_addsub(b: T, isSub: Boolean = false): T = {
     val (t_adj_rd, b_adj_rd, int_exp) = aligned_with(b)
 
-    val new_width = math.max(exp-int_exp, b.exp-int_exp)+1
-    // note: exp - int_exp = width + eff_exp-int_exp where eff_exp = exp-width
+    val new_width = math.max(exp - int_exp, b.exp - int_exp) + 1
+    // note: exp - int_exp = width + eff_exp - int_exp where eff_exp = exp - width
     val new_exp = int_exp + new_width
     val result = Factory(new_exp, new_width)
 
@@ -73,7 +73,7 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
   }
 
   def do_mult(b: T): T = {
-    val result = Factory(exp+b.exp,raw.needWidth()+b.raw.needWidth())
+    val result = Factory(exp + b.exp,raw.needWidth() + b.raw.needWidth())
     result.raw := raw * b.raw
     result
   }
@@ -97,14 +97,14 @@ abstract class Fix[B<:Bits with Num[B],T<:Fix[B,T]](val exp: Int, val raw: B) ex
     }
     else {
       val msb_extract = source.raw.needWidth()-(source.exp-exp)-1
-      val remaining_source = if(msb_extract>=0) msb_extract+1 else 0
+      val remaining_source = if(msb_extract>=0) msb_extract + 1 else 0
       val taken_source = math.min(remaining_source, raw.needWidth())
       val append_zs = raw.needWidth()-taken_source
       raw := toRaw(
         if(append_zs>0) (
-          if(taken_source>0) Cat(source.raw(msb_extract, msb_extract-taken_source+1), UInt(0, width=append_zs))
+          if(taken_source>0) Cat(source.raw(msb_extract, msb_extract - taken_source + 1), UInt(0, width=append_zs))
           else               UInt(0, append_zs)
-        ) else source.raw(msb_extract, msb_extract-taken_source+1)
+        ) else source.raw(msb_extract, msb_extract - taken_source + 1)
       )
     }
   }
@@ -134,8 +134,8 @@ class UFix(exp: Int, raw: UInt) extends Fix[UInt,UFix](exp, raw) with Num[UFix] 
     case _ => illegalAssignment(that)
   }
 
-  def <<(b: Int): UFix = new UFix(exp+b, raw)
-  def >>(b: Int): UFix = new UFix(exp-b, raw)
+  def <<(b: Int): UFix = new UFix(exp + b, raw)
+  def >>(b: Int): UFix = new UFix(exp - b, raw)
 
   def <  (b: UFix): Bool = do_lessthan(b)
   def <= (b: UFix): Bool = do_lesseq(b)
@@ -167,8 +167,8 @@ class SFix(exp: Int, raw: SInt) extends Fix[SInt,SFix](exp, raw) with Num[SFix] 
     case _ => illegalAssignment(that)
   }
 
-  def <<(b: Int): SFix = new SFix(exp+b, raw)
-  def >>(b: Int): SFix = new SFix(exp-b, raw)
+  def <<(b: Int): SFix = new SFix(exp + b, raw)
+  def >>(b: Int): SFix = new SFix(exp - b, raw)
 
   def <  (b: SFix): Bool = do_lessthan(b)
   def <= (b: SFix): Bool = do_lesseq(b)

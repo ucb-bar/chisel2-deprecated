@@ -601,7 +601,7 @@ class CppBackend extends Backend {
 
       case l: Literal if !l.isInObject && words(l) > 1 =>
         // Have we already allocated this literal in the main class definition?
-        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_ + ", " + _) + "};\n"
 
       case _ =>
         ""
@@ -1215,7 +1215,7 @@ class CppBackend extends Backend {
       if (multiwordLiteralInObject) {
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
-          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_+", "+_) + "};\n"
+          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_ + ", " + _) + "};\n"
         }
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
@@ -1257,7 +1257,7 @@ class CppBackend extends Backend {
       }
 
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) +".cnt;\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) + ".cnt;\n")
       }
       for (clock <- Driver.clocks) {
         writeCppFile("  " + emitRef(clock) + ".cnt-=min;\n")

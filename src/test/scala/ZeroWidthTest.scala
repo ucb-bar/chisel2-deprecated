@@ -370,7 +370,7 @@ class ZeroWidthTest extends TestSuite {
   }
 
   /** Concatenate two nodes X and Y (zero-width) in a node Z such that
-    Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
+    Z[0..wx + wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCatCompW0W() {
     println("\ntestCat ...")
     class CatCompW0W extends Module {

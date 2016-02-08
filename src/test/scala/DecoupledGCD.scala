@@ -40,7 +40,7 @@ object GCDCalculator {
       (a, depth)
     }
     else {
-      computeGcdResultsAndCycles(b, a%b, depth+1 )
+      computeGcdResultsAndCycles(b, a%b, depth + 1 )
     }
   }
 }

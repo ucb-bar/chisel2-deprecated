@@ -495,7 +495,7 @@ class FixedSuite extends TestSuite {
         val b = Vec.fill(8){Fixed(INPUT, 32, 16)}
         val c = Fixed(OUTPUT, 32, 16)
       }
-      io.c := (io.a, io.b).zipped.map(_+_).reduce(_+_)
+      io.c := (io.a, io.b).zipped.map(_ + _).reduce(_ + _)
     }
 
     trait FixedVecTests extends Tests {
@@ -506,7 +506,7 @@ class FixedSuite extends TestSuite {
           val inB = Array.fill(8){BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
           (c.io.a, inA).zipped.map((w, v) => poke(w, v))
           (c.io.b, inB).zipped.map((w, v) => poke(w, v))
-          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_+_).reduce(_+_)
+          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_ + _).reduce(_ + _)
           expect(c.io.c, toFixed(res, 16))
         }
       }

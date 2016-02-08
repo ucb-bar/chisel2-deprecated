@@ -305,11 +305,11 @@ object PartitionIslands {
       val dstIsland = markedNodes(s.inputs(0))
       // Ensure srcIsland and dstIsland exist.
       if (!res.contains(srcIsland)) {
-        ChiselError.error("islandHop: node "+ s + " - source island " + srcIsland + " not in results", s.line)
+        ChiselError.error("islandHop: node " + s + " - source island " + srcIsland + " not in results", s.line)
         return
       }
       if (!res.contains(dstIsland)) {
-        ChiselError.error("islandHop: node "+ s.inputs(0) + " - destination island " + dstIsland + " not in results", s.inputs(0).line)
+        ChiselError.error("islandHop: node " + s.inputs(0) + " - destination island " + dstIsland + " not in results", s.inputs(0).line)
         return
       }
       // Remove us from collection of nodes associated with this island.

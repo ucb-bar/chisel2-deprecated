@@ -100,7 +100,7 @@ class ComplexSuite extends TestSuite {
 
       val myLit = Complex(SInt(1, W), SInt(1, W))
 
-      io.out := Mux(io.cond, io.in_t+io.in_f, io.in_t-io.in_f) + myLit
+      io.out := Mux(io.cond, io.in_t + io.in_f, io.in_t - io.in_f) + myLit
 
       io.b_o := Mux(io.cond, io.b_t, Bool(false))
 

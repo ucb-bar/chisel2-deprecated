@@ -128,8 +128,8 @@ class Backend extends FileSystemUtilities{
       root.level = 0
       root.traversal = traversal
       for (child <- root.children) {
-        levelChildren(child, traversal+1)
-        root.level = math.max(root.level, child.level+1)
+        levelChildren(child, traversal + 1)
+        root.level = math.max(root.level, child.level + 1)
       }
     }
 
@@ -758,7 +758,7 @@ class Backend extends FileSystemUtilities{
             stack push ((node, None))
             node.inputs foreach {
               case _: Delay =>
-              case i => stack push ((i, Some(depth+1)))
+              case i => stack push ((i, Some(depth + 1)))
             }
           }
         }

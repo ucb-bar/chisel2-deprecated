@@ -168,7 +168,7 @@ class DotBackend extends Backend {
                   ""
                 }
                 val edge = (emitRef(in) + srcPort  + " -> " + emitRef(m) + dstPort
-                  + "[label=\"" + in.needWidth() + "\"];"+ EOL)
+                  + "[label=\"" + in.needWidth() + "\"];" + EOL)
                 if (islandId != 0) {
                   // If we're drawing partitioned islands, duplicate the logic
                   // for boundary crossings below.

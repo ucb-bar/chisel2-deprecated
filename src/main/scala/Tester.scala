@@ -168,12 +168,12 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     def valid = (buffer get 3) == 1
     def produce { buffer put (3, 1) }
     def consume { buffer put (3, 0) }
-    def update(idx: Int, data: Long) { buffer putLong (8*idx+4, data) }
+    def update(idx: Int, data: Long) { buffer putLong (8 * idx + 4, data) }
     def update(base: Int, data: String) {
-      data.zipWithIndex foreach {case (c, i) => buffer put (base+i+4, c) }
-      buffer put (base+data.size+4, 0)
+      data.zipWithIndex foreach {case (c, i) => buffer put (base + i + 4, c) }
+      buffer put (base + data.size + 4, 0)
     }
-    def apply(idx: Int): Long = buffer getLong (8*idx+4)
+    def apply(idx: Int): Long = buffer getLong (8 * idx + 4)
     def close { file.close }
     buffer order java.nio.ByteOrder.nativeOrder
     new java.io.File(name).delete
@@ -436,7 +436,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       (_inputs.toList foldLeft 0){case (off, in) =>
         val chunk = _chunks(dumpName(in))
         val value = _pokeMap getOrElse (in, BigInt(0))
-        (0 until chunk) foreach (i => inChannel(off+i) = (value >> (64*i)).toLong)
+        (0 until chunk) foreach (i => inChannel(off + i) = (value >> (64 * i)).toLong)
         off + chunk
       }
       inChannel.produce
@@ -453,7 +453,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       (_outputs.toList foldLeft 0){case (off, out) =>
         val chunk = _chunks(dumpName(out))
         _peekMap(out) = ((0 until chunk) foldLeft BigInt(0))(
-          (res, i) => res | (int(outChannel(off+i)) << (64*i)))
+          (res, i) => res | (int(outChannel(off + i)) << (64 * i)))
         off + chunk
       }
       outChannel.consume
@@ -529,7 +529,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * See [[Chisel.Clock$ Clock]]
     */
   def step(n: Int) {
-    if (isTrace) println(s"STEP ${n} -> ${t+n}")
+    if (isTrace) println(s"STEP ${n} -> ${t + n}")
     (0 until n) foreach (_ => takeStep)
     t += n
   }

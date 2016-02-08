@@ -393,12 +393,12 @@ object Driver extends FileSystemUtilities{
         case "--reportDims" => isReportDims = true
         //Jackhammer Flags
         case "--configName" =>  chiselConfigClassName = Some(args(i + 1)); i += 1
-        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
-        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i + 1),1)); chiselProjectName = Some(getArg(args(i + 1),0)); i += 1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i + 1),1)); chiselProjectName = Some(getArg(args(i + 1),0)); i += 1;  //use ChiselConfig to supply parameters
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
-          testerSeed = args(i+1).toLong
+          testerSeed = args(i + 1).toLong
           i += 1
         }
         case "--emitTempNodes" => {
@@ -408,13 +408,13 @@ object Driver extends FileSystemUtilities{
         // Dreamer configuration flags
         case "--numRows" => {
           if (backend.isInstanceOf[FloBackend]) {
-            backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i+1).toInt
+            backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i + 1).toInt
           }
           i += 1
         }
         case "--numCols" => {
           if (backend.isInstanceOf[FloBackend]) {
-            backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i+1).toInt
+            backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i + 1).toInt
           }
           i += 1
         }

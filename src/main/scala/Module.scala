@@ -244,7 +244,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
   private[Chisel] var nindex: Option[Int] = None
   def nextIndex : Int = {
-    nindex = nindex match { case None => Some(0) case Some(i) => Some(i+1) }
+    nindex = nindex match { case None => Some(0) case Some(i) => Some(i + 1) }
     nindex.get
   }
 
