@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011 - 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -33,6 +33,7 @@ import Chisel.testers.{TesterDriver, SteppedHWIOTester, OrderedDecoupledHWIOTest
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
+import TestHelpers._
 
 object GCDCalculator {
   def computeGcdResultsAndCycles(a: Int, b: Int, depth: Int = 1): (Int, Int) = {
@@ -92,25 +93,6 @@ class GCDDecoupledTest extends TestSuite {
       p := Bool(false)
     }
   }
-  
-  
-  
-  //class DecoupledRealGCDTester extends DecoupledTester {
-  //  val device_under_test = Module(new RealGCD)
-  //  val c = device_under_test // alias for dut
-  //
-  //  for(x <- 0 until 9) {
-  //    event(
-  //      Array(
-  //        c.io.in.bits.a -> 14,
-  //        c.io.in.bits.b -> 35
-  //      ),
-  //      Array(c.io.out.bits -> 7)
-  //    )
-  //  }
-  //  finish()
-  //  io_info.show_ports("".r)
-  //}
   
   class RealGCDTests extends SteppedHWIOTester {
     val device_under_test = Module( new RealGCD )
@@ -198,7 +180,7 @@ class GCDDecoupledTest extends TestSuite {
     }
   }
   
-  implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
+  implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test", "--targetDir", TestHelpers.dir.getPath.toString())
   TesterDriver.execute { () => new DecoupledRealGCDTests4 }
  }
 }

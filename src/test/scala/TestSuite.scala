@@ -44,7 +44,7 @@ object TestSuite {
 }
 
 abstract class TestSuite extends JUnitSuite with TestHelpers {
-  // This functionality has been replace by the static TestHelper object
+  // This functionality has been replaced by the static TestHelper object
   //  and should be elminated.
   @Before def initialize() {
   }
