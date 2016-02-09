@@ -37,21 +37,12 @@ import java.io._
 
 // Wrapper to run Chisel3-style testers in Chisel2.
 
-object Chisel2State {
-  var args = Array[String]()
-}
-
-
-trait UnitTestRunners {
-}
-
 object TesterDriver {
-  def execute(t: () => BasicTester)(implicit optionArgs: Array[String]): Boolean = {
-    Chisel2State.args = optionArgs
+  def execute(t: () => BasicTester)(implicit testArgs: Array[String]): Boolean = {
     try {
       // Construct the combined circuit, containing all the required
       //  poke()'s and expect()'s as arrays of data.
-      val mod = Driver(Chisel2State.args, finishWrapper(t), false)
+      val mod = Driver(testArgs, finishWrapper(t), false)
       if (Driver.isTesting) {
         // Initialize a tester with tracing turned on.
         val c = new Tester(mod, true)
@@ -77,10 +68,8 @@ object TesterDriver {
     }
   }
 
-  def elaborate(t: () => BasicTester): Module = {
-    val removeArgs = Array("--compile", "--test", "--genHarness")
-    val filteredArgs = Chisel2State.args.filterNot(removeArgs.contains(_))
-    val mod = Driver(filteredArgs ++ Array("--compile", "--genHarness"), finishWrapper(t), false)
+  def elaborate(t: () => BasicTester)(implicit testArgs: Array[String]): Module = {
+    val mod = Driver(testArgs, finishWrapper(t), false)
     mod
   }
 

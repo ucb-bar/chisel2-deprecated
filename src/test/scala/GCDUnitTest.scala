@@ -33,6 +33,7 @@ import Chisel.testers.{TesterDriver, SteppedHWIOTester}
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
+import TestHelpers._
 
 // Test the Chisel3 UnitTester interface.
 
@@ -100,7 +101,7 @@ class GCDUnitTest extends TestSuite {
     }
   }
 
-  implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
+  implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test", "--targetDir", TestHelpers.dir.getPath.toString())
   TesterDriver.execute { () => new GCDUnitTester }
  }
 }
