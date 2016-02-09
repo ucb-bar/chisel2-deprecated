@@ -59,7 +59,7 @@ lazy val chiselBuildSettings = Seq (
      *    - use of "Tx" vs. "Tx.values"
      */
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5" % "test",
     libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.
