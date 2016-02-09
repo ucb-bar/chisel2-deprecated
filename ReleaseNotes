@@ -70,6 +70,8 @@ Outputs are specified by output events. An output event is a series of values th
 Other examples of these hardware IO testers can be found in DecoupledGCD.scala and GCDUnitTest.scala in
 src/test/scala.
 
+This area is in the early development stage, so expect some potentially significant changes before the API is stabilized.
+
 See the associated Changelog for additional issues resolved with this release.
 
 We will be removing support for Scala 2.10 in future Chisel releases. Please verify your code compiles and runs correctly under Scala 2.11.
