@@ -95,6 +95,11 @@ class CppBackend extends Backend {
     }
   }
 
+  // Emit the address of a node's values.
+  def emitValueAddress(node: Node): String = {
+    "&" + emitLoWordRef(node)
+  }
+
   // Manage a constant pool.
   protected[this] val coalesceConstants = multiwordLiteralInObject
   protected[this] val constantPool = HashMap[(String, Width), Literal]()
@@ -501,38 +506,70 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        emitTmpDec(node) +
-        (if (node.inputs.length < 3 || node.needWidth() == 1) {
-          if (node.inputs(1).isLit) {
-            val value = node.inputs(1).litValue().toInt
-            "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
-          } else if (node.inputs(0).needWidth() <= bpw) {
-            "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
-          } else {
-            val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
-            s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1"
-          }
+        val source = node.inputs(0)
+        val hi = node.inputs(1)
+        val lo = if (node.inputs.length < 3) {
+          hi
         } else {
-          val rsh = node.inputs(2).litValue().toInt
-          if (rsh % bpw == 0) {
-            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
-          } else {
-            block((0 until words(node)).map(i => emitWordRef(node, i)
-              + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
-              + (rsh % bpw) + (
-                if (i + rsh/bpw + 1 < words(node.inputs(0))) {
-                  " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
-                } else {
-                  ""
-                }))) + trunc(node)
+          node.inputs(2)
+        }
+        // Is this a no-op - (i.e., all the source bits are extracted)?
+        if (x.isNop) {
+          emitTmpDec(node) + {
+            // A straight assignment.
+            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i)))
           }
-        })
+        } else if (x.isOneBit) {
+          emitTmpDec(node) + {
+            // Ensure all the other bits are zero.
+            if (words(node) > 1) {
+              if (node.isInObject) {
+                emitRef(node) + " = 0;\n"
+              } else {
+                "  memset(" + emitValueAddress(node) + ", 0, sizeof(" + emitRef(node) + "));\n"
+              }
+            } else {
+              ""
+            }
+          } + {
+            if (hi.isLit) {
+              val value = hi.litValue().toInt
+                  "  " + emitLoWordRef(node) + " = (" + emitWordRef(source, value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
+            } else if (source.needWidth() <= bpw) {
+              "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(source) + " >> " + emitLoWordRef(hi) + ") & 1;\n"
+            } else {
+              val inputWord = wordMangle(source, emitLoWordRef(hi) + "/" + bpw)
+                  s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(hi)} % ${bpw}) & 1;\n"
+            }
+          }
+        } else if (x.isStaticWidth) {
+            emitTmpDec(node) + {
+              val rsh = lo.litValue().toInt
+              if (rsh % bpw == 0) {
+                block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i + rsh/bpw))) + trunc(node)
+              } else {
+                block((0 until words(node)).map(i => emitWordRef(node, i)
+                    + " = " + emitWordRef(source, i + rsh/bpw) + " >> "
+                    + (rsh % bpw) + (
+                        if (i + rsh/bpw + 1 < words(source)) {
+                          " | " + emitWordRef(source, i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
+                        } else {
+                          ""
+                        }))) + trunc(node)
+              }
+            }
+        } else {
+          // Use the low level extract code.
+          val nw = words(node)
+          emitTmpDec(node) + ";\n  " + "  bit_word_funs<" + nw + ">::extract(" + emitValueAddress(node) + ", " + emitValueAddress(source) + ", " + emitRef(hi) + ", " + emitRef(lo) + ");\n"
+        }
 
       case x: Clock => ""
 
-      case x: Bits if x.isInObject && x.inputs.length == 1 => 
+      case x: Bits if x.isInObject && x.inputs.length == 1 => {
         emitTmpDec(x) + block((0 until words(x)).map(i => emitWordRef(x, i)
           + " = " + emitWordRef(x.inputs(0), i)))
+      }
       case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
         emitTmpDec(x) + block("val_t __r = this->__rand_val()" +:
           (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)

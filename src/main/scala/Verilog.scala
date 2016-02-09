@@ -249,12 +249,31 @@ class VerilogBackend extends Backend {
 
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
-        val gotWidth = node.inputs(0).needWidth()
-        List("  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)),
-          if (node.inputs.size < 3 && gotWidth > 1) List("[", emitRef(node.inputs(1)), "]").mkString 
-          else if (gotWidth > 1) List("[", emitRef(node.inputs(1)) , ":", emitRef(node.inputs(2)), "]").mkString
-          else "",
-        ";\n").mkString
+        val extractWidth = node.inputs(0).needWidth()
+        val source = emitRef(node.inputs(0))
+        val hi = emitRef(node.inputs(1))
+        List("  assign " + emitTmp(node) + " = ",
+          // Is this a no-op - extract all the source bits.
+          if (x.isNop) {
+            source
+          } else
+          // Is this a single bit extraction?
+            if (x.isOneBit) {
+            List(source, "[", hi, "]").mkString 
+          } else {
+            // We have three inputs.
+            val lo = emitRef(node.inputs(2))
+            // Are hi and lo constant expressions?
+            if (x.isStaticWidth) {
+              List(source, "[", hi , ":", lo, "]").mkString
+            } else {
+              // The extraction operands are different and at least one of them is not an integer.
+              // We need to generate the equivalent sequence of shifts and masks.
+              val resultWidth = node.needWidth
+              List( "(", source, " >> ", lo, ") & ((", resultWidth, "'h1 << (", hi, " - ", lo, " + 1)) - 1)").mkString
+           }
+         }
+        , ";\n").mkString
 
       case m: Mem[_] if !m.isInline => 
         def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }

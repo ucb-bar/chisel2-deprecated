@@ -29,6 +29,7 @@
 */
 
 import org.scalatest.junit.JUnitSuite
+import org.scalatest._
 import org.junit.Before
 import org.scalatest._
 import scala.reflect.ClassTag
