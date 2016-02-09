@@ -28,7 +28,7 @@ smoke:
 	$(SBT) $(SBT_FLAGS) "test-only $(SMOKE_TESTS) -- -l org.scalatest.tags.Slow"
 
 style:
-	$(SBT) $(SBT_FLAGS) scalastyle
+	$(SBT) $(SBT_FLAGS) scalastyle test:scalastyle
 
 check test:
 	$(SBT) $(SBT_FLAGS) test
