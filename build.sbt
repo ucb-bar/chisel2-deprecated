@@ -1,7 +1,7 @@
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.31",
-    version := "2.2.31",
+    // version := "2.2.32",
+    version := "2.2.32",
     name := "chisel",
     scalaVersion := "2.11.7",
     crossScalaVersions := Seq("2.10.6", "2.11.7"),
@@ -66,6 +66,7 @@ lazy val chiselBuildSettings = Seq (
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials"),
+    javacOptions ++= Seq("-target", "1.7"),
     scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("chisel"), version) map { (bd, v) =>
       Seq("-diagrams", "-diagrams-max-classes", "25", "-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
     }
