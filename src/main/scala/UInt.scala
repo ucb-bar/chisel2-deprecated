@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -117,7 +117,7 @@ class UInt extends Bits with Num[UInt] {
       case l: Literal =>
         if (l.isZ && Driver.minimumCompatibility > "2") {
           // Chisel3 compatibility - generic don't care UInts/Bits are deprecated.
-          ChiselError.warning("General don't care UInts are deprecated. Please use BitPat().")
+          ChiselError.error("General don't care UInts are deprecated. Please use BitPat().")
         }
       case _ =>
     }

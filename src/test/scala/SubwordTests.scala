@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -64,5 +64,43 @@ class SubwordSuite extends TestSuite {
     } else {
       launchVerilogTester((c: SubwordModule) => new SubwordTester(c))
     }
+  }
+
+
+  class SubwordModule2 extends Module {
+    val w = 4
+    val io = new Bundle {
+      val out_initial = UInt(INPUT, w)
+      val in = Bool(INPUT)
+      val out = UInt(OUTPUT, w)
+    }
+
+    io.out    := io.out_initial
+    io.out(0) := io.in
+  }
+
+  class SubwordTester2(c: SubwordModule2) extends Tester(c) {
+    for (
+      in          <- Array(0, 1);
+      out_initial <- 0 until 1 << c.w
+    )
+    {
+      poke(c.io.in, in)
+      poke(c.io.out_initial, out_initial)
+      var expected = out_initial
+      if (in == 1) {
+        // Set the least significant bit
+        expected |= 0x0001
+      } else {
+        // Clear the least significant bit
+        expected &= 0xFFFE
+      }
+      expect(c.io.out, expected)
+    }
+  }
+
+  @Test def testSubwordCpp2() {
+    println("\ntestSubwordCpp2 ...")
+    launchCppTester((c: SubwordModule2) => new SubwordTester2(c))
   }
 }

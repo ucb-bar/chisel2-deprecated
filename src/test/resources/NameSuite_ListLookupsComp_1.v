@@ -17,7 +17,7 @@ module NameSuite_ListLookupsComp_1(
   assign io_sigs_valid = T0;
   assign T0 = T1;
   assign T1 = T7 ^ T2;
-  assign T2 = T3[2'h2:2'h2];
+  assign T2 = T3[2'h2];
   assign T3 = T6 ? 3'h4 : T4;
   assign T4 = T5 ? 3'h1 : 3'h0;
   assign T5 = io_inst == 32'h257b;

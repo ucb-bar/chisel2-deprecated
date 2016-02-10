@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -114,9 +114,9 @@ class WhenSuite extends TestSuite {
           poke(m.io.en0, int(en0))
           poke(m.io.en1, int(en1))
           poke(m.io.in0, i)
-          poke(m.io.in1, i+1)
+          poke(m.io.in1, i + 1)
           step(1)
-          expect(m.io.out, if(en0) i else if(en1) i+1 else 0)
+          expect(m.io.out, if(en0) i else if(en1) i + 1 else 0)
       }
     }
 
@@ -148,7 +148,7 @@ class WhenSuite extends TestSuite {
         io <> sub.io /* connect only io.in to sub.io.in */
       }
     }
-    
+
     def noWerror(srcArgs: Array[String]): Array[String] = {
       srcArgs.filterNot(_ == "--wError")
     }

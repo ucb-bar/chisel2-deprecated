@@ -13,7 +13,7 @@
 version   := 2.2.0
 
 PDFLATEX  := pdflatex
-WWW_PAGES := index.html documentation.html download.html faq.html releases.html
+WWW_PAGES := index.html community.html documentation.html download.html faq.html releases.html
 WWW_EXTRA := manual.html getting-started.html parameters.html
 
 # The following subdirectories build documentation correctly.

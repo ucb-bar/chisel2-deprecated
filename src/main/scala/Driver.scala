@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -32,7 +32,7 @@ package Chisel
 
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
-import sys.process.stringSeqToProcess
+import sys.process.{BasicIO,stringSeqToProcess}
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -41,10 +41,22 @@ object Driver extends FileSystemUtilities{
       if(wrapped) execute(gen) else executeUnwrapped(gen)
     } finally {
       ChiselError.report
-      if (ChiselError.hasErrors && !getLineNumbers) {
+      if (wantLineNumbers) {
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
         apply(args :+ "--lineNumbers", gen, wrapped)
       }
+    }
+  }
+
+  // If we encountered errors, and re-running with --lineNumbers may help
+  //  diagnose the problem, indicate we should do so.
+  def wantLineNumbers: Boolean = {
+    if (ChiselError.hasErrors && !getLineNumbers) {
+      // If we have a non-cpp compilation error with no line number information,
+      //  re-running may help.
+      ChiselError.getErrorList.exists(e => e.line == null && !e.msgFun().startsWith("failed to compile "))
+    } else {
+      false
     }
   }
 
@@ -105,7 +117,7 @@ object Driver extends FileSystemUtilities{
   def setTopComponent(mod: Module) {
     topComponent = Some(mod)
     implicitReset.compOpt = topComponent
-    implicitClock.compOpt = topComponent 
+    implicitClock.compOpt = topComponent
     mod._reset = Some(implicitReset)
     mod._clock = Some(implicitClock)
     mod.hasExplicitReset = true
@@ -220,7 +232,7 @@ object Driver extends FileSystemUtilities{
         case Some(r) if r != implicitReset => pushInitialNode(r.getNode)
         case _ =>
       }
-      for (pin <- c.resets.values) 
+      for (pin <- c.resets.values)
         pushInitialNode(pin)
     }
     val stack = inputs ++ res
@@ -370,7 +382,7 @@ object Driver extends FileSystemUtilities{
         case "--backend" => backendName = args(i + 1); i += 1
         case "--compile" => isCompiling = true
         case "--test" => isTesting = true
-        case "--testCommand" => 
+        case "--testCommand" =>
           var cmd = ""
           while(i + 1 < args.size && args(i + 1).substring(0,2) != "--") {
             cmd += args(i + 1) + " " ; i += 1 }
@@ -381,12 +393,12 @@ object Driver extends FileSystemUtilities{
         case "--reportDims" => isReportDims = true
         //Jackhammer Flags
         case "--configName" =>  chiselConfigClassName = Some(args(i + 1)); i += 1
-        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //dump constraints in dse dir
-        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i+1),1)); chiselProjectName = Some(getArg(args(i+1),0)); i+=1;  //use ChiselConfig to supply parameters
+        case "--configCollect"  => chiselConfigMode = Some("collect"); chiselConfigClassName = Some(getArg(args(i + 1),1)); chiselProjectName = Some(getArg(args(i + 1),0)); i += 1;  //dump constraints in dse dir
+        case "--configInstance" => chiselConfigMode = Some("instance"); chiselConfigClassName = Some(getArg(args(i + 1),1)); chiselProjectName = Some(getArg(args(i + 1),0)); i += 1;  //use ChiselConfig to supply parameters
         case "--configDump" => chiselConfigDump = true; //when using --configInstance, write Dump parameters to .prm file in targetDir
         case "--dumpTestInput" => dumpTestInput = true
         case "--testerSeed" => {
-          testerSeed = args(i+1).toLong
+          testerSeed = args(i + 1).toLong
           i += 1
         }
         case "--emitTempNodes" => {
@@ -396,13 +408,13 @@ object Driver extends FileSystemUtilities{
         // Dreamer configuration flags
         case "--numRows" => {
           if (backend.isInstanceOf[FloBackend]) {
-            backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i+1).toInt
+            backend.asInstanceOf[FloBackend].DreamerConfiguration.numRows = args(i + 1).toInt
           }
           i += 1
         }
         case "--numCols" => {
           if (backend.isInstanceOf[FloBackend]) {
-            backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i+1).toInt
+            backend.asInstanceOf[FloBackend].DreamerConfiguration.numCols = args(i + 1).toInt
           }
           i += 1
         }
@@ -464,7 +476,7 @@ object Driver extends FileSystemUtilities{
   var isVCDinline = false
   var isSupportW0W = false
   var backend: Backend = new CppBackend
-  var topComponent: Option[Module] = None 
+  var topComponent: Option[Module] = None
   var moduleNamePrefix = ""
   val components = ArrayBuffer[Module]()
   val sortedComps = ArrayBuffer[Module]()
@@ -523,8 +535,12 @@ object Driver extends FileSystemUtilities{
 
   // Indicate if an external command is available.
   def isCommandAvailable(cmd: String): Boolean = {
-    Seq("bash", "-c", "which %s".format(cmd)).! == 0
+    // Eat any output.
+    val sb = new StringBuffer
+    val ioToDevNull = BasicIO(false, sb, None)
+
+    Seq("bash", "-c", "which %s".format(cmd)).run(ioToDevNull).exitValue == 0
   }
-  
+
   lazy val isVCSAvailable = isCommandAvailable("vcs")
 }

@@ -127,7 +127,7 @@ object Dump {
   def apply[T](key:Any,value:T):T = {addToDump(key,value); value}
   def apply[T](knob:Knob[T]):Knob[T] = {knobList += knob.name; knob}
   def addToDump(key:Any,value:Any) = dump += ((key,value))
-  def getDump:String = dump.map(_.toString).reduce(_+"\n"+_) + "\n"
+  def getDump:String = dump.map(_.toString).reduce(_ + "\n" + _) + "\n"
 }
 
 // objects given to the user in mask functions (site,here,up)
@@ -625,20 +625,20 @@ object Ex {
     import Implicits._
     e match {
       case ExLit(v) => v.toString
-      case e:ExVar[_]=> "$"+e.name
-      case ExAnd(a,b) => term(a)+" && "+term(b)
-      case ExOr(a,b) => term(a)+" || "+term(b)
-      case ExXor(a,b) => term(a)+" ^ "+term(b)
-      case ExEq(a,b) => term(a)+" = "+term(b)
-      case ExNeq(a,b) => term(a)+" != "+term(b)
-      case ExLt(a,b) => term(a)+" < "+term(b)
-      case ExLte(a,b) => term(a)+" <= "+term(b)
-      case ExGt(a,b) => term(a)+" > "+term(b)
-      case ExGte(a,b) => term(a)+" >= "+term(b)
-      case ExAdd(a,b) => term(a)+" + "+term(b)
-      case ExSub(a,b) => term(a)+" - "+term(b)
-      case ExMul(a,b) => term(a)+" * "+term(b)
-      case ExMod(a,b) => term(a)+" % "+term(b)
+      case e:ExVar[_]=> "$" + e.name
+      case ExAnd(a,b) => term(a) + " && " + term(b)
+      case ExOr(a,b) => term(a) + " || " + term(b)
+      case ExXor(a,b) => term(a) + " ^ " + term(b)
+      case ExEq(a,b) => term(a) + " = " + term(b)
+      case ExNeq(a,b) => term(a) + " != " + term(b)
+      case ExLt(a,b) => term(a) + " < " + term(b)
+      case ExLte(a,b) => term(a) + " <= " + term(b)
+      case ExGt(a,b) => term(a) + " > " + term(b)
+      case ExGte(a,b) => term(a) + " >= " + term(b)
+      case ExAdd(a,b) => term(a) + " + " + term(b)
+      case ExSub(a,b) => term(a) + " - " + term(b)
+      case ExMul(a,b) => term(a) + " * " + term(b)
+      case ExMod(a,b) => term(a) + " % " + term(b)
     }
   }
 }

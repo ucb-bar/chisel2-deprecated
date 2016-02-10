@@ -59,7 +59,7 @@ lazy val chiselBuildSettings = Seq (
      *    - use of "Tx" vs. "Tx.values"
      */
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5" % "test",
     libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.
@@ -67,7 +67,7 @@ lazy val chiselBuildSettings = Seq (
     parallelExecution in Test := false,
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials"),
     scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("chisel"), version) map { (bd, v) =>
-      Seq("-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
+      Seq("-diagrams", "-diagrams-max-classes", "25", "-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
     }
  )
 
