@@ -1,14 +1,19 @@
 ReleaseNotes for Chisel v2.2.32
 
-This release of Chisel includes support for Chisel3-style testers - testers as hardware. Currently, two basic hardware
-tester classes have been implemented: SteppedHWIOTester and OrderedDecoupledHWIOTester.
+This release of Chisel includes support for Chisel3-style testers -
+testers as hardware. Currently, two basic hardware tester classes have
+been implemented: SteppedHWIOTester and OrderedDecoupledHWIOTester.
 
-Use a SteppedHWIOTester to construct a direct (non-decoupled) test harness for a Chisel module. The module to be tested
-will be canonically referred to as the device_under_test (DUT), often simply as c in a specific test. This tester uses poke()'s
-to construct Vec's of values to be connected (in sequence) to the INPUT ports of the DUT. Similarly, expect()'s are used to
-construct Vec's of values expected to match the OUTPUT ports of the DUT.
+Use a SteppedHWIOTester to construct a direct (non-decoupled) test
+harness for a Chisel module. The module to be tested will be
+canonically referred to as the device_under_test (DUT), often simply
+as c in a specific test. This tester uses poke()'s to construct Vec's
+of values to be connected (in sequence) to the INPUT ports of the
+DUT. Similarly, expect()'s are used to construct Vec's of values
+expected to match the OUTPUT ports of the DUT.
 
-For example, here is a simple adder and a SteppedHWIOTester class to test it.
+For example, here is a simple adder and a SteppedHWIOTester class to
+test it.
 
     class Adder(width:Int) extends Module {
       val io = new Bundle {
@@ -30,14 +35,20 @@ For example, here is a simple adder and a SteppedHWIOTester class to test it.
     implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
     TesterDriver.execute { () => new AdderTester }
 
-The SteppedHWIOTester implements most of the functionality of the old Tester, using constructed hardware modules to do do.
-The missing piece is peek().
+The SteppedHWIOTester implements most of the functionality of the old
+Tester, using constructed hardware modules to do do. The missing piece
+is peek().
 
-An OrderedDecoupledHWIOTester supports the implementation of test circuits of modules that use Decoupled input and either Decoupled
-or Valid output interfaces. Inputs to the DUT will flow into their devices asynchronously but in the order they were generated and
-outputs will be produced asynchronously and will be compared in the order they are generated.
-Inputs are specified by input events. An input event is a series of values that will be gated into the decoupled input interface at the same time.
-Outputs are specified by output events. An output event is a series of values that will be tested at the same time.
+An OrderedDecoupledHWIOTester supports the implementation of test
+circuits of modules that use Decoupled input and either Decoupled or
+Valid output interfaces. Inputs to the DUT will flow into their
+devices asynchronously but in the order they were generated and
+outputs will be produced asynchronously and will be compared in the
+order they are generated. Inputs are specified by input events. An
+input event is a series of values that will be gated into the
+decoupled input interface at the same time. Outputs are specified by
+output events. An output event is a series of values that will be
+tested at the same time.
 
     class XTimesYInput(width:Int) extends Bundle {
       val x = Bits(width = 16)
@@ -67,12 +78,21 @@ Outputs are specified by output events. An output event is a series of values th
     implicit val args = Array[String]("--backend", "c", "--compile", "--genHarness", "--test")
     TesterDriver.execute { () => new XTimesXTester }
 
-Other examples of these hardware IO testers can be found in DecoupledGCD.scala and GCDUnitTest.scala in
-src/test/scala.
+Other examples of these hardware IO testers can be found in
+DecoupledGCD.scala and GCDUnitTest.scala in src/test/scala.
 
-This area is in the early development stage, so expect some potentially significant changes before the API is stabilized.
+This area is in the early development stage, so expect some
+potentially significant changes before the API is stabilized.
 
-See the associated Changelog for additional issues resolved with this release.
+A significant number of Scala style issues have been corrected,
+resulting in changes (whitespace only) to almost every source file. We
+are stricter with the enforcement of Scala style in Chisel3. This is
+an appetizer.
 
-We will be removing support for Scala 2.10 in future Chisel releases. Please verify your code compiles and runs correctly under Scala 2.11.
+See the associated Changelog for additional issues resolved with this
+release.
+
+We will be removing support for Scala 2.10 in future Chisel
+releases. Please verify your code compiles and runs correctly under
+Scala 2.11.
 

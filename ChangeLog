@@ -5,6 +5,7 @@ ChangeLog for Chisel v2.2.32
 #623 Print warning and return random for peeks of uwritten signales.
 #621 Use low-level Extract instead of implementing it with shifts and masks.
 #609 Fix incorrect VCD.
+ Bump dependent package versions.
  Update copyright notice (date).
  Add ScalaStyle changes.
  Include class hierarchy diagrams in scaladoc
