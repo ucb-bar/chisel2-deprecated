@@ -53,7 +53,7 @@ object Version {
   *  "3.9" >= "3"
   *  "3.9" >= "3.0"
   *  "3.9" >= "3.9.99"
-  *  
+  *
   *  The empty string "" is the "maximum" version and compares > all other versions.
   */
 class Version(val dottedString: String) extends scala.math.Ordered[Version] {

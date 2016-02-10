@@ -58,7 +58,7 @@ class VcdBackend(top: Module) extends Backend {
 
   private def emitDef1(index: Int) = List(
    s"  if (reset != reset__prev)  goto L${index};",
-   s"K${index}:") mkString "\n" 
+   s"K${index}:") mkString "\n"
 
   private def emitDef1(node: Node, index: Int) = List(
    s"  if (${emitRef(node)} != ${emitRef(node)}__prev)  goto L${index};",
@@ -66,7 +66,7 @@ class VcdBackend(top: Module) extends Backend {
 
   private def emitDef1(node: Node, offset: Int, index: Int) = List(
    s"  if (${emitRef(node)}.get(0x%x) != ${emitRef(node)}__prev.get(0x%x))  goto L${index};".format(offset, offset),
-   s"K${index}:") mkString "\n" 
+   s"K${index}:") mkString "\n"
 
   private def emitDef2(clk: Clock, index: Int, isZero: Boolean) = List(
    s"${if (isZero) "Z" else "L"}${index}:",
@@ -98,7 +98,7 @@ class VcdBackend(top: Module) extends Backend {
    s"    ${emitDefUnconditional(clk, index)}", "  }\n") mkString "\n"
 
   private def emitDefInline(index: Int) = List(
-    "  if (reset != reset__prev) {", 
+    "  if (reset != reset__prev) {",
     "    reset__prev = reset;",
    s"    ${emitDefUnconditional(index)}", "  }\n") mkString "\n"
 
@@ -106,7 +106,7 @@ class VcdBackend(top: Module) extends Backend {
    s"  if (${emitRef(node)} != ${emitRef(node)}__prev) {",
    s"    ${emitRef(node)}__prev = ${emitRef(node)};",
    s"    ${emitDefUnconditional(node, index)}", "  }\n") mkString "\n"
- 
+
   private def emitDefInline(node: Node, offset: Int, index: Int) = List(
    s"  if (${emitRef(node)}.get(0x${offset.toHexString}) != ${emitRef(node)}__prev.get(0x${offset.toHexString})) {",
    s"    ${emitRef(node)}__prev.put(0x${offset.toHexString}, ${emitRef(node)}.get(0x${offset.toHexString}));",
@@ -119,7 +119,7 @@ class VcdBackend(top: Module) extends Backend {
       s"  mem_t<${r.needWidth},${r.n}> ${emitRef(node)}__prev;\n"
     case _ =>
       s"  dat_t<${node.needWidth}> ${emitRef(node)}__prev;\n"
-  } 
+  }
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
     write("  fputs(\"$scope module %s $end\\n\", f);\n".format(c.name))
@@ -133,14 +133,14 @@ class VcdBackend(top: Module) extends Backend {
     baseIdx += 1
     for ((node, i) <- sortedNodes.zipWithIndex if c == node.component && !node.name.isEmpty) {
       write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
-        node.needWidth, varName(baseIdx+i), top.stripComponent(emitRef(node))))
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
     baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.component == c && !mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format( 
-            mem.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(mem)), offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -148,8 +148,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.component == c && !rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
-          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format( 
-            rom.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(rom)), offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n
@@ -163,14 +163,14 @@ class VcdBackend(top: Module) extends Backend {
     var baseIdx = Driver.clocks.size + 1
     for ((node, i) <- sortedNodes.zipWithIndex if node.name.isEmpty) {
       write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
-        node.needWidth, varName(baseIdx+i), top.stripComponent(emitRef(node))))
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
     baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format( 
-            mem.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(mem)), offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -178,8 +178,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
-          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format( 
-            rom.needWidth, varName(baseIdx+offset), top.stripComponent(emitRef(rom)), offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n
@@ -229,7 +229,7 @@ class VcdBackend(top: Module) extends Backend {
     }
     // reset
     var baseIdx = Driver.clocks.size
-    write(emitDefInline(baseIdx)) 
+    write(emitDefInline(baseIdx))
     baseIdx += 1
     for ((node, i) <- sortedNodes.zipWithIndex)
       write(emitDefInline(node, baseIdx + i))
@@ -313,8 +313,8 @@ class VcdBackend(top: Module) extends Backend {
   } sortWith (_.widthW < _.widthW)
 
   private lazy val sortedMems: Seq[Mem[_]] = Driver.orderedNodes filter {
-    case m: Mem[_] => m.isInVCD case _ => false 
-  } map (_.asInstanceOf[Mem[_]]) sortWith (_.widthW < _.widthW) 
+    case m: Mem[_] => m.isInVCD case _ => false
+  } map (_.asInstanceOf[Mem[_]]) sortWith (_.widthW < _.widthW)
 
   private lazy val sortedROMs: Seq[ROMData] = Driver.orderedNodes filter {
     case r: ROMData => r.isInVCD case _ => false

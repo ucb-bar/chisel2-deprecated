@@ -46,7 +46,7 @@ class VerilogMultiModule extends TestSuite {
           val io = new Bundle {
             val in = Decoupled(Flo(INPUT)).flip
             val out = Decoupled(Flo(OUTPUT))
-      
+
           }
           // Specify the filter function - multiply by two.
           io.out.bits := io.in.bits * Flo(2.0)
@@ -54,7 +54,7 @@ class VerilogMultiModule extends TestSuite {
           io.out.valid := io.in.valid
           io.in.ready := io.out.ready
         }
-      
+
         val io = new Bundle {
           val in = Decoupled(Flo(INPUT)).flip
           val out = Decoupled(Flo(OUTPUT))
@@ -70,7 +70,7 @@ class VerilogMultiModule extends TestSuite {
           // Do we have a following section?
           if (s < nSections) {
             val q = Module(new Queue(Flo(), 4))
-  //          q.name = "q" + s.toString + (s+1).toString
+  //          q.name = "q" + s.toString + (s + 1).toString
             q.io.enq <> f.io.out
             lastin = q.io.deq
           } else {
@@ -86,7 +86,7 @@ class VerilogMultiModule extends TestSuite {
       val m2 = Module(new MultiFIR(nSections))
       m2.io.in <> m1.io.out
     }
-    
+
     chiselMain(Array[String]("--backend", "v",
         "--targetDir", dir.getPath.toString()),
         () => Module(new MultiMultiFIR(3)))

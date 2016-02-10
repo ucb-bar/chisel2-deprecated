@@ -218,7 +218,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   def addResetPin(r: Bool): Bool = {
     val pin = _reset match {
       case Some(p) if p == r => reset
-      case _ => 
+      case _ =>
         val p = Bool(INPUT)
         p.isIo = true
         p.compOpt = Some(this)
@@ -244,7 +244,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
 
   private[Chisel] var nindex: Option[Int] = None
   def nextIndex : Int = {
-    nindex = nindex match { case None => Some(0) case Some(i) => Some(i+1) }
+    nindex = nindex match { case None => Some(0) case Some(i) => Some(i + 1) }
     nindex.get
   }
 
@@ -411,7 +411,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     _reset match {
       case None => throwException("no default reset")
       case Some(r) => resetPin match {
-        case None => 
+        case None =>
         case Some(p) =>
           addResetPin(r)
           if ((this ne Module.topMod) && hasExplicitReset) p := r
@@ -425,8 +425,8 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
       // This assert is a sanity check to make sure static resolution
       // of IOs didn't fail
       val io_str = "<" + n + " (" + w.getClass.getName + ")>"
-      ChiselError.error("Statically resolved component(" + this + 
-        ") differs from dynamically resolved component(" + w.component + 
+      ChiselError.error("Statically resolved component(" + this +
+        ") differs from dynamically resolved component(" + w.component +
         ") of IO: " + io_str + " crashing compiler")
     }
     // io naming
@@ -470,7 +470,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
      that will generate C++ or Verilog code must be made public. */
      // get all super classes' methods
      def getMethods(c: Class[_]): Set[java.lang.reflect.Method] = {
-       if (c.toString.split('.').last == "Module") Set[java.lang.reflect.Method]() 
+       if (c.toString.split('.').last == "Module") Set[java.lang.reflect.Method]()
        else c.getDeclaredMethods.toSet ++ getMethods(c.getSuperclass)
      }
      for (m <- getMethods(getClass).toList.sortWith(_.getName < _.getName)) {
@@ -558,7 +558,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
       assignments += ((assignee, ChiselError.findFirstUserLine(stack) getOrElse stack(0)))
     }
   }
-  
+
   /** verifyWireWrap (Chisel3) - verify assignment semantics (type-only nodes must be wire-wrapped)
     *  @return - HashMap of source lines (and associated nodes) requiring Wire() wrapping.
     */
@@ -587,7 +587,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     wireWrapLineToNode
   }
-  
+
   /** reportWireWrap (Chisel3) - report type-only nodes requiring Wire() wrapping.
     *  @param - HashMap of source lines (and associated nodes) requiring Wire() wrapping.
     */

@@ -31,7 +31,7 @@
 package Chisel
 
 abstract class Aggregate extends Data {
-  override def getWidth: Int = this.flatten.map(_._2.getWidth).fold(0)(_+_)
+  override def getWidth: Int = this.flatten.map(_._2.getWidth).fold(0)(_ + _)
     // Aggregate classes do not generally 'live' in the graph so width inference
     //   will not touch these nodes and thus must get their width by looking
     //   into the container

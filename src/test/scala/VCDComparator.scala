@@ -154,7 +154,7 @@ class VCDComparator(masterPath: String, testPath: String) {
     }
 
     /** Read and update the signal states until we see reset de-asserted.
-      *  
+      *
       */
     def init() {
       step()  // Position to the start of the first cycle.

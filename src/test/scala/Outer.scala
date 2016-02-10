@@ -47,9 +47,9 @@ class OuterSuite extends TestSuite {
       }
       io.out := io.in + Bits(1)
     }
-    
+
     class Outer extends Module {
-      val io = new Bundle { 
+      val io = new Bundle {
         val in  = Bits(INPUT, 8)
         val out = Bits(OUTPUT, 8)
       }
@@ -60,7 +60,7 @@ class OuterSuite extends TestSuite {
       c(0).io.in := io.in
       io.out  := (c(0).io.out * Bits(2))(7,0)
     }
-    
+
     class OuterTester(c: Outer) extends Tester(c) {
       for (t <- 0 until 16) {
         val test_in = rnd.nextInt(256)

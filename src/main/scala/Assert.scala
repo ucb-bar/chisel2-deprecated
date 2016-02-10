@@ -48,10 +48,10 @@ class BitsInObject(x: Node) extends UInt {
 
 class PrintfBase(formatIn: String, argsIn: Seq[Node]) extends Delay {
   inputs ++= argsIn.map(a => new BitsInObject(a))
-  def args = inputs 
+  def args = inputs
   override lazy val isInObject: Boolean = true
   def decIntSize(x: Int) = math.ceil(math.log(2)/math.log(10)*x).toInt
-  def decFloSize(m: Int, e: Int) = (2+decIntSize(m)+2+decIntSize(e))
+  def decFloSize(m: Int, e: Int) = (2 + decIntSize(m) + 2 + decIntSize(e))
 
   private var formats = ""
   private val lengths = new HashMap[Char, (Int => Int)]
@@ -108,5 +108,5 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   inputs += condIn
   override def args = inputs.init // : ArrayBuffer[Node] = inputs.init
   def cond: Node = inputs.last
-  def cond_=(x: Bool) { inputs(inputs.size-1) = x } 
+  def cond_=(x: Bool) { inputs(inputs.size-1) = x }
 }

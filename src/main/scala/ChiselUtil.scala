@@ -172,7 +172,7 @@ object ShiftRegister
       in
     }
   }
-  
+
   /** @param in input to delay
     * @param init reset value to use
     * @param n number of cycles to delay */
@@ -602,26 +602,26 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
 
-  val s1_rptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
-  val s2_rptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
+  val s1_rptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
+  val s2_rptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
   val s1_rst_deq = Reg(init=Bool(false), clock=enq_clk)
   val s2_rst_deq = Reg(init=Bool(false), clock=enq_clk)
 
-  val s1_wptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
-  val s2_wptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
+  val s1_wptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
+  val s2_wptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
   val s1_rst_enq = Reg(init=Bool(false), clock=deq_clk)
   val s2_rst_enq = Reg(init=Bool(false), clock=deq_clk)
 
-  val wptr_bin = Reg(init=UInt(0, asize+1), clock=enq_clk)
-  val wptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
+  val wptr_bin = Reg(init=UInt(0, asize + 1), clock=enq_clk)
+  val wptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
   val not_full = Reg(init=Bool(false), clock=enq_clk)
 
   val wptr_bin_next = wptr_bin + (io.enq.valid & not_full)
   val wptr_gray_next = (wptr_bin_next >> UInt(1)) ^ wptr_bin_next
   val not_full_next = !(wptr_gray_next === Cat(~s2_rptr_gray(asize,asize-1), s2_rptr_gray(asize-2,0)))
 
-  val rptr_bin = Reg(init=UInt(0, asize+1), clock=deq_clk)
-  val rptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
+  val rptr_bin = Reg(init=UInt(0, asize + 1), clock=deq_clk)
+  val rptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
   val not_empty = Reg(init=Bool(false), clock=deq_clk)
 
   val rptr_bin_next = rptr_bin + (io.deq.ready & not_empty)
@@ -743,7 +743,7 @@ object Wire
     apply(Option(t), Option(init))
 
   def apply[T <: Data](t: Option[T], init: Option[T]): T = {
-    t match { 
+    t match {
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
@@ -817,7 +817,7 @@ object DelayBetween {
   /** Finds to shortest path between two nodes using a multi-stage depth first search */
   private def nodeShortestPathSearch(startList : List[Node], end : Node) : Int = {
     // We what this to operate in two different stages, first is to find either a register or the end
-    // if the end is found return the value, otherwise start the search again from the registers 
+    // if the end is found return the value, otherwise start the search again from the registers
     var searchNodes = startList
     val visited = new ArrayBuffer[Int]
     var count = -1
@@ -831,7 +831,7 @@ object DelayBetween {
           val delayLevel = nodeFindRegOrEnd(List(node), end, new ArrayBuffer[Node]).toList
           found = delayLevel.contains(end)
           delayLevel.foreach(n => nodesToSearch.append(n))
-        } 
+        }
       }
       searchNodes = nodesToSearch.toList
     }

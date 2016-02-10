@@ -56,7 +56,7 @@ object Node {
       m.inputs(i).widthW
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected (" + i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
           if (!ChiselError.contains(error) && !Driver.isInGetWidth) {
             ChiselError.error(error)
           }
@@ -188,7 +188,7 @@ abstract class Node extends Nameable {
       ChiselError.findFirstUserLine(trace) getOrElse trace(0)
     } else null
   /** The unique id of this node */
-  val _id = Driver.getNodeId 
+  val _id = Driver.getNodeId
 
   private[Chisel] def width: Int = {
     val w = widthW
@@ -347,7 +347,7 @@ abstract class Node extends Nameable {
   def isTopLevelIO = isIo && component == Module.topMod
 
   private[Chisel] lazy val isInObject =
-    (isIo && (Driver.isIoDebug || component == Module.topMod)) || 
+    (isIo && (Driver.isIoDebug || component == Module.topMod)) ||
     component.debugs(this) || (Driver.backend isInObject this) ||
     isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
@@ -501,7 +501,7 @@ abstract class Node extends Nameable {
   /** @return the bitWidth of the node
     * @throws ChiselException if the width is not yet defined
     */
-  def needWidth(): Int = widthW.needWidth 
+  def needWidth(): Int = widthW.needWidth
   /** Return true if the width of this node is known (set). */
   private[Chisel] def isKnownWidth: Boolean = widthW.isKnown
 

@@ -66,8 +66,8 @@ object MuxCase {
 object Multiplex {
   /** muliplex between nodes with if (t != 0) c else a */
   def apply (t: Node, c: Node, a: Node): Node = {
-    t.litOpt match { 
-      case Some(tl) => if (tl.value == 0) a else c 
+    t.litOpt match {
+      case Some(tl) => if (tl.value == 0) a else c
       case None if a != null => (c.litOpt, a.litOpt) match {
         case (_, Some(al)) if a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0)) =>
           Multiplex(t, c, a.inputs(1))

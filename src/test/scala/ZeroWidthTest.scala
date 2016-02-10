@@ -370,7 +370,7 @@ class ZeroWidthTest extends TestSuite {
   }
 
   /** Concatenate two nodes X and Y (zero-width) in a node Z such that
-    Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
+    Z[0..wx + wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCatCompW0W() {
     println("\ntestCat ...")
     class CatCompW0W extends Module {
@@ -491,7 +491,7 @@ class ZeroWidthTest extends TestSuite {
     chiselMain(testArgs, () => Module(new MuxComp()))
   }
 
-  /** Reverse produced many width warning messages. 
+  /** Reverse produced many width warning messages.
     */
   @Test def testReverseNoisyWidth() {
     println("\ntesttestReverseNoisyWidth ...")
@@ -515,19 +515,19 @@ class ZeroWidthTest extends TestSuite {
   @Test def testUnRefOutNullPointer() {
     println("\ntestUnRefOutNullPointer ...")
     class FloatOutModule extends Module {
-    
+
       val io = new Bundle {
         val i_value     = UInt(INPUT, width = 64)
         val i_valid     = Bool(INPUT)
         val o_value     = UInt(OUTPUT, width = 64)
       }
-    
+
       when ( io.i_valid ) {
         io.o_value := io.i_value
       }
     }
   }
-  
+
   /** Issue 439
     *  Chisel somehow finds a way to build negative (actually zero) width wires.
     */
@@ -538,7 +538,7 @@ class ZeroWidthTest extends TestSuite {
       io := UInt(1, 1)
       io := UInt(width = 0)
     }
-    
+
     class ZeroWidthForceMatchingTester(c: ZeroWidthForceMatching) extends Tester(c) {
       assertTrue(c.io.getWidth == 1)
       expect(c.io, 0)

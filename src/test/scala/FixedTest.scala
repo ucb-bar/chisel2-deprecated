@@ -187,7 +187,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedSub) => new FixedSubTester(c))
   }
-  
+
   @Test def testFixedReg() {
     class FixedReg extends Module {
       val io = new Bundle {
@@ -242,7 +242,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedUnary) => new FixedUnaryTester(c))
   }
-  
+
   @Test def testFixedCompare() {
     class FixedCompare extends Module {
       val io = new Bundle {
@@ -270,7 +270,7 @@ class FixedSuite extends TestSuite {
           expect(c.io.gt, Bool(inA > inB).litValue())
           expect(c.io.lt, Bool(inA < inB).litValue())
           expect(c.io.gte, Bool(inA >= inB).litValue())
-          expect(c.io.lte, Bool(inA <= inB).litValue()) 
+          expect(c.io.lte, Bool(inA <= inB).litValue())
         }
       }
     }
@@ -281,7 +281,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedCompare) => new FixedCompareTester(c))
   }
-  
+
   @Test def testFixedDiv() {
     class FixedDiv extends Module {
       val io = new Bundle {
@@ -351,7 +351,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedMul) => new FixedMulTester(c))
   }
-  
+
   @Test def testFixedMulT() {
     class FixedMulT extends Module {
       val io = new Bundle {
@@ -386,7 +386,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedMulT) => new FixedMulTTester(c))
   }
-  
+
   @Test def testFixedMulR() {
     class FixedMulR extends Module {
       val io = new Bundle {
@@ -449,7 +449,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedLine) => new FixedLineTester(c))
   }
-  
+
   @Test def testFixedMux() {
     class FixedMux extends Module {
       val io = new Bundle {
@@ -487,7 +487,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedMux) => new FixedMuxTester(c))
   }
-  
+
   @Test def testFixedVec() {
     class FixedVec extends Module {
       val io = new Bundle {
@@ -495,7 +495,7 @@ class FixedSuite extends TestSuite {
         val b = Vec.fill(8){Fixed(INPUT, 32, 16)}
         val c = Fixed(OUTPUT, 32, 16)
       }
-      io.c := (io.a, io.b).zipped.map(_+_).reduce(_+_)
+      io.c := (io.a, io.b).zipped.map(_ + _).reduce(_ + _)
     }
 
     trait FixedVecTests extends Tests {
@@ -506,7 +506,7 @@ class FixedSuite extends TestSuite {
           val inB = Array.fill(8){BigInt(rnd.nextInt(1 << 30)) * scala.math.pow(-1, rnd.nextInt(2)).toInt}
           (c.io.a, inA).zipped.map((w, v) => poke(w, v))
           (c.io.b, inB).zipped.map((w, v) => poke(w, v))
-          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_+_).reduce(_+_)
+          val res = (inA.map(v => toDouble(v, 16)), inB.map(v => toDouble(v, 16))).zipped.map(_ + _).reduce(_ + _)
           expect(c.io.c, toFixed(res, 16))
         }
       }
@@ -518,7 +518,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedVec) => new FixedVecTester(c))
   }
-  
+
   @Test def testFixedVec2() {
     class FixedVec2 extends Module {
       val io = new Bundle {
@@ -549,7 +549,7 @@ class FixedSuite extends TestSuite {
 
     launchCppTester((c: FixedVec2) => new FixedVec2Tester(c))
   }
-  
+
   @Test def testFixedMod() {
     class FixedMod extends Module {
       val io = new Bundle {

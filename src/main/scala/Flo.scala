@@ -207,7 +207,7 @@ class FloBackend extends Backend {
   }
 
   override def compile(c: Module, flagsIn: Option[String]) {
-    val flags = flagsIn getOrElse "-O2" 
+    val flags = flagsIn getOrElse "-O2"
     val allFlags = flags + " -I../ -I" + chiselENV + "/csrc/"
     val dir = Driver.targetDir + "/"
     def build(name: String) {

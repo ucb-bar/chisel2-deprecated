@@ -36,7 +36,7 @@ import org.junit.Ignore
 class CombLoopSuite extends TestSuite {
   @Test def testCombLoop() {
     println("\ntestCombLoop ...")
-   
+
     class CombLoopModule extends Module {
       val io = new Bundle {
         val in = Decoupled(UInt(width=16)).flip

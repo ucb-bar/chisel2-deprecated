@@ -47,8 +47,8 @@ object Clock {
 /** Create a new clock
   * @param reset The reset for this clock
   */
-class Clock(reset: Bool = Driver.implicitReset, 
-  private[Chisel] val srcClock: Option[Clock] = None, 
+class Clock(reset: Bool = Driver.implicitReset,
+  private[Chisel] val srcClock: Option[Clock] = None,
   private[Chisel] val period: Double = 1.0 /* in ps */) extends Node {
 
   init("", 1)

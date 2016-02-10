@@ -61,7 +61,7 @@ class FlushPrintfOutput extends TestSuite {
     counter := counter + UInt(1)
     printf(counterString, counter);
   }
-  
+
   class FloPrintfModule extends BasePrintfModule {
     val isFloat = true
     val counterString = "counter = %e\n"

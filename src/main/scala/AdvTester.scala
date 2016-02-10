@@ -49,7 +49,7 @@ trait AdvTests extends Tests {
   def takesteps(n: Int)(work: =>Unit = {}): Unit
   def until(pred: =>Boolean, maxCycles: Int = 0)(work: =>Unit): Boolean
   def eventually(pred: =>Boolean, maxCycles: Int = 0): Boolean
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = 0): Boolean 
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = 0): Boolean
 
 }
 
