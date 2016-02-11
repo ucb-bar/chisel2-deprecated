@@ -832,7 +832,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
 
   /** Complete the simulation and inspect all tests */
   def finish: Boolean = {
-    mwhile(!sendCmd(SIM_CMD.FIN)) { }
     try {
       mwhile(!sendCmd(SIM_CMD.FIN)) { }
     }
@@ -845,7 +844,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
     }
     addEvent(new DumpEvent(newTestOutputString))
     addEvent(new FinishEvent(t, ok, failureTime))
-    process.destroy
     _logs.clear
     inChannel.close
     outChannel.close
