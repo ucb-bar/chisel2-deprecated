@@ -275,8 +275,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
   /** Interpret the data as a double precision float */
@@ -284,8 +284,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
 
