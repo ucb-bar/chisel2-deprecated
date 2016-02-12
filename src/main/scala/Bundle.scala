@@ -55,7 +55,7 @@ object Bundle {
   */
 class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
-  private def calcElements(view: Seq[String]) = {
+  protected def calcElements(view : Seq[String]) = {
     val c      = getClass
     var elts   = LinkedHashMap[String, Data]()
     val seen   = HashSet[Object]()
@@ -67,20 +67,27 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
       val types = m.getParameterTypes
 
       val rtype = m.getReturnType
-      val isInterface = classOf[Data].isAssignableFrom(rtype)
+      val isInterface = classOf[Data].isAssignableFrom(rtype) || classOf[Option[_]].isAssignableFrom(rtype)
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
       if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers)
         && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
         && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
         // Fetch the actual object
-        val obj = m invoke this
-        if(!(seen contains obj)) {
-          obj match {
-            case d: Data => elts(name) = d
-            case any =>
+        m invoke this match {
+          case d: Data => if(!(seen contains d)) {
+            elts(name) = d; seen += d
+          } else {
+            require(elts(name) eq d)
           }
-          seen += obj
+          case Some(o) => o match {
+            case d: Data => {
+              if (elts contains name) require(elts(name) eq d)
+              else if (!seen(d)) {elts(name) = d; seen += d}
+            }
+            case _ =>
+          }
+          case _ =>
         }
       }
     }
