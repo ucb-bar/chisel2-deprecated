@@ -834,6 +834,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
   def finish: Boolean = {
     try {
       mwhile(!sendCmd(SIM_CMD.FIN)) { }
+      while(!exitValue.isCompleted) { }
     }
     catch {
       // Depending on load and timing, we may get a TestApplicationException
