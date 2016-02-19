@@ -2,6 +2,9 @@
 #define __SIM_API_H
 
 #include <cassert>
+#include <cstdio>
+#include <cerrno>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -27,15 +30,43 @@ template<class T> struct sim_data_t {
 
 class channel_t {
 public:
-  channel_t(int _fd): fd(_fd) {
+  void init_map() {
+	static std::string m_prefix("channel_t::init_map - ");
     uintptr_t pgsize = sysconf(_SC_PAGESIZE);
-    assert(fd != -1);
-    assert(lseek(fd, pgsize-1, SEEK_SET) != -1);
-    assert(write(fd, "", 1) != -1);
-    assert(fsync(fd) != -1);	// ensure the data is available
+	// ensure the data is available (a full page worth).
+    if (lseek(fd, pgsize-1, SEEK_SET) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " seek to end of page").c_str());
+    	exit(1);
+    }
+    if (write(fd, "", 1) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " write byte").c_str());
+    	exit(1);
+    }
+    if (fsync(fd) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " fsync").c_str());
+    	exit(1);
+    }
     channel = (char*)mmap(NULL, pgsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); 
-    assert(channel != MAP_FAILED);
+    if (channel == MAP_FAILED) {
+    	perror((m_prefix + "file: " + full_file_path + " mmap").c_str());
+    	exit(1);
+    }
   }
+  channel_t(std::string _file_name): file_name(_file_name), fd(open(file_name.c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600)) {
+	static std::string m_prefix("channel_t::channel_t: ");
+    char * rp = realpath(file_name.c_str(), NULL);
+    full_file_path = std::string(rp == NULL ? file_name : rp);
+    if (rp != NULL) {
+    	free(rp);
+    	rp = NULL;
+    }
+	if (fd == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " open").c_str());
+		exit(1);
+	}
+	init_map();
+  }
+
   ~channel_t() {
     uintptr_t pgsize = sysconf(_SC_PAGESIZE);
     munmap((void *)channel, pgsize);
@@ -62,6 +93,8 @@ private:
   // channel[3] -> flag
   // channel[4:] -> data
   char volatile * channel;
+  const std::string file_name;
+  std::string full_file_path;
   const int fd;
 };
 
@@ -73,9 +106,9 @@ public:
     in_ch_name  << std::dec << std::setw(8) << std::setfill('0') << pid << ".in";
     out_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".out";
     cmd_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".cmd";
-    in_channel  = new channel_t(open(in_ch_name.str().c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
-    out_channel = new channel_t(open(out_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
-    cmd_channel = new channel_t(open(cmd_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
+    in_channel  = new channel_t(in_ch_name.str());
+    out_channel = new channel_t(out_ch_name.str());
+    cmd_channel = new channel_t(cmd_ch_name.str());
     
     // Init channels
     out_channel->consume();
