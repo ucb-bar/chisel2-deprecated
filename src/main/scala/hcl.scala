@@ -135,7 +135,7 @@ trait Nameable {
   /** Name of the instance. */
   var name: String = ""
   /** named is used to indicate that name was set explicitly and should not be overriden */
-  var named = false
+  protected[Chisel] var named = false
   /** Set the name of this module to the string 'n'
     * @example {{{ my.io.node.setName("MY_IO_NODE") }}}
     */

@@ -397,9 +397,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
     * @param v The BigInt representing the bits to set
     * @param off The offset or index
     */
-  def pokeNode(node: Node, v: BigInt, off: Option[Int] = None) {
+  def pokeNode(node: Node, v: BigInt, off: Option[Int] = None, force: Boolean = false) {
     val i = off match { case Some(p) => s"[${p}]" case None => "" }
-    pokePath(s"${dumpName(node)}${i}", v)
+    pokePath(s"${dumpName(node)}${i}", v, force)
   }
   /** set the value of some memory
     * @param data The memory to write to

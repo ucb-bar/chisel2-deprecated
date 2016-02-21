@@ -244,7 +244,7 @@ abstract class Node extends Nameable {
 
   lazy val chiselName = this match {
     case l: Literal => ""
-    case _ if named && name != "reset" && compOpt != None =>
+    case _ if named && compOpt != None =>
         component.getPathName(".") + "." + name
     case _ => ""
   }
@@ -280,7 +280,7 @@ abstract class Node extends Nameable {
   private var _isIo = false
   /** @return this node is an I/O Node for a module */
   def isIo = _isIo
-  def isIo_=(isIo: Boolean) = _isIo = isIo
+  protected[Chisel] def isIo_=(isIo: Boolean) = _isIo = isIo
   /** @return this node is a Register */
   def isUsedByClockHi: Boolean = consumers.exists(_.usesInClockHi(this))
   def usesInClockHi(i: Node): Boolean = false
