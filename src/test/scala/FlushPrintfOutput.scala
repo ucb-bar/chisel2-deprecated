@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -61,7 +61,7 @@ class FlushPrintfOutput extends TestSuite {
     counter := counter + UInt(1)
     printf(counterString, counter);
   }
-  
+
   class FloPrintfModule extends BasePrintfModule {
     val isFloat = true
     val counterString = "counter = %e\n"

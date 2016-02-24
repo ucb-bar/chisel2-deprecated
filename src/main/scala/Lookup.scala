@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -35,7 +35,7 @@ object ListLookup {
     val map = mapping.map {
       case (x: BitPat, y) => (addr === x, y)
       case (x: UInt,   y) => (addr === x, y)
-      case _ => throwException("Not allowed type for mapping") 
+      case _ => throwException("Not allowed type for mapping")
     }
     default.zipWithIndex map { case (d, i) =>
       map.foldRight(d)((m, n) => Mux(m._1, m._2(i), n))

@@ -1,26 +1,21 @@
-ChangeLog for Chisel v2.2.31
+ChangeLog for Chisel v2.2.32
 
-#603 When validateGen() fails in Reg, mention the failing element.
-#595 Improve Tester stability.
-#583 Check for empty _log on tester application exit.
-#581 Avoid Tester hang on bogus peek()/poke().
-#580 Ensure tester mapped memory is marked volatile.
-#573 Flo is not printed with printf.
-#569 Combinational loop detector is broken.
-#556 Module debug for aggregates.
-#535 Add more checkpoints in an attempt to report errors sooner.
-#534 Add optional message to (most of) expect(Bits, ...).
-#531 `Wire(new Bundle { ... })` does not compile.
- Bumped Scala build versions to 2.10.6 and 2.11.7
- Fix comment in QueueIO.
- Fix bad verilog translation of mem and assert (Verilog backend).
- No longer use deprecated -use_vpiobj for vcs compilation (Verilog backend).
- Add cloneType methods for ArbiterIO and QueueIO Bundles.
- Fix Queue object example and add Pipe object example.
- Draw Muxes as diamonds with fixed port connections (Dot backend).
- OnceOnlyFiles are also unoptimizedFiles (compile -O0) (C++ backend).
- Set names for anonymous mems.
- Implement rsha_n correctly (C++ backend).
- Add optional needsHold parameter to Arbiters.
- Fix vcd dump issues in verilog (Verilog backend).
- Reintroduce MuxCase / PriorityMux'ing of bundles.
+#627 Dump vcd in module->clock()
+#624 Try to avoid IndexOutOfBoundsException at the start of simulation.
+#623 Print warning and return random for peeks of uwritten signales.
+#621 Use low-level Extract instead of implementing it with shifts and masks.
+#609 Fix incorrect VCD.
+ Bump dependent package versions.
+ Update copyright notice (date).
+ Add ScalaStyle changes.
+ Include class hierarchy diagrams in scaladoc
+ Add support for non-JUint tests.
+ Removed new line in tester to avoid lots of blank lines for multiple steps.
+ Fixeds are signed nodes too.
+ Treat chisel3 compatibility warnings as errors.
+ Add Chisel3 asUInt()/asSInt().
+ Flo and Dbl widths are really fixed (and known).
+ Add support for Chisel3-style "testers as hardware".
+ Small documentation fixes and comments/questions
+ Be more selective when re-running to enable line numbers.
+ Fix broken subword support.

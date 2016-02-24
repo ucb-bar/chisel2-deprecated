@@ -61,7 +61,7 @@ class VCDVerifySuite extends TestSuite {
       }
       io.output := reg
     }
-    
+
     class Top extends Module {
       val io = new Bundle {
               val input = Bool(INPUT)
@@ -70,7 +70,7 @@ class VCDVerifySuite extends TestSuite {
       val hz = Module(new Hz)
       hz.io <> io
     }
-    
+
     class VCDTester(c: Top) extends Tester(c) {
       step(1)
       poke(c.io.input, true)

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -53,7 +53,7 @@ object Version {
   *  "3.9" >= "3"
   *  "3.9" >= "3.0"
   *  "3.9" >= "3.9.99"
-  *  
+  *
   *  The empty string "" is the "maximum" version and compares > all other versions.
   */
 class Version(val dottedString: String) extends scala.math.Ordered[Version] {
