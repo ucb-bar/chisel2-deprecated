@@ -57,9 +57,9 @@ object AdvTester {
   implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
 }
 
-class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, 
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16,
     testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None) 
-    extends Tester[T](dut, isTrace, testCmd, dumpFile) {
+    extends Tester[T](dut, isTrace, _base, testCmd, dumpFile) {
   val defaultMaxCycles = 1024L
   var _cycles = 0L
   def cycles = _cycles

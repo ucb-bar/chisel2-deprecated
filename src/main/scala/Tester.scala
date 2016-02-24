@@ -91,12 +91,13 @@ object Tester {
 /** This class is the super class for test cases
   * @param c The module under test
   * @param isTrace print the all I/O operations and tests to stdout, default true
+  * @param _base base for prints, default 16 (hex)
   * @param testCmd command to run the emulator
   * @param dumpFile vcd/vpd file name
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true, 
+class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16, 
     testCmd: Option[String] = Driver.testCommand, 
     dumpFile: Option[String] = None) extends FileSystemUtilities {
   // Define events
@@ -122,7 +123,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true,
   case class DumpEvent(msg: String) extends Event
   case class NoIdEvent(path: String) extends Event
   // Define observer
-  class Observer(base: Int = 16, file: java.io.PrintStream = System.out) {
+  class Observer(base: Int = _base, file: java.io.PrintStream = System.out) {
     private var lock = false
     protected def convt(x: BigInt) = base match {
       case 2  if x < 0 => s"-0b${(-x).toString(base)}"
