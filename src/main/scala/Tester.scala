@@ -276,10 +276,6 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     new java.io.File(name).delete
   }
 
-  private lazy val inChannel  = new Channel(inChannelName)
-  private lazy val outChannel = new Channel(outChannelName)
-  private lazy val cmdChannel = new Channel(cmdChannelName)
-
   def dumpName(data: Node): String = Driver.backend match {
     case _: FloBackend => data.getNode.name
     case _ => data.getNode.chiselName
@@ -788,9 +784,9 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
       case _ => target
     }
   }
-  val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
+  private val (process: Process, exitValue: Future[Int], inChannel, outChannel, cmdChannel) = {
     val processBuilder = Process(cmd)
-    val processLogger = ProcessLogger(_logs += _)
+    val processLogger = ProcessLogger(println, _logs += _) // don't log stdout
     val process = processBuilder run processLogger
 
     // Set up a Future to wait for (and signal) the test process exit.
@@ -816,20 +812,26 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     val in_channel_name = _logs.remove(0)
     val out_channel_name = _logs.remove(0)
     val cmd_channel_name = _logs.remove(0)
+    val in_channel = new Channel(in_channel_name)
+    val out_channel = new Channel(out_channel_name)
+    val cmd_channel = new Channel(cmd_channel_name)
+
     println(s"inChannelName: ${in_channel_name}")
     println(s"outChannelName: ${out_channel_name}")
     println(s"cmdChannelName: ${cmd_channel_name}")
+
+    in_channel.consume
+    cmd_channel.consume
+    in_channel.release
+    out_channel.release
+    cmd_channel.release
+    _t = 0
+
     // Init channels
-    (process, exitValue, in_channel_name, out_channel_name, cmd_channel_name)
+    (process, exitValue, in_channel, out_channel, cmd_channel)
   }
 
   private def start {
-    inChannel.consume
-    cmdChannel.consume
-    inChannel.release
-    outChannel.release
-    cmdChannel.release
-    _t = 0
     mwhile(!recvOutputs) { }
     addEvent(new StartEvent(Driver.testerSeed, cmd))
     // reset(5)
