@@ -29,7 +29,8 @@
 */
 
 import Chisel._
-import Chisel.testers.{TesterDriver, SteppedHWIOTester}
+import Chisel.testers.TesterDriver
+import hwiotesters.SteppedHWIOTester
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore
