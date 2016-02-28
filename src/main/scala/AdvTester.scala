@@ -111,11 +111,18 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
 
   // This function replaces step in the advanced tester and makes sure all tester features are clocked in the appropriate order
   def takestep(work: => Unit = {}): Unit = {
-    step(1)
-    do_registered_updates()
-    preprocessors.foreach(_.process()) // e.g. sinks
-    work
-    postprocessors.foreach(_.process())
+    try {
+      step(1)
+      do_registered_updates()
+      preprocessors.foreach(_.process()) // e.g. sinks
+      work
+      postprocessors.foreach(_.process())
+    } catch {
+      case e: java.lang.AssertionError => 
+        assert(false, e.toString) // catch assert
+      case e: java.lang.IllegalArgumentException => 
+        assert(false, e.toString) // catch require
+    }
   }
   def takesteps(n: Int)(work: =>Unit = {}): Unit = {
     require(n>0, "Number of steps taken must be positive integer.")
@@ -140,8 +147,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    if (!expr && errMsg != "") { 
-      println("ASSERT FAILED: " + errMsg) 
+    if (!expr && !errMsg.isEmpty) { 
+      addEvent(new DumpEvent(s"ASSERT FAILED: ${errMsg}"))
       fail
     }
     expr
@@ -169,7 +176,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object DecoupledSink {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSink(socket, (socket_bits: T) => peek(socket_bits))
+    def apply[T<:Bits](socket: DecoupledIO[T]) = 
+      new DecoupledSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
   class ValidSink[T <: Data, R]( socket: ValidIO[T], cvt: T=>R ) extends Processable
@@ -187,7 +195,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object ValidSink {
-    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSink(socket, (socket_bits: T) => peek(socket_bits))
+    def apply[T<:Bits](socket: ValidIO[T]) = 
+      new ValidSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
   class DecoupledSource[T <: Data, R]( socket: DecoupledIO[T], post: (T,R)=>Unit ) extends Processable
@@ -217,7 +226,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object DecoupledSource {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
+    def apply[T<:Bits](socket: DecoupledIO[T]) = 
+      new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 
   class ValidSource[T <: Data, R]( socket: ValidIO[T], post: (T,R)=>Unit ) extends Processable
@@ -244,7 +254,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object ValidSource {
-    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
+    def apply[T<:Bits](socket: ValidIO[T]) = 
+      new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 }
 
