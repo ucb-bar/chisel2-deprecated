@@ -113,12 +113,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
 
-  // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
-  private def mwhile(block: => Boolean)(loop: => Unit) {
-    while (!exitValue.isCompleted && block) {
-      loop
-    }
-    // If the test application died, throw a run-time error.
+  def throwExceptionIfDead(exitValue: Future[Int]) {
     if (exitValue.isCompleted) {
       val exitCode = Await.result(exitValue, Duration(-1, SECONDS))
       // We assume the error string is the last log entry.
@@ -130,6 +125,15 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       println(newTestOutputString)
       throw new TestApplicationException(exitCode, errorString)
     }
+  }
+
+  // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
+  private def mwhile(block: => Boolean)(loop: => Unit) {
+    while (!exitValue.isCompleted && block) {
+      loop
+    }
+    // If the test application died, throw a run-time error.
+    throwExceptionIfDead(exitValue)
   }
   private object SIM_CMD extends Enumeration {
     val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN = Value }
@@ -275,8 +279,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
   /** Interpret the data as a double precision float */
@@ -284,8 +288,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
 
@@ -722,7 +726,11 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       println(_logs.remove(0))
     }
     if (!_logs.isEmpty) println(_logs.remove(0)) else println("<no startup message>")
-    while (_logs.size < 3) { Thread.sleep(100) }
+    while (_logs.size < 3) {
+      // If the test application died, throw a run-time error.
+      throwExceptionIfDead(exitValue)
+      Thread.sleep(100)
+    }
     val in_channel_name = _logs.remove(0)
     val out_channel_name = _logs.remove(0)
     val cmd_channel_name = _logs.remove(0)
