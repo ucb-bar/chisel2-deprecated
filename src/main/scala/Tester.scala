@@ -70,12 +70,14 @@ trait Tests {
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean
   def expect (data: Bits, expected: Int): Boolean
   def expect (data: Bits, expected: Long): Boolean
+  def expect (data: Bool, expected: Boolean): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
   def newTestOutputString: String
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean
   def expect (data: Bits, expected: Int, msg: => String): Boolean
   def expect (data: Bits, expected: Long, msg: => String): Boolean
+  def expect (data: Bool, expected: Boolean, msg: => String): Boolean
   def expect (data: Flo, expected: Float, msg: => String): Boolean
   def expect (data: Dbl, expected: Double, msg: => String): Boolean
   def printfs: Vector[String]
@@ -612,6 +614,16 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def expect (data: Bits, expected: Long): Boolean = {
     expect(data, expected, "")
   }
+
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
+  def expect (data: Bool, expected: Boolean, msg: => String): Boolean = {
+    expect(data, { if (expected) 1 else 0 }, msg)
+  }
+  def expect (data: Bool, expected: Boolean): Boolean = {
+    expect(data, expected, "")
+  }
+
   /* We need the following so scala doesn't use our "tolerant" Float version of expect.
    */
   /** Expect the value of 'data' to be 'expected'
