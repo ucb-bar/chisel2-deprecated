@@ -750,6 +750,7 @@ class CppBackend extends Backend {
     harness.write(s"""  ${name}_api_t api(&module);\n""")
     harness.write(s"""  module.init();\n""")
     harness.write(s"""  api.init_sim_data();\n""")
+    harness.write(s"""  api.init_channels();\n""")
     if (Driver.isVCD) {
       harness.write(s"""  FILE *f = fopen("${Driver.targetDir}/${name}.vcd", "w");\n""")
     } else {

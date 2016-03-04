@@ -164,6 +164,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       channel map (FileChannel.MapMode.READ_WRITE, 0, size)
     }
     implicit def intToByte(i: Int) = i.toByte
+    val channel_data_offset_64bw = 4    // Offset from start of channel buffer to actual user data in 64bit words.
     def aquire {
       buffer put (0, 1)
       buffer put (2, 0)
@@ -174,12 +175,12 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     def valid = (buffer get 3) == 1
     def produce { buffer put (3, 1) }
     def consume { buffer put (3, 0) }
-    def update(idx: Int, data: Long) { buffer putLong (8 * idx + 4, data) }
+    def update(idx: Int, data: Long) { buffer putLong (8 * idx + channel_data_offset_64bw, data) }
     def update(base: Int, data: String) {
-      data.zipWithIndex foreach {case (c, i) => buffer put (base + i + 4, c) }
-      buffer put (base + data.size + 4, 0)
+      data.zipWithIndex foreach {case (c, i) => buffer put (base + i + channel_data_offset_64bw, c) }
+      buffer put (base + data.size + channel_data_offset_64bw, 0)
     }
-    def apply(idx: Int): Long = buffer getLong (8 * idx + 4)
+    def apply(idx: Int): Long = buffer getLong (8 * idx + channel_data_offset_64bw)
     def close { file.close }
     buffer order java.nio.ByteOrder.nativeOrder
     new java.io.File(name).delete
