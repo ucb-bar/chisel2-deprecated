@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -51,23 +51,23 @@ class RiscSuite extends TestSuite {
       val file = Mem(256, UInt(width = 32))
       val code = Mem(256, UInt(width = 32))
       val pc   = Reg(init=UInt(0, 8))
-      
+
       val add_op :: imm_op :: Nil = Enum(UInt(width = 8), 2)
-    
+
       val inst = code(pc)
       val op   = inst(31,24)
       val rci  = inst(23,16)
       val rai  = inst(15, 8)
       val rbi  = inst( 7, 0)
-    
+
       val ra = Mux(rai === UInt(0), UInt(0), file(rai))
       val rb = Mux(rbi === UInt(0), UInt(0), file(rbi))
       val rc = UInt(width = 32)
-    
+
       io.valid := Bool(false)
       io.out   := UInt(0)
       rc       := UInt(0)
-    
+
       when (io.isWr) {
         code(io.wrAddr) := io.wrData
       } .elsewhen (io.boot) {
@@ -86,7 +86,7 @@ class RiscSuite extends TestSuite {
         pc := pc + UInt(1)
       }
     }
-    
+
     class RiscTester(c: Risc) extends Tester(c) {
       def wr(addr: BigInt, data: BigInt)  = {
         poke(c.io.isWr,   1)
@@ -105,13 +105,13 @@ class RiscSuite extends TestSuite {
         println("I = " + cr)
         cr
       }
-    
+
       val app  = Array(I(c.imm_op,   1, 0, 1), // r1 <- 1
                        I(c.add_op,   1, 1, 1), // r1 <- r1 + r1
                        I(c.add_op,   1, 1, 1), // r1 <- r1 + r1
                        I(c.add_op, 255, 1, 0)) // rh <- r1
       wr(0, 0) // skip reset
-      for (addr <- 0 until app.length) 
+      for (addr <- 0 until app.length)
         wr(addr, app(addr))
       def dump(k: Int) {
         println("K = " + k)

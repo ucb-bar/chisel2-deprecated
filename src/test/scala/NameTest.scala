@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -506,41 +506,41 @@ class NameSuite extends TestSuite {
       val y = Bool()
       val z = Bool()
     }
-    
+
     class EntryIO(num_ports: Int) extends Bundle
     {
       val vals = Vec(num_ports,   Bool(INPUT) )
       val out = Bool(OUTPUT)
-    }     
-    
+    }
+
     class Entry(num_ports: Int) extends Module
     {
       val io = new EntryIO(num_ports)
       io.out := io.vals.reduce(_|_)
-    }  
-    
+    }
+
     class NameItTooEager153 extends Module {
      val io = new Bundle {
          val idx = UInt(INPUT,2)
          val vals = Vec(4,   Bool(INPUT) )
          val z = Bool(OUTPUT)
       }
-    
+
       val entry_io = Vec(4,   Module(new Entry(4)).io )
-    
+
       for (i <- 0 until 4)
-      {  
+      {
          for (j <- 0 until 4)
-         {  
+         {
             entry_io(i).vals(j) := io.vals(j)
          }
       }
     }
-    
+
     chiselMain(Array[String]("--backend", "v",
         "--targetDir", dir.getPath.toString()),
         () => Module(new NameItTooEager153()))
-    
+
   }
 
   class KeywordsModule extends Module {
@@ -557,8 +557,8 @@ class NameSuite extends TestSuite {
   trait KeywordsModuleTestsCommon extends Tests {
     val values = Vector(3,2,1)
     def init(c: KeywordsModule) {
-      values foreach { v => 
-        poke(c.io.a, v) 
+      values foreach { v =>
+        poke(c.io.a, v)
         step(1)
       }
     }
@@ -577,7 +577,7 @@ class NameSuite extends TestSuite {
     expect(c.time, 2)
     expect(c.end, 3)
   }
- 
+
   @Test def testKeywordsCpp() {
     println("testKeywordsCpp:")
     launchCppTester((c: KeywordsModule) => new KeywordsModulePathTests(c))
@@ -614,7 +614,7 @@ class NameSuite extends TestSuite {
         val recv = Reg(UInt(0, 8))
       }
     }
-    
+
     // This should fail since we don't assign a directiom to the IO ports.
     intercept[IllegalStateException] {
       chiselMain(Array[String]("--backend", "v",

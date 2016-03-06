@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -103,7 +103,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: Option[UInt]): Unit = {
     val cond = // add bounds check if depth is not a power of 2
       condIn && (Bool(isPow2(n)) || addr(log2Up(n)-1,0) < UInt(n))
-    val wmask = wmaskIn match { // remove constant-1 write masks 
+    val wmask = wmaskIn match { // remove constant-1 write masks
       case Some(mask) => mask.litOpt match {
         case Some(l) if l.value == (BigInt(1) << data.getWidth)-1 => None
         case _ => wmaskIn
@@ -174,7 +174,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
         val read = readPortCache getOrElseUpdate (addr, gen().fromNode(new MemRead(this, addr)))
         write.data = data.toBits & mask | read.toBits & ~mask
       }
-    } 
+    }
   }
 
   def computePorts = {

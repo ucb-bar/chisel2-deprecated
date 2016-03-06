@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -47,9 +47,8 @@ import Chisel.AdvTester._
 // scalastyle:off method.length
 
 class TesterTest extends TestSuite {
-  val testArgs = Array("--backend", "v",
-      "--targetDir", dir.getPath.toString()
-      )
+
+  val backends = List("c") ++ {if (Driver.isVCSAvailable) "v" :: Nil else Nil}
 
   /** Test poking various numbers.
    *  This is primarily a test of the Tester and its peek/poke/expect interface.
@@ -57,7 +56,7 @@ class TesterTest extends TestSuite {
    */
   @Test def testVariousPokes () {
     println("\ntestVariousPokes ...")
-    
+
     class IOSelector extends Module {
       val io = new Bundle {
         val selectIn = UInt(INPUT, width=4)
@@ -128,9 +127,11 @@ class TesterTest extends TestSuite {
       tests(m)
     }
 
-    chiselMainTest(Array[String]("--backend", "c",
-      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
-      () => Module(new IOSelector())) {m => new VariousPokeTester(m)}
+    for (b <- backends) {
+      chiselMainTest(Array[String]("--backend", b,
+        "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+        () => Module(new IOSelector())) {m => new VariousPokeTester(m)}
+    }
   }
 
   /** Test poking negative numbers.
@@ -139,31 +140,33 @@ class TesterTest extends TestSuite {
    */
   @Test def testPokeNegTests () {
     println("\ntestPokeNegTests ...")
-    
+
     class PokeNegModule extends Module {
-    
-      val io = new Bundle {  
+
+      val io = new Bundle {
         val i_value     = UInt(INPUT, width = 64)
         val o_value     = UInt(OUTPUT, width = 64)
       }
-    
+
       io.o_value := io.i_value
-    } 
-    
+    }
+
     class PokeNegTests(c:PokeNegModule) extends AdvTester(c, true){
       wire_poke(c.io.i_value, 0x7100a000a000a000L)
       expect(c.io.o_value, 0x7100a000a000a000L)
-    
+
       wire_poke(c.io.i_value, 0x8100a000a000a000L)
-      expect(c.io.o_value, 0x8100a000a000a000L) 
-    
+      expect(c.io.o_value, 0x8100a000a000a000L)
+
       wire_poke(c.io.i_value, -1L )
       expect(c.io.o_value, -1L )
-    }   
-    
-    chiselMainTest(Array[String]("--backend", "c",
-      "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
-      () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
+    }
+
+    for (b <- backends) {
+      chiselMainTest(Array[String]("--backend", b,
+        "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+        () => Module(new PokeNegModule())) {m => new PokeNegTests(m)}
+    }
   }
 
   /** Test poking wide numbers.
@@ -173,44 +176,82 @@ class TesterTest extends TestSuite {
   @Test def testPokeWide () {
     println("\ntestPokeWide ...")
 
-    // We'd like to use something like assume() here, but it generates
-    // a TestCanceledException. There should be a programmatic way to skip
-    // tests (without failing) but make a note of the fact.
-    if (!Driver.isVCSAvailable) {
-      assert(true, "vcs unavailable - skipping testPokeWide")
-    } else {
-      class PokeWideModule extends Module {
-      
-        val io = new Bundle {  
-          val i_value     = UInt(INPUT, width = 64)
-          val o_value     = UInt(OUTPUT, width = 64)
-        }
-      
-        io.o_value := io.i_value
-      } 
-      
-      class PokeWideTests(c:PokeWideModule) extends AdvTester(c, true){
-        wire_poke(c.io.i_value, 0x7100a000a000a000L)
-        expect(c.io.o_value, 0x7100a000a000a000L)
-      
-        // We need to construct the next number carefully.
-        //  We don't want it flagged as a negative number,
-        //  so we manually construct it by shifting a positive number.
-        //  (0x8100a000a000a000L is interpreted as a negative 64-bit number.
-        val notNeg = BigInt(0x8100a000a000a00L) << 4
-        wire_poke(c.io.i_value, notNeg)
-        expect(c.io.o_value, notNeg) 
+    class PokeWideModule extends Module {
 
-        // "-1" is not a legal poke value for the Verilog tester..
-        // All poke values must be hex strings for Verilog.
-        // See harnessAPIs() in Verilog.scala
-        //wire_poke(c.io.i_value, -1L )
-        //expect(c.io.o_value, -1L )
-      }   
-  
-      chiselMainTest(Array[String]("--backend", "v",
+      val io = new Bundle {
+        val i_value     = UInt(INPUT, width = 64)
+        val o_value     = UInt(OUTPUT, width = 64)
+      }
+
+      io.o_value := io.i_value
+    }
+
+    class PokeWideTests(c:PokeWideModule) extends AdvTester(c, true){
+      wire_poke(c.io.i_value, 0x7100a000a000a000L)
+      expect(c.io.o_value, 0x7100a000a000a000L)
+
+      // We need to construct the next number carefully.
+      //  We don't want it flagged as a negative number,
+      //  so we manually construct it by shifting a positive number.
+      //  (0x8100a000a000a000L is interpreted as a negative 64-bit number.
+      val notNeg = BigInt(0x8100a000a000a00L) << 4
+      wire_poke(c.io.i_value, notNeg)
+      expect(c.io.o_value, notNeg)
+
+      // "-1" is not a legal poke value for the Verilog tester..
+      // All poke values must be hex strings for Verilog.
+      // See harnessAPIs() in Verilog.scala
+      //wire_poke(c.io.i_value, -1L )
+      //expect(c.io.o_value, -1L )
+    }
+
+    for (b <- backends) {
+      chiselMainTest(Array[String]("--backend", b,
         "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
         () => Module(new PokeWideModule())) {m => new PokeWideTests(m)}
+    }
+  }
+
+  /** Test many IOs - issue #665.
+   *  This is primarily a test of the Tester and its peek/poke/expect interface.
+   *
+   */
+  @Test def testBigIO () {
+    println("\ntestBiGIO ...")
+
+    class PokeBigIOModule extends Module {
+
+      val io = new Bundle {
+        val i_values     = Vec(8192, UInt(INPUT, width = 64))
+        val o_values     = Vec(10000, UInt(OUTPUT, width = 64))
+      }
+
+      io.o_values(9000) := io.i_values(8191)
+    }
+
+    class PokeBigIOTests(c:PokeBigIOModule) extends AdvTester(c, true){
+      wire_poke(c.io.i_values(8191), 0x7100a000a000a000L)
+      expect(c.io.o_values(9000), 0x7100a000a000a000L)
+
+      // We need to construct the next number carefully.
+      //  We don't want it flagged as a negative number,
+      //  so we manually construct it by shifting a positive number.
+      //  (0x8100a000a000a000L is interpreted as a negative 64-bit number.
+      val notNeg = BigInt(0x8100a000a000a00L) << 4
+      wire_poke(c.io.i_values(8191), notNeg)
+      expect(c.io.o_values(9000), notNeg)
+
+      // "-1" is not a legal poke value for the Verilog tester..
+      // All poke values must be hex strings for Verilog.
+      // See harnessAPIs() in Verilog.scala
+      //wire_poke(c.io.i_value, -1L )
+      //expect(c.io.o_value, -1L )
+    }
+
+    for (b <- backends) {
+      chiselMainTest(Array[String]("--backend", b,
+        "--targetDir", dir.getPath.toString(), "--genHarness", "--compile", "--test"),
+        () => Module(new PokeBigIOModule())) {m => new PokeBigIOTests(m)}
     }
   }
 }

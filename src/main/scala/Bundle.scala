@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -55,9 +55,9 @@ object Bundle {
   */
 class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   /** Populates the cache of elements declared in the Bundle. */
-  private def calcElements(view: Seq[String]) = {
+  protected def calcElements(view : Seq[String]) = {
     val c      = getClass
-    var elts   = LinkedHashMap[String, Data]() 
+    var elts   = LinkedHashMap[String, Data]()
     val seen   = HashSet[Object]()
     for (m <- c.getMethods.sortWith(
       (x, y) => (x.getName < y.getName)
@@ -67,20 +67,28 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
       val types = m.getParameterTypes
 
       val rtype = m.getReturnType
-      val isInterface = classOf[Data].isAssignableFrom(rtype)
+      val isInterface = classOf[Data].isAssignableFrom(rtype) || classOf[Option[_]].isAssignableFrom(rtype)
 
       // TODO: SPLIT THIS OUT TO TOP LEVEL LIST
-      if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers) 
+      if( types.length == 0 && !java.lang.reflect.Modifier.isStatic(modifiers)
         && isInterface && !(name contains '$') && !(Bundle.keywords contains name)
         && (view.isEmpty || (view contains name)) && checkPort(m, name)) {
         // Fetch the actual object
-        val obj = m invoke this
-        if(!(seen contains obj)) {
-          obj match {
-            case d: Data => elts(name) = d
-            case any =>
+        m invoke this match {
+          case d: Data => if(!(seen contains d)) {
+            elts(name) = d; seen += d
           }
-          seen += obj
+          case Some(o) => o match {
+            case d: Data => {
+              if (elts contains name)
+                ChiselError.warning("Already saw " + name + " (" + d + ") in Bundle " + this)
+              if (!seen(d)) {
+                elts(name) = d; seen += d
+              }
+            }
+            case _ =>
+          }
+          case _ =>
         }
       }
     }
@@ -161,7 +169,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   }
 
   /** Check if an element exists with that name */
-  def contains(name: String): Boolean = elements contains name 
+  def contains(name: String): Boolean = elements contains name
 
   override def apply(name: String): Data = elements(name)
 
@@ -193,8 +201,8 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
   }
 
   override def flatten: Array[(String, Bits)] = {
-    val sortedElems = elements.toArray sortWith (_._2._id < _._2._id) 
-    (sortedElems foldLeft Array[(String, Bits)]()){(res, x) => 
+    val sortedElems = elements.toArray sortWith (_._2._id < _._2._id)
+    (sortedElems foldLeft Array[(String, Bits)]()){(res, x) =>
       val (n, i) = x
       res ++ (if (i.name != "") i.flatten else i match {
         case b: Bits => Array((n, b))

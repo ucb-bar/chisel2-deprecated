@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -42,8 +42,8 @@ import ExecutionContext.Implicits.global
 
 // Provides a template to define tester transactions
 trait Tests {
-  def t: Int 
-  def delta: Int 
+  def t: Int
+  def delta: Int
   def rnd: Random
   def setClocks(clocks: Iterable[(Clock, Int)]): Unit
   def peek(data: Bits): BigInt
@@ -56,26 +56,28 @@ trait Tests {
   def poke(data: Bits, x: Long): Unit
   def poke(data: Bits, x: BigInt): Unit
   def poke(data: Aggregate, x: Array[BigInt]): Unit
-  def poke(data: Flo, x: Float): Unit 
+  def poke(data: Flo, x: Float): Unit
   def poke(data: Dbl, x: Double): Unit
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
   def reset(n: Int = 1): Unit
   def step(n: Int): Unit
-  def int(x: Boolean): BigInt 
-  def int(x: Int):     BigInt 
-  def int(x: Long):    BigInt 
-  def int(x: Bits):    BigInt 
+  def int(x: Boolean): BigInt
+  def int(x: Int):     BigInt
+  def int(x: Long):    BigInt
+  def int(x: Bits):    BigInt
   def expect (good: Boolean, msg: => String): Boolean
   def expect (data: Bits, expected: BigInt): Boolean
   def expect (data: Aggregate, expected: Array[BigInt]): Boolean
   def expect (data: Bits, expected: Int): Boolean
   def expect (data: Bits, expected: Long): Boolean
+  def expect (data: Bool, expected: Boolean): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
   def newTestOutputString: String
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean
   def expect (data: Bits, expected: Int, msg: => String): Boolean
   def expect (data: Bits, expected: Long, msg: => String): Boolean
+  def expect (data: Bool, expected: Boolean, msg: => String): Boolean
   def expect (data: Flo, expected: Float, msg: => String): Boolean
   def expect (data: Dbl, expected: Double, msg: => String): Boolean
   def printfs: Vector[String]
@@ -113,12 +115,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
 
-  // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
-  private def mwhile(block: => Boolean)(loop: => Unit) {
-    while (!exitValue.isCompleted && block) {
-      loop
-    }
-    // If the test application died, throw a run-time error.
+  def throwExceptionIfDead(exitValue: Future[Int]) {
     if (exitValue.isCompleted) {
       val exitCode = Await.result(exitValue, Duration(-1, SECONDS))
       // We assume the error string is the last log entry.
@@ -131,7 +128,16 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       throw new TestApplicationException(exitCode, errorString)
     }
   }
-  private object SIM_CMD extends Enumeration { 
+
+  // A busy-wait loop that monitors exitValue so we don't loop forever if the test application exits for some reason.
+  private def mwhile(block: => Boolean)(loop: => Unit) {
+    while (!exitValue.isCompleted && block) {
+      loop
+    }
+    // If the test application died, throw a run-time error.
+    throwExceptionIfDead(exitValue)
+  }
+  private object SIM_CMD extends Enumeration {
     val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN = Value }
   implicit def cmdToId(cmd: SIM_CMD.Value) = cmd.id
 
@@ -152,12 +158,13 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
 [info]   at Chisel.Driver$.apply(Driver.scala:65)
 [info]   at Chisel.chiselMain$.apply(hcl.scala:63)
 [info]   ...
-       */ 
+       */
       val size = channel.size
       assert(size > 16, "channel.size is bogus: %d".format(size))
       channel map (FileChannel.MapMode.READ_WRITE, 0, size)
     }
     implicit def intToByte(i: Int) = i.toByte
+    val channel_data_offset_64bw = 4    // Offset from start of channel buffer to actual user data in 64bit words.
     def aquire {
       buffer put (0, 1)
       buffer put (2, 0)
@@ -168,20 +175,20 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     def valid = (buffer get 3) == 1
     def produce { buffer put (3, 1) }
     def consume { buffer put (3, 0) }
-    def update(idx: Int, data: Long) { buffer putLong (8*idx+4, data) }
-    def update(base: Int, data: String) { 
-      data.zipWithIndex foreach {case (c, i) => buffer put (base+i+4, c) }
-      buffer put (base+data.size+4, 0)
+    def update(idx: Int, data: Long) { buffer putLong (8 * idx + channel_data_offset_64bw, data) }
+    def update(base: Int, data: String) {
+      data.zipWithIndex foreach {case (c, i) => buffer put (base + i + channel_data_offset_64bw, c) }
+      buffer put (base + data.size + channel_data_offset_64bw, 0)
     }
-    def apply(idx: Int): Long = buffer getLong (8*idx+4)
+    def apply(idx: Int): Long = buffer getLong (8 * idx + channel_data_offset_64bw)
     def close { file.close }
     buffer order java.nio.ByteOrder.nativeOrder
     new java.io.File(name).delete
   }
 
-  private lazy val inChannel  = new Channel(inChannelName)  
+  private lazy val inChannel  = new Channel(inChannelName)
   private lazy val outChannel = new Channel(outChannelName)
-  private lazy val cmdChannel = new Channel(cmdChannelName) 
+  private lazy val cmdChannel = new Channel(cmdChannelName)
 
   def dumpName(data: Node): String = Driver.backend match {
     case _: FloBackend => data.getNode.name
@@ -204,7 +211,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val w = dtype.needWidth()
     dtype match {
       /* Any "signed" node */
-      case _: SInt | _ : Flo | _: Dbl => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
+      case _: SInt | _ : Flo | _: Dbl | _: Fixed => (if(rv >= (BigInt(1) << w - 1)) (rv - (BigInt(1) << w)) else rv)
       /* anything else (i.e., UInt) */
       case _ => (rv)
     }
@@ -253,9 +260,14 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @return a BigInt representation of the bits */
   def peek(data: Bits): BigInt = {
     if (isStale) update
-    val value = 
+    val value =
       if (data.isLit) data.litValue()
-      else if (data.isTopLevelIO && data.dir == INPUT) _pokeMap(data)
+      else if (data.isTopLevelIO && data.dir == INPUT) (_pokeMap get data) match {
+        case Some(p) => p
+        case None =>
+          if (isTrace) println(s" No initial values for ${dumpName(data)}")
+          BigInt(rnd.nextInt)
+      }
       else signed_fix(data, _peekMap getOrElse (data, peekNode(data.getNode)))
     if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value.toString(_base)}")
     value
@@ -270,8 +282,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
   /** Interpret the data as a double precision float */
@@ -279,12 +291,12 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val _isTrace = isTrace
     isTrace = false
     val value = longBitsToDouble(peek(data.asInstanceOf[Bits]).toLong)
-    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     isTrace = _isTrace
+    if (isTrace) println(s"  PEEK ${dumpName(data)} -> ${value}")
     value
   }
 
-  private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) { 
+  private def poke(id: Int, chunk: Int, v: BigInt, force: Boolean = false) {
     val cmd = if (!force) SIM_CMD.POKE else SIM_CMD.FORCE
     mwhile(!sendCmd(cmd)) { }
     mwhile(!sendCmd(id)) { }
@@ -296,7 +308,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * @example {{{ poke(path, BigInt(63) << 60, 2) }}}
     */
   def pokePath(path: String, v: BigInt, force: Boolean = false) {
-    val id = _signalMap getOrElseUpdate (path, getId(path)) 
+    val id = _signalMap getOrElseUpdate (path, getId(path))
     if (id == -1) {
       println("Can't find id for '%s'".format(path))
     } else {
@@ -431,7 +443,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       (_inputs.toList foldLeft 0){case (off, in) =>
         val chunk = _chunks(dumpName(in))
         val value = _pokeMap getOrElse (in, BigInt(0))
-        (0 until chunk) foreach (i => inChannel(off+i) = (value >> (64*i)).toLong)
+        (0 until chunk) foreach (i => inChannel(off + i) = (value >> (64 * i)).toLong)
         off + chunk
       }
       inChannel.produce
@@ -448,9 +460,9 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       (_outputs.toList foldLeft 0){case (off, out) =>
         val chunk = _chunks(dumpName(out))
         _peekMap(out) = ((0 until chunk) foldLeft BigInt(0))(
-          (res, i) => res | (int(outChannel(off+i)) << (64*i)))
+          (res, i) => res | (int(outChannel(off + i)) << (64 * i)))
         off + chunk
-      }        
+      }
       outChannel.consume
     }
     outChannel.release
@@ -477,7 +489,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private def calcDelta = {
     val min = (_clockCnts.values foldLeft Int.MaxValue)(math.min(_, _))
     _clockCnts.keys foreach (_clockCnts(_) -= min)
-    (_clockCnts filter (_._2 == 0)).keys foreach (k => _clockCnts(k) = _clockLens(k)) 
+    (_clockCnts filter (_._2 == 0)).keys foreach (k => _clockCnts(k) = _clockLens(k))
     min
   }
 
@@ -487,7 +499,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    if (isTrace) println(newTestOutputString)
+    if (isTrace && newTestOutputString != "") println(newTestOutputString)
     isStale = false
   }
 
@@ -524,7 +536,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     * See [[Chisel.Clock$ Clock]]
     */
   def step(n: Int) {
-    if (isTrace) println(s"STEP ${n} -> ${t+n}")
+    if (isTrace) println(s"STEP ${n} -> ${t + n}")
     (0 until n) foreach (_ => takeStep)
     t += n
   }
@@ -573,7 +585,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     val got = peek(data) & mask
     val exp = expected & mask
     isTrace = _isTrace
-    expect(got == exp, prependOptionalString(msg, 
+    expect(got == exp, prependOptionalString(msg,
       s"  EXPECT ${dumpName(data)} <- ${got.toString(_base)} == ${exp.toString(_base)}"))
   }
   def expect (data: Bits, expected: BigInt): Boolean = {
@@ -603,6 +615,16 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   def expect (data: Bits, expected: Long): Boolean = {
     expect(data, expected, "")
   }
+
+  /** Expect the value of 'data' to be 'expected'
+    * @return the test passed */
+  def expect (data: Bool, expected: Boolean, msg: => String): Boolean = {
+    expect(data, { if (expected) 1 else 0 }, msg)
+  }
+  def expect (data: Bool, expected: Boolean): Boolean = {
+    expect(data, expected, "")
+  }
+
   /* We need the following so scala doesn't use our "tolerant" Float version of expect.
    */
   /** Expect the value of 'data' to be 'expected'
@@ -651,7 +673,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       }
     }
     isTrace = _isTrace
-    expect(gotFLoat == expectedFloat, prependOptionalString(msg, 
+    expect(gotFLoat == expectedFloat, prependOptionalString(msg,
       s"  EXPECT ${dumpName(data)} <- ${gotFLoat} == ${expectedFloat}"))
   }
   def expect (data: Bits, expected: Float): Boolean = {
@@ -659,17 +681,17 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
 
   _signalMap ++= Driver.signalMap flatMap {
-    case (m: Mem[_], id) => 
+    case (m: Mem[_], id) =>
       (0 until m.n) map (idx => "%s[%d]".format(dumpName(m), idx) -> (id + idx))
     case (node, id) => Seq(dumpName(node) -> id)
   }
 
-  Driver.dfs { 
-    case m: Mem[_] => (0 until m.n) foreach {idx => 
+  Driver.dfs {
+    case m: Mem[_] => (0 until m.n) foreach {idx =>
       val name = s"${dumpName(m)}[${idx}]"
       _chunks(name) = (m.needWidth-1)/64 + 1
     }
-    case node if node.isInObject => 
+    case node if node.isInObject =>
       _chunks(dumpName(node)) = (node.needWidth-1)/64 + 1
     case _ =>
   }
@@ -688,7 +710,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
         command ++= ArrayBuffer(":target-dir", Driver.targetDir)
         command.mkString(" ")
-      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0", 
+      case b: VerilogBackend => List(target, "-q", "+vcs+initreg+0",
         if (Driver.isVCD) "+vpdfile=%s.vpd".format(Driver.targetDir + c.name)  else "",
         if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
       case _ => target
@@ -696,7 +718,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   }
 
   val (process: Process, exitValue: Future[Int], inChannelName, outChannelName, cmdChannelName) = {
-    val processBuilder = Process(cmd) 
+    val processBuilder = Process(cmd)
     val processLogger = ProcessLogger(_logs += _)
     val process = processBuilder run processLogger
 
@@ -717,7 +739,11 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       println(_logs.remove(0))
     }
     if (!_logs.isEmpty) println(_logs.remove(0)) else println("<no startup message>")
-    while (_logs.size < 3) { Thread.sleep(100) }
+    while (_logs.size < 3) {
+      // If the test application died, throw a run-time error.
+      throwExceptionIfDead(exitValue)
+      Thread.sleep(100)
+    }
     val in_channel_name = _logs.remove(0)
     val out_channel_name = _logs.remove(0)
     val cmd_channel_name = _logs.remove(0)
@@ -745,7 +771,16 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
 
   /** Complete the simulation and inspect all tests */
   def finish {
-    mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    try {
+      mwhile(!sendCmd(SIM_CMD.FIN)) { }
+    }
+    catch {
+      // Depending on load and timing, we may get a TestApplicationException
+      //  when the test application exits.
+      //  Check the exit value.
+      //  Anything other than 0 is an error.
+      case e: TestApplicationException => if (e.exitVal != 0) fail
+    }
     if (isTrace) println(newTestOutputString)
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")
@@ -779,12 +814,12 @@ class MapTester[+T <: Module](c: T, val testNodes: Seq[Node]) extends Tester(c, 
     step(1)
     if (isTrace) println("OUTPUTS")
     outs forall { out =>
-      val value = out match { 
+      val value = out match {
         case io: Bits if io.isTopLevelIO => peek(io)
         case _ => peekNode(out)
       }
       (ovars get out) match {
-        case None => 
+        case None =>
           ovars(out) = Literal(value)
           if (isTrace) println("  READ " + dumpName(out) + " = " + value)
           true

@@ -38,7 +38,7 @@ class FullAdder extends Module {
     io.out.valid := Bool(false)
     p := Bool(true)
     q := Bool(true)
-  } 
+  }
 
   when (io.out.ready && p) {
     // Calculate the sum

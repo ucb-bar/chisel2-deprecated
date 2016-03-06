@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -56,7 +56,7 @@ object Node {
       m.inputs(i).widthW
     } catch {
         case e: java.lang.IndexOutOfBoundsException => {
-          val error = new ChiselError(() => {m + " is unconnected ("+ i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
+          val error = new ChiselError(() => {m + " is unconnected (" + i + " of " + m.inputs.length + "). Ensure that it is assigned."}, m.line)
           if (!ChiselError.contains(error) && !Driver.isInGetWidth) {
             ChiselError.error(error)
           }
@@ -120,7 +120,15 @@ object Node {
 //        ChiselError.warning("lshWidthOf: child width not set - " + m.inputs(0))
         Width()
       } else {
-        w0 + n.litValue((1 << w.needWidth)-1).toInt
+        val shiftWidth = {
+          val nWidth = w.needWidth
+          val mWidth = 31
+          if (nWidth > mWidth) {
+//            ChiselError.warning("lshWidthOf: shiftWidth (%d) overflows Int (%d).".format(nWidth, mWidth))
+          }
+          nWidth
+        }
+        w0 + n.litValue((1 << shiftWidth)-1).toInt
       }
     }
   }
@@ -180,7 +188,7 @@ abstract class Node extends Nameable {
       ChiselError.findFirstUserLine(trace) getOrElse trace(0)
     } else null
   /** The unique id of this node */
-  val _id = Driver.getNodeId 
+  val _id = Driver.getNodeId
 
   private[Chisel] def width: Int = {
     val w = widthW
@@ -339,7 +347,7 @@ abstract class Node extends Nameable {
   def isTopLevelIO = isIo && component == Module.topMod
 
   private[Chisel] lazy val isInObject =
-    (isIo && (Driver.isIoDebug || component == Module.topMod)) || 
+    (isIo && (Driver.isIoDebug || component == Module.topMod)) ||
     component.debugs(this) || (Driver.backend isInObject this) ||
     isUsedByClockHi || Driver.isDebug && named || Driver.emitTempNodes
 
@@ -494,7 +502,7 @@ abstract class Node extends Nameable {
   /** @return the bitWidth of the node
     * @throws ChiselException if the width is not yet defined
     */
-  def needWidth(): Int = widthW.needWidth 
+  def needWidth(): Int = widthW.needWidth
   /** Return true if the width of this node is known (set). */
   private[Chisel] def isKnownWidth: Boolean = widthW.isKnown
 

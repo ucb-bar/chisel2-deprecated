@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -305,11 +305,11 @@ object PartitionIslands {
       val dstIsland = markedNodes(s.inputs(0))
       // Ensure srcIsland and dstIsland exist.
       if (!res.contains(srcIsland)) {
-        ChiselError.error("islandHop: node "+ s + " - source island " + srcIsland + " not in results", s.line)
+        ChiselError.error("islandHop: node " + s + " - source island " + srcIsland + " not in results", s.line)
         return
       }
       if (!res.contains(dstIsland)) {
-        ChiselError.error("islandHop: node "+ s.inputs(0) + " - destination island " + dstIsland + " not in results", s.inputs(0).line)
+        ChiselError.error("islandHop: node " + s.inputs(0) + " - destination island " + dstIsland + " not in results", s.inputs(0).line)
         return
       }
       // Remove us from collection of nodes associated with this island.

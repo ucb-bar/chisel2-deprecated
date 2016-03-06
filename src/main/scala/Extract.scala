@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -59,11 +59,7 @@ object NodeExtract {
     val widthInfer = if (width == -1) Node.widthOf(0) else Node.fixWidth(width)
     (hi.litOpt, lo.litOpt) match {
       case (Some(hl), Some(ll)) => apply(mod, hl.value.toInt, ll.value.toInt, width)
-      case _ =>
-        val rsh = Op(">>", widthInfer, mod, lo)
-        val hiMinusLoPlus1 = Op("+", Node.maxWidth _, Op("-", Node.maxWidth _, hi, lo), UInt(1))
-        val mask = Op("-", widthInfer, Op("<<", widthInfer, UInt(1), hiMinusLoPlus1), UInt(1))
-        Op("&", widthInfer, rsh, mask)
+      case _ => makeExtract(mod, hi, lo, widthInfer)
     }
   }
 
@@ -106,11 +102,11 @@ class Extract(hi: Node, lo: Node) extends Node {
   def validateIndex(x: Node) {
     val w0 = inputs(0).widthW
     x.litOpt match {
-      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(), 
+      case Some(l) => assert(l.value >= 0 && l.value < w0.needWidth(),
         ChiselError.error("Extract(" + l.value + ")" +
           " out of range [0," + (w0.needWidth()-1) + "]" +
           " of " + inputs(0), line))
-      case _ => 
+      case _ =>
     }
   }
 
@@ -133,6 +129,49 @@ class Extract(hi: Node, lo: Node) extends Node {
       case _ =>
         ChiselError.error("Extract(" + inputs(0) + ", " + inputs(1) + ", " + inputs(2) + ")" +
             " W0Wtransform", line)
+    }
+  }
+
+  // Static width - we can determine the width of the extracted bits at elaboration time.
+  def isStaticWidth: Boolean = {
+    if (this.inputs.length < 3 || this.needWidth() == 1) {
+      true
+    } else {
+      val hi = this.inputs(1)
+      val lo = this.inputs(2)
+      // The width is known if both inputs will have the same runtime value, or both are literals.
+      hi == lo || (hi.isLit && lo.isLit)
+    }
+  }
+
+  // Is this a (known) single bit extraction?
+  def isOneBit: Boolean = {
+    // It must at least be static, then either have only one argument, or two identical arguments,
+    //  or two arguments with identical values.
+    //  TODO: This last test is redundant if literal nodes are identical if their values are identical
+    isStaticWidth && (this.inputs.length < 3 || {
+      (this.inputs(1), this.inputs(2)) match {
+        case (hi: Literal, lo: Literal) => hi.value == lo.value
+        case _ => {
+           // If the width is static and we get here, both inputs must be the same.
+          assert(hi == lo)
+          true
+        }
+      }
+    })
+  }
+
+  // Is this operation a no-op - extract all source bits?
+  def isNop: Boolean = {
+    // The extracted width must be static and equal to the source width, and the lo value must be 0.
+    isStaticWidth && this.inputs(1).isLit && {
+      val hiValue = this.inputs(1).litValue()
+      val loValue = if (this.inputs.length < 3) {
+        hiValue
+      } else {
+        this.inputs(2).litValue()
+      }
+      hiValue - loValue + 1 == this.inputs(0).needWidth && loValue == 0
     }
   }
 

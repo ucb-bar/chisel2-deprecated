@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -112,8 +112,8 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     // create buckets for each elm in data type
     val buckets = (for (i <- 0 until this(0).flatten.length) yield (new ArrayBuffer[Data])).toArray
     // fill out buckets
-    for (elm <- this ; ((n, io), i) <- elm.flatten.zipWithIndex) buckets(i) += io 
-     
+    for (elm <- this ; ((n, io), i) <- elm.flatten.zipWithIndex) buckets(i) += io
+
     buckets
   }
 
@@ -146,7 +146,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
 
   override def flatten: Array[(String, Bits)] = {
     // Todo: why reverse?
-    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) => 
+    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) =>
       val (elm, idx) = x
       res ++ (if (elm.name != "") elm.flatten else elm match {
         case b: Bits => Array((idx.toString, b))
@@ -166,11 +166,11 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
 
   override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = comp match {
     case Some(p) => p procAssign Vec(that)
-    case None => { 
+    case None => {
       def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
         who.forall(_._2.dir == who.head._2.dir)
 
-      assert(size == that.size, 
+      assert(size == that.size,
         ChiselError.error("Can't wire together Vecs of mismatched lengths"))
       assert(unidirectional(flatten),
         ChiselError.error("Cannot mix directions on left hand side of :="))
