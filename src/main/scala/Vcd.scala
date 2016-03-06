@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -38,85 +38,109 @@ class VcdBackend(top: Module) extends Backend {
       case _: Literal =>
         node.name
       case _: Reg =>
-        if (node.named) node.name else "R" + node.emitIndex
+        if (node.named) node.name else s"R${node.emitIndex}"
       case _ =>
-        if (node.named) node.name else "T" + node.emitIndex
+        if (node.named) node.name else s"T${node.emitIndex}"
     }
 
+  private def emitDefUnconditional(index: Int) =
+    s"dat_dump<1>(f, reset, 0x%x);".format(varNumber(index))
+
   private def emitDefUnconditional(node: Node, index: Int) =
-    "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ", 0x" + varNumber(index).toHexString + ");\n"
+    s"dat_dump<${varNameLength(index)}>(f, ${emitRef(node)}, 0x%x);".format(varNumber(index))
 
   private def emitDefUnconditional(node: Node, offset: Int, index: Int) =
-    "  dat_dump<" + varNameLength(index) + ">(f, " + emitRef(node) + ".get(0x" + offset.toHexString +"), 0x" + varNumber(index).toHexString + ");\n"
+    s"dat_dump<${varNameLength(index)}>(f, ${emitRef(node)}.get(0x%x), 0x%x);".format(offset, varNumber(index))
 
-  private def emitDef1(node: Node, index: Int, toZero: Boolean = false) = (node match {
-    case _: Clock => "  if (" + emitRef(node) + ".len == "  + emitRef(node) + ".cnt)" 
-    case _        => "  if (" + emitRef(node) + " != " + emitRef(node) + "__prev)" }) + 
-    "  goto " + (if (toZero) "Z" else "L") + index + ";\n" + (if (toZero) "C" else "K") + index + ":"
+  private def emitDef1(clk: Clock, index: Int, toZero: Boolean) = List(
+   s"  if (${emitRef(clk)}.cnt == 0)  goto ${if (toZero) "Z" else "L"}${index};",
+   s"${if (toZero) "C" else "K"}${index}:") mkString "\n"
 
-  private def emitDef1(node: Node, offset: Int, index: Int) =
-    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
-    "__prev.get(0x" + offset.toHexString + "))" + "  goto L" + index + ";\n" + "K" + index + ":"
+  private def emitDef1(index: Int) = List(
+   s"  if (reset != reset__prev)  goto L${index};",
+   s"K${index}:") mkString "\n"
 
-  private def emitDef2(node: Node, index: Int, isZero: Boolean = false) =
-    (if (isZero) "Z" else "L") + index + ":\n" +
-    (node match { 
-      case _: Clock => "  " + emitRef(node) + ".values[0] = %d;\n".format(if (isZero) 0 else 1)
-      case _        => "  " + emitRef(node) + "__prev = " + emitRef(node) + ";\n" }) +
-    emitDefUnconditional(node, index) +
-    "  goto " + (if (isZero) "C" else "K") + index + ";\n"
+  private def emitDef1(node: Node, index: Int) = List(
+   s"  if (${emitRef(node)} != ${emitRef(node)}__prev)  goto L${index};",
+   s"K${index}:") mkString "\n"
 
-  private def emitDef2(node: Node, offset: Int, index: Int) =
-    "L" + index + ":\n" +
-    "  " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
-    emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
-    emitDefUnconditional(node, offset, index) +
-    "  goto K" + index + ";\n"
+  private def emitDef1(node: Node, offset: Int, index: Int) = List(
+   s"  if (${emitRef(node)}.get(0x%x) != ${emitRef(node)}__prev.get(0x%x))  goto L${index};".format(offset, offset),
+   s"K${index}:") mkString "\n"
 
-  private def emitDefInline(node: Node, index: Int, isZero: Boolean = false) = (node match {
-    case _: Clock =>
-      "  if (" + emitRef(node) + ".len == " + emitRef(node) + ".cnt) {\n" +
-      "    " + emitRef(node) + ".values[0] = %d;\n".format(if (isZero) 0 else 1)
-    case _        =>
-      "  if (" + emitRef(node) + " != " + emitRef(node) + "__prev) {\n" +
-      "    " + emitRef(node) + "__prev = " + emitRef(node) + ";\n" }) +
-      "  " + emitDefUnconditional(node, index) + "  }\n"
- 
+  private def emitDef2(clk: Clock, index: Int, isZero: Boolean) = List(
+   s"${if (isZero) "Z" else "L"}${index}:",
+   s"  ${emitRef(clk)}.values[0] = ${if (isZero) 0 else 1};",
+   s"  ${emitDefUnconditional(clk, index)}",
+   s"  goto ${if (isZero) "C" else "K"}${index};\n") mkString "\n"
 
-  private def emitDefInline(node: Node, offset: Int, index: Int) =
-    "  if (" + emitRef(node) + ".get(0x" + offset.toHexString +") != " + emitRef(node) +
-    "__prev.get(0x" + offset.toHexString + ")) {\n" +
-    "    " + emitRef(node) + "__prev.put(0x" + offset.toHexString + ", " +
-    "    " + emitRef(node) + ".get(0x" + offset.toHexString + "));\n" +
-    "    " + emitDefUnconditional(node, offset, index) +
-    "  }\n"
+  private def emitDef2(index: Int) = List(
+   s"L${index}:",
+    "  reset__prev = reset;",
+   s"  ${emitDefUnconditional(index)}",
+   s"  goto K${index};\n") mkString "\n"
+
+  private def emitDef2(node: Node, index: Int) = List(
+   s"L${index}:",
+   s"  ${emitRef(node)}__prev = ${emitRef(node)};",
+   s"  ${emitDefUnconditional(node, index)}",
+   s"  goto K${index};\n") mkString "\n"
+
+  private def emitDef2(node: Node, offset: Int, index: Int) = List(
+   s"L${index}:",
+   s"  ${emitRef(node)}__prev.put(0x%x, ${emitRef(node)}.get(0x%x));".format(offset, offset),
+   s"  ${emitDefUnconditional(node, offset, index)}",
+   s"  goto K${index};\n") mkString "\n"
+
+  private def emitDefInline(clk: Clock, index: Int, isZero: Boolean) = List(
+   s"  if (${emitRef(clk)}.cnt == 0) {",
+   s"    ${emitRef(clk)}.values[0] = ${if (isZero) 0 else 1};",
+   s"    ${emitDefUnconditional(clk, index)}", "  }\n") mkString "\n"
+
+  private def emitDefInline(index: Int) = List(
+    "  if (reset != reset__prev) {",
+    "    reset__prev = reset;",
+   s"    ${emitDefUnconditional(index)}", "  }\n") mkString "\n"
+
+  private def emitDefInline(node: Node, index: Int) = List(
+   s"  if (${emitRef(node)} != ${emitRef(node)}__prev) {",
+   s"    ${emitRef(node)}__prev = ${emitRef(node)};",
+   s"    ${emitDefUnconditional(node, index)}", "  }\n") mkString "\n"
+
+  private def emitDefInline(node: Node, offset: Int, index: Int) = List(
+   s"  if (${emitRef(node)}.get(0x${offset.toHexString}) != ${emitRef(node)}__prev.get(0x${offset.toHexString})) {",
+   s"    ${emitRef(node)}__prev.put(0x${offset.toHexString}, ${emitRef(node)}.get(0x${offset.toHexString}));",
+   s"    ${emitDefUnconditional(node, offset, index)}", "  }\n") mkString "\n"
 
   override def emitDec(node: Node): String = node match {
     case m: Mem[_] =>
-      "  mem_t<" + m.needWidth() + "," + m.n + "> " + emitRef(node) + "__prev;\n"
+      s"  mem_t<${m.needWidth},${m.n}> ${emitRef(node)}__prev;\n"
     case r: ROMData =>
-      "  mem_t<" + r.needWidth() + "," + r.n + "> " + emitRef(node) + "__prev;\n"
+      s"  mem_t<${r.needWidth},${r.n}> ${emitRef(node)}__prev;\n"
     case _ =>
-      "  dat_t<" + node.needWidth() + "> " + emitRef(node) + "__prev;\n"
-  } 
+      s"  dat_t<${node.needWidth}> ${emitRef(node)}__prev;\n"
+  }
 
   def dumpVCDScope(c: Module, write: String => Unit): Unit = {
-    write("  fputs(\"" + "$scope module " + c.name + " $end" + "\\n\", f);\n")
+    write("  fputs(\"$scope module %s $end\\n\", f);\n".format(c.name))
     if (c == topMod) {
       for ((clk, i) <- Driver.clocks.zipWithIndex) {
-        write("  fputs(\"$var wire 1 " + varName(i) + " " + clk.name + " $end\\n\", f);\n")
+        write("  fputs(\"$var wire 1 %s %s $end\\n\", f);\n".format(varName(i), clk.name))
       }
     }
     var baseIdx = Driver.clocks.size
-    for ((mod, i) <- sortedMods.zipWithIndex if c == mod.component && !mod.name.isEmpty) {
-      write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(baseIdx + i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
+    if (c == topMod) write("  fputs(\"$var wire 1 %s reset $end\\n\", f);\n".format(varName(baseIdx)))
+    baseIdx += 1
+    for ((node, i) <- sortedNodes.zipWithIndex if c == node.component && !node.name.isEmpty) {
+      write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
-    baseIdx += sortedMods.size
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.component == c && !mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -124,8 +148,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.component == c && !rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
-          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n
@@ -135,16 +159,18 @@ class VcdBackend(top: Module) extends Backend {
   }
 
   def dumpScopeForTemps(write: String => Unit): Unit = {
-    write("  fputs(\"" + "$scope module _chisel_temps_ $end" + "\\n\", f);\n")
-    for ((mod, i) <- sortedMods.zipWithIndex if mod.name.isEmpty) {
-      write("  fputs(\"$var wire " + mod.needWidth() + " " + varName(i) + " " + top.stripComponent(emitRef(mod)) + " $end\\n\", f);\n")
+    write("  fputs(\"$scope module _chisel_temps_ $end\\n\", f);\n")
+    var baseIdx = Driver.clocks.size + 1
+    for ((node, i) <- sortedNodes.zipWithIndex if node.name.isEmpty) {
+      write("  fputs(\"$var wire %d %s %s $end\\n\", f);\n".format(
+        node.needWidth, varName(baseIdx + i), top.stripComponent(emitRef(node))))
     }
-    var baseIdx = sortedMods.size
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       if (mem.name.isEmpty) {
         for (offset <- 0 until mem.n) {
-          write("  fputs(\"$var wire " + mem.needWidth() + " " + varName(baseIdx + offset) + " " +
-            top.stripComponent(emitRef(mem)) + "[%d] $end\\n\", f);\n".format(offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            mem.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(mem)), offset))
         }
       }
       baseIdx += mem.n
@@ -152,8 +178,8 @@ class VcdBackend(top: Module) extends Backend {
     for (rom <- sortedROMs) {
       if (rom.name.isEmpty) {
         for (offset <- 0 until rom.n) {
-          write("  fputs(\"$var wire " + rom.needWidth() + " " + varName(baseIdx + offset) + " " +
-            top.stripComponent(emitRef(rom)) + "[%d] $end\\n\", f);\n".format(offset))
+          write("  fputs(\"$var wire %d %s %s[%d] $end\\n\", f);\n".format(
+            rom.needWidth, varName(baseIdx + offset), top.stripComponent(emitRef(rom)), offset))
         }
       }
       baseIdx += rom.n
@@ -170,35 +196,44 @@ class VcdBackend(top: Module) extends Backend {
     write("  fputs(\"$end\\n\", f);\n")
     write("  fputs(\"#0\\n\", f);\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
-      write(emitDefUnconditional(clk, i))
+      write(emitDefInline(clk, i, false))
     }
     var baseIdx = Driver.clocks.size
-    for ((mod, i) <- sortedMods.zipWithIndex) {
-      write(emitDefUnconditional(mod, baseIdx + i))
-      val ref = emitRef(mod)
-      write("  " + ref + "__prev = " + ref +";\n");
+    write( "  dat_t<1> reset = LIT<1>(1);\n")
+    write(s"  ${emitDefUnconditional(baseIdx)}\n")
+    baseIdx += 1
+    for ((node, i) <- sortedNodes.zipWithIndex) {
+      write(s"  ${emitDefUnconditional(node, baseIdx + i)}\n")
+      write(s"  ${emitRef(node)}__prev = ${emitRef(node)};\n")
     }
-    baseIdx += sortedMods.size
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       for (offset <- 0 until mem.n)
-        write(emitDefUnconditional(mem, offset, baseIdx + offset))
+        write(s"  ${emitDefUnconditional(mem, offset, baseIdx + offset)}\n")
       baseIdx += mem.n
     }
     for (rom <- sortedROMs) {
       for (offset <- 0 until rom.n)
-        write(emitDefUnconditional(rom, offset, baseIdx + offset))
+        write(s"  ${emitDefUnconditional(rom, offset, baseIdx + offset)}\n")
       baseIdx += rom.n
+    }
+    write("  fputs(\"#1\\n\", f);\n")
+    for ((clk, i) <- Driver.clocks.zipWithIndex) {
+      write(emitDefInline(clk, i, true))
     }
   }
 
-  def dumpModsInline(write: String => Unit) {
+  def dumpNodesInline(write: String => Unit) {
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
-      write(emitDefInline(clk, i))
+      write(emitDefInline(clk, i, false))
     }
+    // reset
     var baseIdx = Driver.clocks.size
-    for ((mod, i) <- sortedMods.zipWithIndex)
-      write(emitDefInline(mod, baseIdx + i))
-    baseIdx += sortedMods.size
+    write(emitDefInline(baseIdx))
+    baseIdx += 1
+    for ((node, i) <- sortedNodes.zipWithIndex)
+      write(emitDefInline(node, baseIdx + i))
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       for (offset <- 0 until mem.n)
         write(emitDefInline(mem, offset, baseIdx + offset))
@@ -216,14 +251,16 @@ class VcdBackend(top: Module) extends Backend {
     write("  return;\n")
   }
 
-  def dumpModsGoTos(write: String => Unit) {
+  def dumpNodesGoTos(write: String => Unit) {
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
-      write(emitDef1(clk, i))
+      write(emitDef1(clk, i, false))
     }
     var baseIdx = Driver.clocks.size
-    for ((mod, i) <- sortedMods.zipWithIndex)
-      write(emitDef1(mod, baseIdx + i))
-    baseIdx += sortedMods.size
+    write(emitDef1(baseIdx))
+    baseIdx += 1
+    for ((node, i) <- sortedNodes.zipWithIndex)
+      write(emitDef1(node, baseIdx + i))
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       for (offset <- 0 until mem.n)
         write(emitDef1(mem, offset, baseIdx + offset))
@@ -240,12 +277,14 @@ class VcdBackend(top: Module) extends Backend {
     }
     write("  return;\n")
     for ((clk, i) <- Driver.clocks.zipWithIndex) {
-      write(emitDef2(clk, i))
+      write(emitDef2(clk, i, false))
     }
     baseIdx = Driver.clocks.size
-    for ((mod, i) <- sortedMods.zipWithIndex)
-      write(emitDef2(mod, baseIdx + i))
-    baseIdx += sortedMods.size
+    write(emitDef2(baseIdx))
+    baseIdx += 1
+    for ((node, i) <- sortedNodes.zipWithIndex)
+      write(emitDef2(node, baseIdx + i))
+    baseIdx += sortedNodes.size
     for (mem <- sortedMems) {
       for (offset <- 0 until mem.n)
         write(emitDef2(mem, offset, baseIdx + offset))
@@ -263,23 +302,23 @@ class VcdBackend(top: Module) extends Backend {
 
   def dumpVCD(write: String => Unit): Unit = {
     if (Driver.isVCDinline) {
-      dumpModsInline(write)
+      dumpNodesInline(write)
     } else {
-      dumpModsGoTos(write)
+      dumpNodesGoTos(write)
     }
   }
 
-  private lazy val sortedMods = Driver.orderedNodes filter {
+  private lazy val sortedNodes = Driver.orderedNodes filter {
     case _: Mem[_] => false case _: ROMData => false case node => node.isInVCD
-  } sortWith (_.width < _.width)
+  } sortWith (_.widthW < _.widthW)
 
   private lazy val sortedMems: Seq[Mem[_]] = Driver.orderedNodes filter {
-    case m: Mem[_] => m.isInVCD case _ => false 
+    case m: Mem[_] => m.isInVCD case _ => false
   } map (_.asInstanceOf[Mem[_]]) sortWith (_.widthW < _.widthW)
 
   private lazy val sortedROMs: Seq[ROMData] = Driver.orderedNodes filter {
     case r: ROMData => r.isInVCD case _ => false
-  } map (_.asInstanceOf[ROMData]) sortWith (_.width < _.width)
+  } map (_.asInstanceOf[ROMData]) sortWith (_.widthW < _.widthW)
 
   private val (lo, hi) = ('!'.toInt, '~'.toInt)
   private val range = hi - lo + 1

@@ -3,7 +3,7 @@
 void VerifSuite_CppAssertComp_1_t::init ( val_t rand_init ) {
   this->__srand(rand_init);
   clk.len = 1;
-  clk.cnt = clk.len;
+  clk.cnt = 0;
   clk.values[0] = 0;
 }
 int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
@@ -21,7 +21,7 @@ void VerifSuite_CppAssertComp_1_t::print ( std::ostream& s ) {
 }
 void VerifSuite_CppAssertComp_1_t::dump_init ( FILE* f ) {
 }
-void VerifSuite_CppAssertComp_1_t::dump ( FILE* f, int t ) {
+void VerifSuite_CppAssertComp_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
 }
 void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0;

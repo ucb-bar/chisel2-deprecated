@@ -29,7 +29,7 @@ module VerifSuite_VerilogPrintfComp_1(input clk, input reset,
   assign T1 = io_y;
   assign T2 = io_x;
   assign T3 = T4;
-  assign T4 = tsc_reg[5'h1f:1'h0];
+  assign T4 = tsc_reg;
   assign T8 = reset ? 32'h0 : T5;
   assign T5 = tsc_reg + 32'h1;
   assign io_z = T7;

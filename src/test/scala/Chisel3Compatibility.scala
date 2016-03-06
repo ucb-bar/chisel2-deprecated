@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -38,7 +38,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestMissingWire ...")
 
     class OptionalWire(noWire: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
@@ -67,7 +67,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
       chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
     }
     assertTrue(ChiselError.hasErrors)
-    
+
     // This should pass
     chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -77,7 +77,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestBadWireWrap ...")
 
     class OptionalWire(noWire: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
@@ -99,7 +99,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (no Wire() wrapper)
     chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -115,7 +115,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestBadMixedMux ...")
 
     class OptionalMux(mixedTypes: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val t = Bool(INPUT)
         val c = UInt(INPUT, 8)
@@ -143,7 +143,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (mixedTypes is false)
     chiselMainTest(testArgs, () => Module(new OptionalMux(false))){ c => new OptionalMuxTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -159,7 +159,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestSubwordNoWireWrap ...")
 
     class SubwordNoWire() extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
@@ -176,7 +176,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (no Wire() wrapper)
     chiselMainTest(testArgs, () => Module(new SubwordNoWire())){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)

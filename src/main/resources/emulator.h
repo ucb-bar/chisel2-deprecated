@@ -519,11 +519,11 @@ struct bit_word_funs {
   static void lsh (val_t d[], const val_t s0[], const int amount) {
     lsh_n(d, s0, amount, nw, nw);
   }
-  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s) {
     // TODO: FINISH THIS
     const int bw = e-s+1;
     val_t msk[nw];
-    mask_n(msk, nw, nb);
+    mask_n(msk, nw, bw);
     if (s == 0) {
       // printf("EXT E %d S %d NW %d NB %d: ", e, s, nw, nb);
       for (int i = 0; i < nw; i++) {
@@ -635,7 +635,7 @@ struct bit_word_funs<1> {
     d[0] = s0[0] << (val_n_bits() - w);
     d[0] = (sval_t(d[0]) >> (val_n_bits() - w + amount)) & mask_val(w);
   }
-  static void extract (val_t d[], val_t s0[], int e, int s, int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s) {
     const int bw = e-s+1;
     d[0] = (s0[0] >> s) & mask_val(bw);
   }
@@ -670,8 +670,7 @@ struct bit_word_funs<2> {
     d[1] = sww > 1 ? s0[1] : 0;
   }
   static void mask (val_t d[], int nb) {
-    d[0] = val_all_ones();
-    d[1] = mask_val(nb - val_n_bits());
+	mask_n(d, 2, nb);
   }
   static void add (val_t d[], val_t x[], val_t y[], int nb) {
     val_t x0     = x[0];
@@ -745,7 +744,7 @@ struct bit_word_funs<2> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]);
   }
-  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s) {
     val_t msk[2];
     const int bw = e-s+1;
     mask_n(msk, 2, bw);
@@ -845,9 +844,7 @@ struct bit_word_funs<3> {
     d[2] = sww > 2 ? s0[2] : 0;
   }
   static void mask (val_t d[], int nb) {
-    d[0] = val_all_ones();
-    d[1] = val_all_ones();
-    d[2] = mask_val(nb - 2*val_n_bits());
+	mask_n(d, 3, nb);
   }
   static void add (val_t d[], val_t s0[], val_t s1[], int nb) {
     add_n(d, s0, s1, 3, nb);
@@ -907,7 +904,7 @@ struct bit_word_funs<3> {
   static bool neq (val_t s0[], val_t s1[]) {
     return (s0[0] != s1[0]) | (s0[1] != s1[1]) | (s0[2] != s1[2]);
   }
-  static void extract (val_t d[], const val_t s0[], const int e, const int s, const int nb) {
+  static void extract (val_t d[], const val_t s0[], const int e, const int s) {
     val_t msk[3];
     const int bw = e-s+1;
     mask_n(msk, 3, bw);
@@ -1200,6 +1197,12 @@ class dat_t {
     bit_word_funs<n_words>::set(values, o.values);
     return *this;
   }
+  // Set values (typically to 0).
+  dat_t<w>& operator = ( val_t val ) {
+	for (int i = 0; i < n_words; i++)
+	  values[i] = val;
+    return *this;
+  }
   dat_t<w> fill_bit( val_t bit ) {
     dat_t<w> res;
     val_t word = 0L - bit;
@@ -1245,12 +1248,14 @@ class dat_t {
     return res;
   }
   template <int dw>
-  dat_t<dw> extract(val_t e, val_t s) {
+  dat_t<dw> extract(const val_t e, const val_t s) {
+	const int bw = e-s+1;
+	dat_t<w> msk = mask<w>(bw);
     dat_t<w> x = (*this >> s);
-    return x.extract<dw>();
+    return x & msk;
   }
   template <int dw, int iwe, int iws>
-  inline dat_t<dw> extract(dat_t<iwe> e, dat_t<iws> s) {
+  inline dat_t<dw> extract(const dat_t<iwe> e, const dat_t<iws> s) {
     return extract<dw>(e.lo_word(), s.lo_word());
   }
 
@@ -1740,14 +1745,14 @@ class mod_t {
 
   virtual void print ( FILE* f ) { };
   virtual void print ( std::ostream& s ) { };
-  virtual void dump ( FILE* f, int t ) { };
+  virtual void dump ( FILE* f, int t , dat_t<1> reset=LIT<1>(0) ) { };
 
   void set_dumpfile(FILE* f) { dumpfile = f; }
 
   size_t timestep;
 
-  void dump () {
-    if (dumpfile != NULL) dump(dumpfile, timestep);
+  void dump ( dat_t<1> reset=LIT<1>(0) ) {
+    if (dumpfile != NULL) dump(dumpfile, timestep, reset);
     timestep += 1;
   }
 

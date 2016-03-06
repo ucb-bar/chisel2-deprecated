@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -248,7 +248,7 @@ trait Delay extends Node {
 
   /** If there is an environment variable `chiselArguments`, construct an `Array[String]`
     *  of its value split on ' ', otherwise, return a 0 length `Array[String]`
-    *  
+    *
     *  This makes it easy to merge with command line arguments and have the latter take precedence.
     * {{{
     *  def main(args: Array[String]) {
@@ -263,7 +263,7 @@ object chiselEnvironmentArguments {
 
   /**
     * @return value of environment variable `chiselArguments` split on ' ' or a 0 length Array[String]
-    *  
+    *
     */
   def apply(envName: String = chiselArgumentNameDefault): Array[String] = {
     val chiselArgumentString = Properties.envOrElse(envName, "")
