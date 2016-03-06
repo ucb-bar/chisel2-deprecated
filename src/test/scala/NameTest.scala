@@ -325,7 +325,7 @@ class NameSuite extends TestSuite {
 
       io.status := reg_status
 
-      val elts = Vec(List[UInt](reg_status.toBits))
+      val elts = Vec(List[UInt](reg_status.asUInt))
       rdata := elts(UInt(0))
 
       reg_status := new Status().fromBits(wdata)
@@ -482,8 +482,8 @@ class NameSuite extends TestSuite {
     println("testInputPortNameChange:")
     class InputPortNameComp extends Module {
       val io = new Bundle {
-        val in = Bits(INPUT, 20)
-        val out = Bits(OUTPUT, 20)
+        val in = UInt(INPUT, 20)
+        val out = UInt(OUTPUT, 20)
       }
 
       val newName = io.in

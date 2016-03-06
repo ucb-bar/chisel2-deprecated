@@ -91,8 +91,7 @@ object UInt {
     res
   }
 
-// FIXME: This should return a BitPat, not a UInt
-//  def DC(width: Int): BitPat = BitPat.DC(width)
+  @deprecated("Use [[Chisel.BitPat BitPat]] to define don't cares", "3")
   def DC(width: Int): UInt = Lit("b" + "?"*width, width){UInt()}
 
   private def checkSign(x: BigInt) = {
@@ -129,7 +128,9 @@ class UInt extends Bits with Num[UInt] {
     UInt(x).asInstanceOf[this.type]
   }
 
+  @deprecated("Use asUInt instead of toBits", "3")
   override def toBits: UInt = this
+  override def asUInt: UInt = this
 
   // to support implicit conversions
   def ===(b: UInt): Bool = LogicalOp(this, b, "===")

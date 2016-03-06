@@ -35,7 +35,7 @@ object Bundle {
   val keywords = Set("elements", "flip", "toString",
     "flatten", "binding", "asInput", "asOutput", "unary_$tilde",
     "unary_$bang", "unary_$minus", "clone", "cloneType", "toUInt", "toBits",
-    "toBool", "toSInt", "asDirectionless")
+    "asUInt", "toBool", "toSInt", "asDirectionless")
 
   def apply[T <: Bundle](b: => T)(implicit p: Parameters): T = {
     Driver.parStack.push(p.push)

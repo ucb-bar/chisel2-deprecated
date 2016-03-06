@@ -35,30 +35,29 @@ import org.junit.Ignore
 
 import Chisel._
 
-
 class OuterSuite extends TestSuite {
   @Test def testOuterSuite() {
     println("\ntestOuterSuite...")
 
     class Inner extends Module {
       val io = new Bundle {
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
+        val in  = UInt(INPUT, 8)
+        val out = UInt(OUTPUT, 8)
       }
-      io.out := io.in + Bits(1)
+      io.out := io.in + UInt(1)
     }
 
     class Outer extends Module {
       val io = new Bundle {
-        val in  = Bits(INPUT, 8)
-        val out = Bits(OUTPUT, 8)
+        val in  = UInt(INPUT, 8)
+        val out = UInt(OUTPUT, 8)
       }
       // val c = Module(new Inner)
       val c = Array(Module(new Inner))
-      // val w = Wire(Bits(NO_DIR, 8))
+      // val w = Wire(UInt(NO_DIR, 8))
       // w := io.in
       c(0).io.in := io.in
-      io.out  := (c(0).io.out * Bits(2))(7,0)
+      io.out  := (c(0).io.out * UInt(2))(7,0)
     }
 
     class OuterTester(c: Outer) extends Tester(c) {

@@ -117,7 +117,7 @@ object is {
   private def switchCond = {
     if (Module.current.switchKeys.isEmpty) {
       ChiselError.error("The 'is' keyword may not be used outside of a switch.")
-      Bits(0)
+      UInt(0)
     } else Module.current.switchKeys.top
   }
 }

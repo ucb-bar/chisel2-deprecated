@@ -214,7 +214,7 @@ object Mux1H
   def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
     if (in.tail.isEmpty) in.head
     else {
-      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
+      val masked = (sel, in).zipped map ((s, i) => Mux(s, i.asUInt, UInt(0)))
       in.head.fromBits(masked.reduceLeft(_|_))
     }
   }
@@ -453,7 +453,7 @@ class Arbiter[T <: Data](gen: T, n: Int, needsHold: Boolean = false) extends Loc
 object FillInterleaved
 {
   def apply(n: Int, in: Bits): UInt = apply(n, in.toBools)
-  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).toBits
+  def apply(n: Int, in: Seq[Bool]): UInt = Vec(in.map(Fill(n, _))).asUInt
 }
 
 /** A counter module, can also be created using [[Chisel.Counter$ Counter]]

@@ -30,23 +30,23 @@
 
 package Chisel
 
-/* backward compatibility */
+@deprecated("Do not define abstract class Bits directly", "3")
 object Bits {
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: Int): UInt = UInt(x);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: Int, width: Int): UInt = UInt(x, width);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: BigInt): UInt = UInt(x);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: BigInt, width: Int): UInt = UInt(x, width);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: String): UInt = UInt(x);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(x: String, width: Int): UInt = UInt(x, width);
-  /** Deprecated: Do not use */
+  @deprecated("Do not define a UInt with Bits", "3")
   def apply(dir: IODirection = NODIR, width: Int = -1): UInt = UInt(dir, width);
-  /** Deprecated: Do not use */
+  @deprecated("Use [[Chisel.BitPat BitPat]] to define Don't Cares instead", "3")
   def DC(width: Int): UInt = UInt.DC(width)
 }
 

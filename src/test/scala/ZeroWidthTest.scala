@@ -125,13 +125,13 @@ class ZeroWidthTest extends TestSuite {
       }
 
       // apply(bit: Int): Bool
-      // val a = io.x(0).toBits /* This should generate an extraction error. */
+      // val a = io.x(0).asUInt /* This should generate an extraction error. */
 
       // apply(hi: Int, lo: Int): UInt
       val c = io.x(3, 4) /* This should NOT throw an Assertion failure or error. */
 
       // apply(bit: UInt): Bool
-      // val a1 = io.x(UInt(0)).toBits
+      // val a1 = io.x(UInt(0)).asUInt
 
       // apply(hi: UInt, lo: UInt): UInt
       val c1 = io.x(UInt(3), UInt(4)) /* This should NOT throw an Assertion failure or error. */
@@ -146,13 +146,13 @@ class ZeroWidthTest extends TestSuite {
       val h = ~io.x
 
       // andR(): Bool
-      val i = io.x.andR.toBits
+      val i = io.x.andR.asUInt
 
       // orR():  Bool
-      val j = io.x.orR.toBits
+      val j = io.x.orR.asUInt
 
       // xorR():  Bool
-      val k = io.x.xorR.toBits
+      val k = io.x.xorR.asUInt
 
       // << (b: UInt): UInt
       val l = io.x << c
@@ -191,7 +191,7 @@ class ZeroWidthTest extends TestSuite {
         | r | u | ab | ac
         /* XXX Computing any of those signals throws an exception */
         | c | c1 | t
-      ).toBits
+      ).asUInt
 
       // -- result type is Bool --
 

@@ -67,7 +67,7 @@ class BitsSuite extends TestSuite {
   @Test def testEql() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(2) === Bits(2)
+      val res = UInt(2) === UInt(2)
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
@@ -77,7 +77,7 @@ class BitsSuite extends TestSuite {
   @Test def testEqlBundle() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(2) === new Bundle{ val abc = Bits(2) }.toBits
+      val res = UInt(2) === new Bundle{ val abc = UInt(2) }.asUInt
       assertTrue( res.getWidth == 1 )
     }
     val dummyInst = Module(new Dummy)
@@ -86,7 +86,7 @@ class BitsSuite extends TestSuite {
   @Test def testEqlVec() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(2) === Vec(Bits(2) :: Nil).toBits
+      val res = UInt(2) === Vec(UInt(2) :: Nil).asUInt
       assertTrue( res.getWidth == 1 )
     }
     val dummyInst = Module(new Dummy)
@@ -95,7 +95,7 @@ class BitsSuite extends TestSuite {
   @Test def testNeg() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = ~Bits(2)
+      val res = ~UInt(2)
       assertTrue( res.getWidth == 2 )
       assertTrue( res.litValue() == 1 )
     }
@@ -106,7 +106,7 @@ class BitsSuite extends TestSuite {
   @Test def testAndR() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5).andR
+      val res = UInt(5).andR
       assertTrue( res.getWidth == 1 )
     }
     val dummyInst = Module(new Dummy)
@@ -116,7 +116,7 @@ class BitsSuite extends TestSuite {
   @Test def testOrR() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5).orR
+      val res = UInt(5).orR
       assertTrue( res.getWidth == 1)
     }
     val dummyInst = Module(new Dummy)
@@ -126,7 +126,7 @@ class BitsSuite extends TestSuite {
   @Test def testXorR() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5).xorR
+      val res = UInt(5).xorR
       assertTrue( res.getWidth == 1)
     }
     val dummyInst = Module(new Dummy)
@@ -136,7 +136,7 @@ class BitsSuite extends TestSuite {
   @Test def testNeq() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5) =/= Bits(4)
+      val res = UInt(5) =/= UInt(4)
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
@@ -147,7 +147,7 @@ class BitsSuite extends TestSuite {
   @Test def testAnd() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5) & Bits(4)
+      val res = UInt(5) & UInt(4)
       assertTrue( res.getWidth == 3 )
       assertTrue( res.litValue() == 4 )
     }
@@ -158,7 +158,7 @@ class BitsSuite extends TestSuite {
   @Test def testOr() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5) | Bits(4)
+      val res = UInt(5) | UInt(4)
       assertTrue( res.getWidth == 3 )
       assertTrue( res.litValue() == 5 )
     }
@@ -169,7 +169,7 @@ class BitsSuite extends TestSuite {
   @Test def testXor() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = Bits(5) ^ Bits(4)
+      val res = UInt(5) ^ UInt(4)
       assertTrue( res.getWidth == 3 )
       assertTrue( res.litValue() == 1 )
     }
@@ -180,7 +180,7 @@ class BitsSuite extends TestSuite {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
       try {
-        val res = Bits(5) ## Bits(4)
+        val res = UInt(5) ## UInt(4)
         assertTrue( res.getWidth == 6 )
         assertTrue( res.litValue() == 44 )
       } catch {

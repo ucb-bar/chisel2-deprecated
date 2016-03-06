@@ -46,6 +46,7 @@ object Bool {
     *  FIXME: This should remain a BitPat(), not a Bool().
     *  We don't want to give the impression that BitPat()'s can be used in arbitrary expressions.
     */
+  @deprecated("Use [[Chisel.BitPat BitPat]] to get don't cares", "3")
   def DC = Bool().fromNode(Bits.DC(1))
 }
 
