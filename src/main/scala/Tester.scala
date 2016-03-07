@@ -115,6 +115,14 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
 
+  // Accumulate and optionally print output if there is something accumulated.
+  def accumulateAndPrintNewNonBlankOutput(doPrint: Boolean = isTrace) {
+    val newOutput = newTestOutputString
+    if (doPrint && newOutput.length > 0) {
+      println(newOutput)
+    }
+  }
+
   def throwExceptionIfDead(exitValue: Future[Int]) {
     if (exitValue.isCompleted) {
       val exitCode = Await.result(exitValue, Duration(-1, SECONDS))
@@ -124,7 +132,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       } else {
         "test application exit"
       } + " - exit code %d".format(exitCode)
-      println(newTestOutputString)
+      accumulateAndPrintNewNonBlankOutput(true)  // If we have any accumulated output, print it. It might help diagnose the issue.
       throw new TestApplicationException(exitCode, errorString)
     }
   }
@@ -498,8 +506,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     mwhile(!sendInputs) { }
     delta += calcDelta
     mwhile(!recvOutputs) { }
-    // dumpLogs
-    if (isTrace && newTestOutputString != "") println(newTestOutputString)
+    // Print any accumulated output if we're tracing
+    accumulateAndPrintNewNonBlankOutput()
     isStale = false
   }
 
@@ -781,7 +789,8 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
       //  Anything other than 0 is an error.
       case e: TestApplicationException => if (e.exitVal != 0) fail
     }
-    if (isTrace) println(newTestOutputString)
+    // Print any accumulated output if we're tracing
+    accumulateAndPrintNewNonBlankOutput()
     val passMsg = if (ok) "PASSED" else s"FAILED FIRST AT CYCLE ${failureTime}"
     println(s"RAN ${t} CYCLES ${passMsg}")
     process.destroy
