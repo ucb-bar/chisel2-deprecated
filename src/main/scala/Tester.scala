@@ -73,7 +73,7 @@ trait Tests {
   def expect (data: Bool, expected: Boolean): Boolean
   def expect (data: Flo, expected: Float): Boolean
   def expect (data: Dbl, expected: Double): Boolean
-  def newTestOutputString: String
+  def outputString: String
   def expect (data: Bits, expected: BigInt, msg: => String): Boolean
   def expect (data: Bits, expected: Int, msg: => String): Boolean
   def expect (data: Bits, expected: Long, msg: => String): Boolean
@@ -107,10 +107,12 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
   private var isStale = false
   // Return any accumulated module printf output since the last call.
   private var _lastLogIndex = 0
-  def newTestOutputString: String = {
-    val result = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
+  private var _outputString = ""
+  def outputString : String = _outputString
+  private def newTestOutputString : String = {
+    _outputString = _logs.slice(_lastLogIndex, _logs.length) mkString("\n")
     _lastLogIndex = _logs.length
-    result
+    _outputString
   }
   private val _logs = new ArrayBuffer[String]()
   def printfs = _logs.toVector
@@ -499,7 +501,7 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
     delta += calcDelta
     mwhile(!recvOutputs) { }
     // dumpLogs
-    if (isTrace && newTestOutputString != "") println(newTestOutputString)
+    if (isTrace && newTestOutputString != "") println(outputString)
     isStale = false
   }
 
