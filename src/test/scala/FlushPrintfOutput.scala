@@ -73,18 +73,17 @@ class FlushPrintfOutput extends TestSuite {
   // TODO: better way to check logs? logging is lower than tests, so it sometimes fails...
   trait FlushPrintfOutputTests extends Tests {
     val expectedOutputs = collection.mutable.ArrayBuffer[String]()
+    val outputs = collection.mutable.ArrayBuffer[String]()
     def tests(m: BasePrintfModule) {
       for (i <- 0 until 4) {
         step(1)
+        outputs += outputString
         if (m.isFloat) {
           expectedOutputs += m.counterString.format(i.toFloat)
         } else {
           expectedOutputs += m.counterString.format(i)
         }
       }
-      // Wait for any delayed output to accumulate
-      Thread.sleep(200)
-      val outputs = printfs
       assertResult(true, "incorrect number of outputs - %s".format(outputs)) {
         outputs.length == expectedOutputs.length
       }
