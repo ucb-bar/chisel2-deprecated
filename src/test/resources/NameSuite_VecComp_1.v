@@ -27,7 +27,7 @@ module NameSuite_VecComp_1(input clk,
 `endif
 
   assign io_status_im = reg_status_im;
-  assign T0 = wdata[3'h7:1'h0];
+  assign T0 = wdata[6'h7:6'h0];
   assign wdata = io_r_en ? io_w_data : host_pcr_bits_data;
   assign T1 = io_r_en ? T2 : host_pcr_bits_data;
   assign T2 = {56'h0, rdata};

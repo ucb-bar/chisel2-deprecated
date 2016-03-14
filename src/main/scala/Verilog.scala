@@ -97,6 +97,15 @@ class VerilogBackend extends Backend {
   override def emitTmp(node: Node): String =
     emitRef(node)
 
+  // for emitting possible literals which require a width other than their own.
+  def emitRef(node: Node, w: Int): String = {
+    node match {
+      case x: Literal => emitLit(x.value, w)
+      case _ =>
+        emitRef(node)
+    }
+  }
+    
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal => emitLit(x.value, x.needWidth())
@@ -249,9 +258,9 @@ class VerilogBackend extends Backend {
 
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
-        val extractWidth = node.inputs(0).needWidth()
+        val extractWidth = node.inputs(0).extractionWidth
         val source = emitRef(node.inputs(0))
-        val hi = emitRef(node.inputs(1))
+        val hi = emitRef(node.inputs(1), extractWidth)
         List("  assign " + emitTmp(node) + " = ",
           // Is this a no-op - extract all the source bits.
           if (x.isNop) {
@@ -262,7 +271,7 @@ class VerilogBackend extends Backend {
             List(source, "[", hi, "]").mkString
           } else {
             // We have three inputs.
-            val lo = emitRef(node.inputs(2))
+            val lo = emitRef(node.inputs(2), extractWidth)
             // Are hi and lo constant expressions?
             if (x.isStaticWidth) {
               List(source, "[", hi , ":", lo, "]").mkString

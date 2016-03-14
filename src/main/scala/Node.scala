@@ -502,6 +502,10 @@ abstract class Node extends Nameable {
     * @throws ChiselException if the width is not yet defined
     */
   def needWidth(): Int = widthW.needWidth
+  /** Get the with needed to index into this Node
+    * @return an "known" integer value, log_2(needWidth()) rounded up
+    * @throws NoSuchElementException if called when the width is unknown */
+  lazy val extractionWidth: Int = scala.math.ceil(scala.math.log(needWidth())/scala.math.log(2)).toInt
   /** Return true if the width of this node is known (set). */
   private[Chisel] def isKnownWidth: Boolean = widthW.isKnown
 
