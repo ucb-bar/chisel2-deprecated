@@ -29,8 +29,8 @@ module DelaySuite_ReadCondMaskedWrite_1(input clk,
   assign T2 = T4 | T3;
   assign T3 = T0 & 32'hff;
   assign T4 = T0 & 32'hff00;
-  assign T5 = io_addr[2'h2:1'h0];
-  assign T6 = io_addr[2'h2:1'h0];
+  assign T5 = io_addr[5'h2:5'h0];
+  assign T6 = io_addr[5'h2:5'h0];
 
   always @(posedge clk) begin
     if (io_enable)

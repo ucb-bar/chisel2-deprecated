@@ -19,7 +19,7 @@ module StdlibSuite_OHToUIntComp_1(
   assign T5 = {T10, T6};
   assign T6 = T7[1'h1];
   assign T7 = T9 | T8;
-  assign T8 = T1[1'h1:1'h0];
+  assign T8 = T1[2'h1:2'h0];
   assign T1 = T2;
   assign T2 = {T4, T3};
   assign T3 = {io_in, 1'h1};
