@@ -17,14 +17,14 @@ module StdlibSuite_OHToUIntComp_1(
 
   assign io_out = T5;
   assign T5 = {T10, T6};
-  assign T6 = T7[1'h1];
+  assign T6 = T7[1];
   assign T7 = T9 | T8;
-  assign T8 = T1[1'h1:1'h0];
+  assign T8 = T1[1:0];
   assign T1 = T2;
   assign T2 = {T4, T3};
   assign T3 = {io_in, 1'h1};
   assign T4 = {io_in, 1'h0};
-  assign T9 = T1[2'h3:2'h2];
+  assign T9 = T1[3:2];
   assign T10 = T9 != 2'h0;
 endmodule
 
