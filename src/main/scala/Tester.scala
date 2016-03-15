@@ -854,6 +854,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     }
   }
 
+  def close { process.destroy }
+
   /** Complete the simulation and inspect all tests */
   def finish: Boolean = {
     try {
