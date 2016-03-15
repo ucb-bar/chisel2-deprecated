@@ -750,6 +750,7 @@ class CppBackend extends Backend {
     harness.write(s"""  ${name}_api_t api(&module);\n""")
     harness.write(s"""  module.init();\n""")
     harness.write(s"""  api.init_sim_data();\n""")
+    harness.write(s"""  api.init_channels();\n""")
     harness.write(s"""  std::vector<std::string> args(argv+1, argv+argc);\n""")
     harness.write(s"""  std::string vcdfile = "${Driver.targetDir}/${name}.vcd";\n""")
     harness.write(s"""  std::vector<std::string>::const_iterator it;\n""")

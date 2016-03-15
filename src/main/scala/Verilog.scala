@@ -109,10 +109,10 @@ class VerilogBackend extends Backend {
 
   private def emitLit(x: BigInt): String =
     emitLit(x, x.bitLength + (if (x < 0) 1 else 0))
-  private def emitLit(x: BigInt, w: Int): String = {
-    val unsigned = if (x < 0) (BigInt(1) << w) + x else x
-    require(unsigned >= 0)
-    w + "'h" + unsigned.toString(16)
+  private def emitLit(x: BigInt, w: Int, base10: Boolean = false): String = {
+    val unsigned = if (x < 0) (BigInt(1) << w) + x else x // drop leading 1's on negative numbers to get the necessary width
+    require(unsigned >= 0)  // only positive numbers are used for constants
+    if (base10) unsigned.toString(10) else w + "'h" + unsigned.toString(16) // write base 10 or hex constant
   }
 
   // $random only emits 32 bits; repeat its result to fill the Node
@@ -249,9 +249,10 @@ class VerilogBackend extends Backend {
 
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
-        val extractWidth = node.inputs(0).needWidth()
         val source = emitRef(node.inputs(0))
-        val hi = emitRef(node.inputs(1))
+        val hi = node.inputs(1) match { // if the high bit is a literal, we want it in base 10. ex io_something[7:3]
+          case x: Literal => emitLit(x.value, x.width, true)
+          case x => emitRef(x)}
         List("  assign " + emitTmp(node) + " = ",
           // Is this a no-op - extract all the source bits.
           if (x.isNop) {
@@ -262,7 +263,9 @@ class VerilogBackend extends Backend {
             List(source, "[", hi, "]").mkString
           } else {
             // We have three inputs.
-            val lo = emitRef(node.inputs(2))
+            val lo = node.inputs(2) match { // if the low bit is a literal, we want it in base 10. ex io_something[7:3]
+              case x: Literal => emitLit(x.value, x.width, true)
+              case x => emitRef(x)}
             // Are hi and lo constant expressions?
             if (x.isStaticWidth) {
               List(source, "[", hi , ":", lo, "]").mkString

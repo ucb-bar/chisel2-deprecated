@@ -28,11 +28,10 @@
  MODIFICATIONS.
 */
 
-package Chisel.testers
+package Chisel.hwiotesters
 
 import Chisel._
-
-import scala.util.Random
+import Chisel.testers.BasicTester
 
 // scalastyle:off regex
 // scalastyle:off method.name
