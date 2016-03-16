@@ -29,7 +29,7 @@
 */
 
 package Chisel
-import scala.collection.mutable.{ArrayBuffer, HashMap, Stack, Queue => ScalaQueue}
+import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import scala.util.Random
 import java.nio.channels.FileChannel
@@ -87,7 +87,12 @@ trait Tests {
 case class TestApplicationException(exitVal: Int, lastMessage: String) extends RuntimeException(lastMessage)
 
 object Tester {
+  private[Chisel] val processes = HashSet[Process]()
   implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
+  def close { 
+    processes foreach (_.destroy)
+    processes.clear
+  }
 }
 
 /** This class is the super class for test cases
@@ -840,7 +845,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     cmd_channel.release
     _t = 0
 
-    // Init channels
+    Tester.processes += process
     (process, exitValue, in_channel, out_channel, cmd_channel)
   }
 
@@ -854,7 +859,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     }
   }
 
-  def close { process.destroy }
+  def close {
+    Tester.processes -= process
+    process.destroy
+  }
 
   /** Complete the simulation and inspect all tests */
   def finish: Boolean = {
@@ -875,7 +883,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     inChannel.close
     outChannel.close
     cmdChannel.close
-    if (!ok) throwException("Module under test FAILED at least one test vector.")
+    Tester.processes -= process
     ok
   }
 

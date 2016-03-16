@@ -62,7 +62,13 @@ object Driver extends FileSystemUtilities{
 
   def apply[T <: Module](args: Array[String], gen: () => T, ftester: T => Tester[T], wrapped:Boolean): T = {
     val mod = apply(args, gen, wrapped)
-    if (isTesting) ftester(mod).finish
+    if (isTesting) {
+      try {
+        if (!ftester(mod).finish) throwException("Module under test FAILED at least one test vector.")
+      } finally {
+        Tester.close
+      }
+    }
     mod
   }
 
