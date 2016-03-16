@@ -84,7 +84,7 @@ trait FileSystemUtilities {
   def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val shared = if (isLib) "-shared" else ""
-    val ac = (List(compiler, LDFLAGS, shared, "-o", s"${dir}/${target}") ++ 
+    val ac = (List(compiler, LDFLAGS, shared, "-o", s"${dir}/${target}") ++
       (objects map (obj => s"${dir}/${obj}"))).mkString(" ")
     if (!run(ac)) throwException("failed to link " + objects.mkString(", "))
   }

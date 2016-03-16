@@ -42,8 +42,8 @@ import ExecutionContext.Implicits.global
 
 // Provides a template to define tester transactions
 trait Tests {
-  def t: Long 
-  def delta: Int 
+  def t: Long
+  def delta: Int
   def rnd: Random
   def setClocks(clocks: Iterable[(Clock, Int)]): Unit
   def peek(data: Bits): BigInt
@@ -89,7 +89,7 @@ case class TestApplicationException(exitVal: Int, lastMessage: String) extends R
 object Tester {
   private[Chisel] val processes = HashSet[Process]()
   implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
-  def close { 
+  def close {
     processes foreach (_.destroy)
     processes.clear
   }
@@ -104,8 +104,8 @@ object Tester {
   * @example
   * {{{ class myTest(c : TestModule) extends Tester(c) { ... } }}}
   */
-class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16, 
-    testCmd: Option[String] = Driver.testCommand, 
+class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
+    testCmd: Option[String] = Driver.testCommand,
     dumpFile: Option[String] = None) extends FileSystemUtilities {
   // Define events
   abstract class Event
@@ -159,11 +159,11 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
         file.println(s"  POKE ${dumpName(b)} <- ${v}")
       case PokeDblEvent(b, v) if !locked =>
         file.println(s"  POKE ${dumpName(b)} <- ${v}")
-      case PeekEvent(b, None) if !locked => 
+      case PeekEvent(b, None) if !locked =>
         file.println(s"  PEEK ${dumpName(b)} -> No initial values")
-      case PeekEvent(b, Some(v)) if !locked => 
+      case PeekEvent(b, Some(v)) if !locked =>
         file.println(s"  PEEK ${dumpName(b)} <- ${convt(v)}")
-      case PeekMemEvent(m, off, v) if !locked => 
+      case PeekMemEvent(m, off, v) if !locked =>
         file.println(s"  PEEK ${dumpName(m)}[${off}] -> ${convt(v)}")
       case PeekFloEvent(b, v) if !locked =>
         file.println(s"  PEEK ${dumpName(b)} -> ${v}")
@@ -181,7 +181,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
         file.println(msg)
       case NoIdEvent(path) => file.println(s"Can't find id for '${path}'")
       case _ => // silent
-    }  
+    }
   }
   class BasicObserver extends Observer // defulat: prints hex to the screen
   private val observers = ArrayBuffer[Observer]()
@@ -371,7 +371,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     val value = intBitsToFloat(peek(data.asInstanceOf[Bits]).toInt)
     addEvent(new UnmuteEvent())
     addEvent(new PeekFloEvent(data, value))
-    value 
+    value
   }
   /** Interpret the data as a double precision float */
   def peek(data: Dbl): Double = {
@@ -786,7 +786,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     case Some(cmd) => cmd
     case None => Driver.backend match {
       case b: FloBackend =>
-        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true", 
+        val command = ArrayBuffer(b.floDir + "fix-console", ":is-debug", "true",
           ":filename", target + ".hex", ":flo-filename", target + ".mwe.flo")
         if (Driver.isVCD) { command ++= ArrayBuffer(":is-vcd-dump", "true") }
         if (Driver.emitTempNodes) { command ++= ArrayBuffer(":emit-temp-nodes", "true") }
@@ -794,10 +794,10 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
         command.mkString(" ")
       case b: VerilogBackend =>
         val vpd = dumpFile getOrElse s"${Driver.targetDir}/${c.name}.vpd"
-        List(target, "-q", "+vcs+initreg+0", 
+        List(target, "-q", "+vcs+initreg+0",
           if (Driver.isVCD) s"+vpdfile=${vpd}" else "",
           if (Driver.isVCDMem) "+vpdmem" else "") mkString " "
-      case c: CppBackend => 
+      case c: CppBackend =>
         List(target, dumpFile map (vcd => s"+vcdfile=${vcd}") getOrElse "") mkString " "
       case _ => target
     }

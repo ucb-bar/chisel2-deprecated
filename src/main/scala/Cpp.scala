@@ -1328,7 +1328,7 @@ class CppBackend extends Backend {
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CMethod(CTypedName("void", "dump"), 
+      val method = CMethod(CTypedName("void", "dump"),
         Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
