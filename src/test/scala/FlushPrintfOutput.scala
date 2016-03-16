@@ -93,7 +93,9 @@ class FlushPrintfOutput extends TestSuite {
       tests(m)
     }
     launchCppTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
-    launchVerilogTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
+    if (Driver.isVCSAvailable) {
+      launchVerilogTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
+    }
   }
 
   @Test def testFlushFlotPrintfOutput() {
