@@ -751,8 +751,14 @@ class CppBackend extends Backend {
     harness.write(s"""  module.init();\n""")
     harness.write(s"""  api.init_sim_data();\n""")
     harness.write(s"""  api.init_channels();\n""")
+    harness.write(s"""  std::vector<std::string> args(argv+1, argv+argc);\n""")
+    harness.write(s"""  std::string vcdfile = "${Driver.targetDir}/${name}.vcd";\n""")
+    harness.write(s"""  std::vector<std::string>::const_iterator it;\n""")
+    harness.write(s"""  for (it = args.begin() ; it != args.end() ; it++) {\n""")
+    harness.write(s"""    if (it->find("+vcdfile=") == 0) vcdfile = it->c_str()+9;\n""")
+    harness.write(s"""  }\n""")
     if (Driver.isVCD) {
-      harness.write(s"""  FILE *f = fopen("${Driver.targetDir}/${name}.vcd", "w");\n""")
+      harness.write(s"""  FILE *f = fopen(vcdfile.c_str(), "w");\n""")
     } else {
       harness.write(s"""  FILE *f = NULL;\n""")
     }
@@ -770,7 +776,7 @@ class CppBackend extends Backend {
     val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
     val cppFlags = CPPFLAGS + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = List(cppFlags, cxxFlags).mkString(" ")
-    val dir = Driver.targetDir + "/"
+    val dir = Driver.targetDir
     val parallelMakeJobs = Driver.parallelMakeJobs
 
     def make(args: String) {
@@ -1173,7 +1179,7 @@ class CppBackend extends Backend {
         }
         out_h.write(" public:\n")
       }
-      out_h.write("  void dump ( FILE* f, int t, dat_t<1> reset=LIT<1>(0) );\n")
+      out_h.write("  void dump ( FILE* f, val_t t, dat_t<1> reset=LIT<1>(0) );\n")
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
@@ -1266,6 +1272,7 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
+      writeCppFile("  if (!reset.to_bool()) print( std::cerr );\n")
       if (Driver.isVCD) writeCppFile("  mod_t::dump( reset );\n")
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
@@ -1321,14 +1328,14 @@ class CppBackend extends Backend {
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CMethod(CTypedName("void", "dump"),
-        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t"), CTypedName("dat_t<1>", "reset")))
+      val method = CMethod(CTypedName("void", "dump"), 
+        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
         val codePrefix = List(
-          "  if (t == 0) return dump_init(f);\n",
-          "  fprintf(f, \"#%d\\n\", t << 1);\n") mkString ""
+          "  if (t == 0L) return dump_init(f);\n",
+          "  fprintf(f, \"#%lu\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
           val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))

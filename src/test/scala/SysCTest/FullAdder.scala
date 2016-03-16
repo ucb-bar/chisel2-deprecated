@@ -92,7 +92,7 @@ class FullAdderTests(c: FullAdder) extends Tester(c) {
     printf("* INPUT -> a: %d  b: %d  cin: %d",a, b, cin)
     printf("  -  OUTPUT -> sum: %d  cout: %d\n", sum, cout)
   } while (t < 50 && i < 4)
-  if (t >= 50) ok = false
+  if (t >= 50) fail
 }
 
 object FullAdder {

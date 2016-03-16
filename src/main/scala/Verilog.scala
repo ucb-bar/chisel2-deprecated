@@ -779,8 +779,7 @@ class VerilogBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
     val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc",
-      "-licwait 5",
-      "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
+      "+vcs+lic+wait", "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
     val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-P", "vpi.tab", "vpi.o", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)

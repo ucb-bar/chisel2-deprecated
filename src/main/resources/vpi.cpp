@@ -62,6 +62,7 @@ PLI_INT32 sim_start_cb(p_cb_data cb_data) {
 
 PLI_INT32 sim_end_cb(p_cb_data cb_data) {
   delete vpi_api;
+  vpi_control(vpiFinish, 0);
   return 0;
 }
 
