@@ -58,6 +58,10 @@ trait Tests {
   def poke(data: Aggregate, x: Array[BigInt]): Unit
   def poke(data: Flo, x: Float): Unit
   def poke(data: Dbl, x: Double): Unit
+  def pokePart(data: Bits, pos: Int, x: Boolean): Unit
+  def pokePart(data: Bits, hi: Int, lo: Int, x: Int): Unit
+  def pokePart(data: Bits, hi: Int, lo: Int, x: Long): Unit
+  def pokePart(data: Bits, hi: Int, lo: Int, x: BigInt): Unit
   def pokeAt[T <: Bits](data: Mem[T], value: BigInt, off: Int): Unit
   def reset(n: Int = 1): Unit
   def step(n: Int): Unit
@@ -363,8 +367,48 @@ class Tester[+T <: Module](c: T, private var isTrace: Boolean = true, _base: Int
         _pokeMap(data) = value
         isStale = true
       case _ =>
-        if (isTrace) println(s"  NOT ALLOWED POKE ${dumpName(data)}")
+        if (isTrace) println(s"  POKE NOT ALLOWED ON '${dumpName(data)}'. DID YOU MEAN TO pokePart(data, hi, lo, x)?")
     }
+  }
+  
+  def pokePart(data: Bits, pos: Int, x: Boolean)  {
+    pokePart(data, pos, pos, BigInt(if (x) 1 else 0))
+  }
+  
+  // convenience methods for pokePart
+  def pokePart(data: Bits, hi: Int, lo: Int, x: Int)     { this.pokePart(data, hi, lo, int(x)) }
+  def pokePart(data: Bits, hi: Int, lo: Int, x: Long)    { this.pokePart(data, hi, lo, int(x)) }
+  /**
+   * poke a Part. This method expects the entire word as a parameter, plus the range hi >= lo bits to
+   * poke at. If the word is not initialized, all unspecified bits will be set to 0 in the word, and a 
+   * warning will be printed (if tracing)
+   * 
+   */
+  def pokePart(data: Bits, hi: Int, lo: Int, x: BigInt)  {
+    if (!(data.isTopLevelIO && data.dir == INPUT)) { // If the user failed to pass a top-level input, we can't do anything.
+      if (isTrace) println(s"  POKE NOT ALLOWED ON '${dumpName(data)}'. PLEASE ENSURE YOU ARE PASSING A WHOLE I/O OBJECT")
+      return
+    }
+    if (lo > hi) { // if lo > hi, the user probably made a mistake. This method is not designed to work with lo > hi.
+      if (isTrace) println(s"  POKE PART ON '${dumpName(data)}' FAILED. RECIEVED HIGH < LOW BITS") //  lets just print a warning and return.
+      return
+    }
+    // Lets get the current value of the data. If we fail, then just use 0 as a default
+    val oldValue = try {
+      _pokeMap(data)
+    } catch {
+      case e: NoSuchElementException => {
+        // found no value. lets print a warning, and assume the user wants 0's for their unspecified bits.
+        if (isTrace) 
+          println(s"  IN POKE PART, WORD HAS NOT BEEN INITIALIZED. INITALIZATING TO 0")
+        BigInt(0) 
+      }
+    }
+    val onesOfSize = BigInt(-1) + ((BigInt(1) << (hi-lo + 1))) // if hi-lo is 2, then we get 111. etc.
+    val bitmaskA = (BigInt(-1) & ~((BigInt(1) << (hi + 1)) - 1)) | ((BigInt(1) << lo) - 1) // all 1's with 0's through range
+    val bitmaskB = ~(((~x) & onesOfSize) << lo)      // all 1's with x through range
+    val newValue = (oldValue | ~bitmaskA) & bitmaskB // change ONLY the specified bits
+    poke(data, newValue) // finally, we just pass along our data to the old poke method.
   }
   /** Set the value of Aggregate data */
   def poke(data: Aggregate, x: Array[BigInt]): Unit = {
