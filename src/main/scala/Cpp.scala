@@ -1272,6 +1272,7 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
+      writeCppFile("  if (!reset.to_bool()) print( std::cerr );\n")
       if (Driver.isVCD) writeCppFile("  mod_t::dump( reset );\n")
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")

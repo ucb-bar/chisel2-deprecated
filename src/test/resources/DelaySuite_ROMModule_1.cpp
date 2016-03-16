@@ -15,6 +15,7 @@ int DelaySuite_ROMModule_1_t::clock ( dat_t<1> reset ) {
   if (clk.cnt < min) min = clk.cnt;
   clk.cnt-=min;
   if (clk.cnt == 0) clock_lo( reset );
+  if (!reset.to_bool()) print( std::cerr );
   if (clk.cnt == 0) clock_hi( reset );
   if (clk.cnt == 0) clk.cnt = clk.len;
   return min;
