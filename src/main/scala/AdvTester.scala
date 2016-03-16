@@ -50,7 +50,7 @@ trait AdvTests extends Tests {
   def takesteps(n: Int)(work: =>Unit = {}): Unit
   def until(pred: =>Boolean, maxCycles: Long = 0L)(work: =>Unit): Boolean
   def eventually(pred: =>Boolean, maxCycles: Long = 0L): Boolean
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = 0L): Boolean 
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = 0L): Boolean
 }
 
 object AdvTester {
@@ -58,7 +58,7 @@ object AdvTester {
 }
 
 class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16,
-    testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None) 
+    testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None)
     extends Tester[T](dut, isTrace, _base, testCmd, dumpFile) {
   val defaultMaxCycles = 1024L
   var _cycles = 0L
@@ -86,9 +86,9 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   def wire_poke(port: Dbl,       target: Double)        = { super.poke(port, target) }
   def wire_poke(port: Aggregate, target: Array[BigInt]) = { super.poke(port, target) }
 
-  override def poke(port: Bits, target: BigInt) = 
+  override def poke(port: Bits, target: BigInt) =
     require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
-  override def poke(port: Aggregate, target: Array[BigInt]) = 
+  override def poke(port: Aggregate, target: Array[BigInt]) =
     require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
 
   private val registered_bits_updates = new scala.collection.mutable.HashMap[Bits,BigInt]()
@@ -117,9 +117,9 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
       work
       postprocessors.foreach(_.process())
     } catch {
-      case e: java.lang.AssertionError => 
+      case e: java.lang.AssertionError =>
         assert(false, e.toString) // catch assert
-      case e: java.lang.IllegalArgumentException => 
+      case e: java.lang.IllegalArgumentException =>
         assert(false, e.toString) // catch require
     }
   }
@@ -146,7 +146,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    if (!expr && !errMsg.isEmpty) { 
+    if (!expr && !errMsg.isEmpty) {
       addEvent(new DumpEvent(s"ASSERT FAILED: ${errMsg}"))
       fail
     }
@@ -175,7 +175,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object DecoupledSink {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = 
+    def apply[T<:Bits](socket: DecoupledIO[T]) =
       new DecoupledSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
@@ -194,7 +194,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object ValidSink {
-    def apply[T<:Bits](socket: ValidIO[T]) = 
+    def apply[T<:Bits](socket: ValidIO[T]) =
       new ValidSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
@@ -225,7 +225,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object DecoupledSource {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = 
+    def apply[T<:Bits](socket: DecoupledIO[T]) =
       new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 
@@ -253,7 +253,7 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object ValidSource {
-    def apply[T<:Bits](socket: ValidIO[T]) = 
+    def apply[T<:Bits](socket: ValidIO[T]) =
       new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 }
