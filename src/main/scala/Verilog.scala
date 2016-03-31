@@ -258,6 +258,10 @@ class VerilogBackend extends Backend {
           if (x.isNop) {
             source
           } else
+          // Is source a single bit? - no need to extract
+            if (node.inputs(0).needWidth == 1) {
+            source
+          } else
           // Is this a single bit extraction?
             if (x.isOneBit) {
             List(source, "[", hi, "]").mkString
