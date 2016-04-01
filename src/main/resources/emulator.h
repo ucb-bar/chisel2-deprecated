@@ -1549,7 +1549,7 @@ class mem_t {
   }
   val_t get (val_t idx, int word) {
     if (/*!ispow2(d) &&*/ idx >= d)
-      return __rand_val(seedp) & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+      return __rand_val(seedp) & (((word+1) == val_n_words(w) && val_n_word_bits(w)) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
 
