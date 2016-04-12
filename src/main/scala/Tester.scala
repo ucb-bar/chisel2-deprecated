@@ -236,7 +236,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     throwExceptionIfDead(exitValue)
   }
   private object SIM_CMD extends Enumeration {
-    val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN = Value }
+    val RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN, DUMPON, DUMPOFF = Value }
   implicit def cmdToId(cmd: SIM_CMD.Value) = cmd.id
 
   private class Channel(name: String) {
@@ -557,10 +557,12 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     * @param n number of cycles to hold reset for, default 1 */
   def reset(n: Int = 1) {
     addEvent(new ResetEvent(n))
+    dumpoff
     for (i <- 0 until n) {
       mwhile(!sendCmd(SIM_CMD.RESET)) { }
       mwhile(!recvOutputs) { }
     }
+    dumpon
   }
 
   protected def update {
@@ -880,11 +882,23 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     addEvent(new DumpEvent(newTestOutputString))
     addEvent(new FinishEvent(t, ok, failureTime))
     _logs.clear
+    _pokeMap.clear
+    _peekMap.clear
+    _signalMap.clear
+    _chunks.clear
     inChannel.close
     outChannel.close
     cmdChannel.close
     Tester.processes -= process
     ok
+  }
+
+  def dumpon {
+    mwhile(!sendCmd(SIM_CMD.DUMPON)) { }
+  }
+
+  def dumpoff {
+    mwhile(!sendCmd(SIM_CMD.DUMPOFF)) { }
   }
 
   // Once everything has been prepared, we can start the communications.

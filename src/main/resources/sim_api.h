@@ -17,7 +17,7 @@
 #include <sys/mman.h>
 #include <time.h>
 
-enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN };
+enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN, DUMPON, DUMPOFF };
 const int SIM_CMD_MAX_BYTES = 1024;
 const int channel_data_offset_64bw = 4;		// Offset from start of channel buffer to actual user data in 64bit words.
 static size_t gSystemPageSize;
@@ -190,6 +190,8 @@ public:
         case GETCHK: getchk(); break;
         case SETCLK: setclk(); break;
         case FIN:  finish(); exit = true; break;
+        case DUMPON: dumpon(); break;
+        case DUMPOFF: dumpoff(); break;
         default: break;
       }
     } while (!exit);
@@ -201,10 +203,12 @@ private:
   channel_t *cmd_channel;
 
   virtual void reset() = 0;
-  virtual void start() = 0; 
+  virtual void start() = 0;
   virtual void finish() = 0;
-  virtual void update() = 0; 
+  virtual void update() = 0;
   virtual void step() = 0;
+  virtual void dumpon() { }
+  virtual void dumpoff() { }
   // Consumes input tokens 
   virtual void put_value(T& sig, std::string &value, bool force = false) = 0;
   virtual size_t put_value(T& sig, uint64_t* data, bool force = false) = 0;

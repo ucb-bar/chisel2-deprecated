@@ -11,7 +11,7 @@ extern "C" PLI_INT32 sim_end_cb(p_cb_data cb_data);
 
 class vpi_api_t: public sim_api_t<vpiHandle> {
 public:
-  vpi_api_t() { }
+  vpi_api_t() { srand(time(NULL)); }
   ~vpi_api_t() { }
 
   virtual void tick() {
@@ -61,12 +61,17 @@ public:
 
   void init_sigs() {
     vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, NULL);
-    top_handle = vpi_scan(vpi_iterate(vpiArgument, syscall_handle));
+    vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
+    top_handle = vpi_scan(arg_iter);
+    dump_handle = vpi_scan(arg_iter);
+    fin_handle = vpi_scan(arg_iter);
     search_signals();
   }
 
 private:
   vpiHandle top_handle;
+  vpiHandle dump_handle;
+  vpiHandle fin_handle;
   std::queue<vpiHandle> forces;
   std::map<vpiHandle, size_t> sizes;
   std::map<vpiHandle, size_t> chunks;
@@ -145,7 +150,12 @@ private:
     }
   }
 
-  virtual void finish() { vpi_control(vpiFinish, 0); }
+  virtual void finish() { 
+    s_vpi_value value_s;
+    value_s.format    = vpiHexStrVal;
+    value_s.value.str = (PLI_BYTE8*) "1";
+    vpi_put_value(fin_handle, &value_s, NULL, vpiNoDelay);
+  }
 
   virtual void step() { }
 
@@ -162,6 +172,20 @@ private:
     data_s.value     = NULL;
     data_s.user_data = NULL;
     vpi_free_object(vpi_register_cb(&data_s));
+  }
+
+  virtual void dumpon() {
+    s_vpi_value value_s;
+    value_s.format    = vpiHexStrVal;
+    value_s.value.str = (PLI_BYTE8*) "1";
+    vpi_put_value(dump_handle, &value_s, NULL, vpiNoDelay);
+  }
+
+  virtual void dumpoff() {
+    s_vpi_value value_s;
+    value_s.format    = vpiHexStrVal;
+    value_s.value.str = (PLI_BYTE8*) "0";
+    vpi_put_value(dump_handle, &value_s, NULL, vpiNoDelay);
   }
 
   virtual size_t add_signal(vpiHandle& sig_handle, std::string& wire) {
@@ -242,7 +266,15 @@ private:
               std::string elmname = vpi_get_str(vpiName, elm_handle);
               std::string elmpath = modname + "." + elmname;
               size_t elmid = add_signal(elm_handle, elmpath);
-              id = (wire && wirename == elmname) ? elmid : id;
+              if (wire) {
+                id = elmid;
+              } else {
+                // Initialize it
+                s_vpi_value value_s;
+                value_s.format    = vpiHexStrVal;
+                value_s.value.str = (PLI_BYTE8*) "0";
+                vpi_put_value(elm_handle, &value_s, NULL, vpiNoDelay);
+              }
             }
           }
           if (id > 0) break;
@@ -255,7 +287,16 @@ private:
         while (vpiHandle udp_handle = vpi_scan(udp_iter)) {
           if (vpi_get(vpiPrimType, udp_handle) == vpiSeqPrim) {
             size_t udpid = add_signal(udp_handle, modname);
-            if (wire) { id = udpid; break; }
+            if (wire) {
+              id = udpid;
+              break;
+            } else {
+              // Initialize it
+              s_vpi_value value_s;
+              value_s.format    = vpiHexStrVal;
+              value_s.value.str = (PLI_BYTE8*) "0";
+              vpi_put_value(udp_handle, &value_s, NULL, vpiNoDelay);
+            }
           }
         }
 
