@@ -397,8 +397,12 @@ class VerilogBackend extends Backend {
     outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node)))
     clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name))
     resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name))
-    clocks foreach (clk => harness write "  integer %s_len;\n".format(clk.name))
-    clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+    if (clocks.size > 1) {
+      clocks foreach (clk => harness write "  integer %s_len;\n".format(clk.name))
+      clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name))
+    } else {
+      harness write "  always #`CLOCK_PERIOD %s = ~%s;\n".format(mainClk.name, mainClk.name) 
+    }
     if (clocks.size > 1) {
       harness write "  integer min = 1 << 31 - 1;\n\n"
       clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name))
@@ -419,16 +423,18 @@ class VerilogBackend extends Backend {
     harness write ");\n\n"
 
     harness write "  initial begin\n"
-    clocks foreach (clk => clk.srcClock match {
-      case None => harness write "    %s_len = `CLOCK_PERIOD;\n".format(clk.name)
-      case Some(src) =>
-        val initStr = "%s_len".format(src.name) + (if (src.period > clk.period)
-          " / " + (src.period / clk.period).round else
-          " * " + (clk.period / src.period).round)
-        harness write "    %s_len = %s;\n".format(clk.name, initStr)
-    })
-    if (clocks.size > 1) clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name))
-    harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
+    if (clocks.size > 1) {
+      clocks foreach (clk => clk.srcClock match {
+        case None => harness write "    %s_len = `CLOCK_PERIOD;\n".format(clk.name)
+        case Some(src) =>
+          val initStr = "%s_len".format(src.name) + (if (src.period > clk.period)
+            " / " + (src.period / clk.period).round else
+            " * " + (clk.period / src.period).round)
+          harness write "    %s_len = %s;\n".format(clk.name, initStr)
+      })
+      clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name))
+      harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
+    } 
     harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
