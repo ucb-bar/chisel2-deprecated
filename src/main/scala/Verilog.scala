@@ -467,6 +467,7 @@ class VerilogBackend extends Backend {
       clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
       harness write "    #min $tick();\n"
+      harness write "    #0.1;\n"
       harness write "    if (is_fin) begin\n"
       harness write "      if (vpdfile) $vcdplusoff;\n"
       harness write "      if (vcdfile && dump_on) $dumpoff;\n"
@@ -491,7 +492,8 @@ class VerilogBackend extends Backend {
       harness write "  end\n"
     } else {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
-      harness write "    $tick();\n".format(mainClk.name)
+      harness write "    $tick();\n"
+      harness write "    #0.1;\n"
       harness write "    if (is_fin) begin\n"
       harness write "      if (vpdfile) $vcdplusoff;\n"
       harness write "      if (vcdfile && dump_on) $dumpoff;\n"
