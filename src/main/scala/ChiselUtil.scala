@@ -876,3 +876,84 @@ object DelayBetween {
     nodeShortestPathSearch(List(b), a)
   }
 }
+
+/** @param data The data type for the payload
+  *
+  * The DCInput module provides timing closure on the INPUT
+  * side of a module by registering the "ready" signal coming
+  * out of a larger design block.  This is consistent with a
+  * registered-output design methodology.
+  */
+class DCInput[D <: Bits](data: D)  extends Module {
+  val io = new Bundle {
+    val c = new DecoupledIO(data).flip
+    val p = new DecoupledIO(data)
+  }
+  val nxt_occupied = Bool()
+  val occupied = Reg(next = nxt_occupied, init = Bool(false))
+  val nxt_hold = UInt()
+  val hold = Reg(next = nxt_hold)
+  val drain = occupied & io.p.ready
+  val load = io.c.valid & io.c.ready & (!io.p.ready | drain)
+  val nxt_c_drdy = (!occupied & !load) | (drain & !load)
+  val c_drdy = Reg(next = nxt_c_drdy, init = Bool(false))
+
+  when (occupied)
+    { io.p.bits := hold }
+  .otherwise
+    { io.p.bits := io.c.bits }
+  io.p.valid := (io.c.valid & io.c.ready) | occupied
+  nxt_hold := hold
+  when (load) {
+    nxt_hold := io.c.bits
+    nxt_occupied := Bool(true)
+  }.elsewhen (drain) {
+    nxt_occupied := Bool(false)
+  }.otherwise {
+    nxt_occupied := occupied
+  }
+  io.c.ready := c_drdy
+}
+
+/** @param data The data type for the payload
+  *
+  * The DCOutput module provides timing closure on the output
+  * side of a module by registering the "valid" and "bits" signals coming
+  * out of a larger design block.  This is consistent with a
+  * registered-output design methodology.
+  */
+class DCOutput[T <: Data](data: T) extends Module {
+  val io = new Bundle {
+    val c = new DecoupledIO(data).flip
+    val p = new DecoupledIO(data)
+  }
+  val nxt_p_valid = io.c.valid | (!io.p.ready & io.p.valid)
+  io.p.valid := Reg(next = nxt_p_valid, init=Bool(false))
+  io.c.ready := io.p.ready | !io.p.valid
+  val load = io.c.valid & io.c.ready
+  //val nxt_p_data = UInt(io.c.bits)
+  val p_bits = Reg(io.c.bits)
+  when (load) {
+    p_bits := io.c.bits
+  }
+  io.p.bits := p_bits
+}
+
+/** @param data The data type for the payload
+  *
+  * The DCFull module provides timing closure for either the INPUT
+  * or output side of a module by registering all inputs and outputs.
+  * This is consistent with a registered-input, registered-output
+  * design methodology.
+  */
+class DCFull[T <: Data](data: T) extends Module {
+  val io = new Bundle {
+    val c = new DecoupledIO(data).flip
+    val p = new DecoupledIO(data)
+  }
+  val dci = Module(new DCInput(type))
+  val dco = Module(new DCOutput(type))
+  io.c <> dci.io.c
+  dci.io.p <> dco.io.c
+  dco.io.p <> io.p
+}
