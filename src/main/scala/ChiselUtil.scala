@@ -884,7 +884,7 @@ object DelayBetween {
   * out of a larger design block.  This is consistent with a
   * registered-output design methodology.
   */
-class DCInput[D <: Bits](data: D)  extends Module {
+class DCInput[T <: Bits](data: T)  extends Module {
   val io = new Bundle {
     val c = new DecoupledIO(data).flip
     val p = new DecoupledIO(data)
@@ -937,23 +937,4 @@ class DCOutput[T <: Data](data: T) extends Module {
     p_bits := io.c.bits
   }
   io.p.bits := p_bits
-}
-
-/** @param data The data type for the payload
-  *
-  * The DCFull module provides timing closure for either the INPUT
-  * or output side of a module by registering all inputs and outputs.
-  * This is consistent with a registered-input, registered-output
-  * design methodology.
-  */
-class DCFull[T <: Data](data: T) extends Module {
-  val io = new Bundle {
-    val c = new DecoupledIO(data).flip
-    val p = new DecoupledIO(data)
-  }
-  val dci = Module(new DCInput(type))
-  val dco = Module(new DCOutput(type))
-  io.c <> dci.io.c
-  dci.io.p <> dco.io.c
-  dco.io.p <> io.p
 }
