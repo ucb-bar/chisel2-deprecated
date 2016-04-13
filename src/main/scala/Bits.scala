@@ -361,7 +361,7 @@ abstract class Bits extends Data with proc {
   /** reduction and, and all bits together */
   def andR(): Bool           = newLogicalOp(SInt(-1), "===")
   /** reduction or, or all bits together */
-  def orR(): Bool            = newLogicalOp(UInt(0), "!=")
+  def orR(): Bool            = newLogicalOp(UInt(0), "=/=")
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
   @deprecated("Use =/= rather than != for chisel comparison", "3")
@@ -369,7 +369,7 @@ abstract class Bits extends Data with proc {
     if (Driver.minimumCompatibility > "2") {
       ChiselError.error("!= is deprecated, use =/= instead")
     }
-    newLogicalOp(b, "!=");
+    newLogicalOp(b, "=/=");
   }
   /** not equal to */
   def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
@@ -508,7 +508,12 @@ abstract class Bits extends Data with proc {
 
   def === (that: BitPat): Bool = that === this
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (that: BitPat): Bool = that =/= this
+  def != (that: BitPat): Bool = {
+    if (Driver.minimumCompatibility > "2") {
+      ChiselError.error("!= is deprecated, use =/= instead")
+    }
+    that =/= this
+  }
   def =/= (that: BitPat): Bool = that =/= this
 
   /** Cat bits together to into a single data object with the width of both combined */
