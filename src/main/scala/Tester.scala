@@ -890,6 +890,8 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
     outChannel.close
     cmdChannel.close
     Tester.processes -= process
+    Thread.sleep(100)
+    process.destroy
     ok
   }
 
