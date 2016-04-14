@@ -919,4 +919,4 @@ class DCInput[T <: Bits](data: T)  extends Module {
   *
   * Syntactic sugar for a single-entry queue which registers valid and bits.
   */
-class DCOutput[T <: Data](data: T) extends Queue(data, 1, false, false)
+class DCOutput[T <: Data](data: T) extends Queue(data, 1, true, false)
