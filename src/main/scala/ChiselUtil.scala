@@ -917,24 +917,6 @@ class DCInput[T <: Bits](data: T)  extends Module {
 
 /** @param data The data type for the payload
   *
-  * The DCOutput module provides timing closure on the output
-  * side of a module by registering the "valid" and "bits" signals coming
-  * out of a larger design block.  This is consistent with a
-  * registered-output design methodology.
+  * Syntactic sugar for a single-entry queue which registers valid and bits.
   */
-class DCOutput[T <: Data](data: T) extends Module {
-  val io = new Bundle {
-    val c = new DecoupledIO(data).flip
-    val p = new DecoupledIO(data)
-  }
-  val nxt_p_valid = io.c.valid | (!io.p.ready & io.p.valid)
-  io.p.valid := Reg(next = nxt_p_valid, init=Bool(false))
-  io.c.ready := io.p.ready | !io.p.valid
-  val load = io.c.valid & io.c.ready
-  //val nxt_p_data = UInt(io.c.bits)
-  val p_bits = Reg(io.c.bits)
-  when (load) {
-    p_bits := io.c.bits
-  }
-  io.p.bits := p_bits
-}
+class DCOutput[T <: Data](data: T) extends Queue(data, 1, false, false)
