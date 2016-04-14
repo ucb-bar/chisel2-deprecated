@@ -64,14 +64,12 @@ public:
     vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
     top_handle = vpi_scan(arg_iter);
     dump_handle = vpi_scan(arg_iter);
-    fin_handle = vpi_scan(arg_iter);
     search_signals();
   }
 
 private:
   vpiHandle top_handle;
   vpiHandle dump_handle;
-  vpiHandle fin_handle;
   std::queue<vpiHandle> forces;
   std::map<vpiHandle, size_t> sizes;
   std::map<vpiHandle, size_t> chunks;
@@ -150,11 +148,8 @@ private:
     }
   }
 
-  virtual void finish() { 
-    s_vpi_value value_s;
-    value_s.format    = vpiHexStrVal;
-    value_s.value.str = (PLI_BYTE8*) "1";
-    vpi_put_value(fin_handle, &value_s, NULL, vpiNoDelay);
+  virtual void finish() {
+    vpi_control(vpiFinish, 0);
   }
 
   virtual void step() { }

@@ -189,7 +189,7 @@ public:
         case GETID: getid(); break;
         case GETCHK: getchk(); break;
         case SETCLK: setclk(); break;
-        case FIN:  finish(); exit = true; break;
+        case FIN: finish(); exit = true; break;
         case DUMPON: dumpon(); break;
         case DUMPOFF: dumpoff(); break;
         default: break;

@@ -409,7 +409,6 @@ class VerilogBackend extends Backend {
     }
     harness write "  reg dump_on = 0;\n"
     harness write "  reg dump_cmd = 0;\n"
-    harness write "  reg is_fin = 0;\n"
     harness write "  reg [1023:0] vcdfile = 0;\n"
     harness write "  reg [1023:0] vpdfile = 0;\n"
     harness write "  reg [1023:0] saiffile = 0;\n"
@@ -438,7 +437,7 @@ class VerilogBackend extends Backend {
     harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
     harness write "    $init_outs(" + (outs map (emitRef(_)) mkString ", ") + ");\n"
-    harness write "    $init_sigs(%s, dump_cmd, is_fin);\n".format(c.name)
+    harness write "    $init_sigs(%s, dump_cmd);\n".format(c.name)
 
     harness write "    /*** VCD, VPD, SAIF dump ***/\n"
     harness write "    if ($value$plusargs(\"vcdfile=%s\", vcdfile)) begin\n"
@@ -456,8 +455,6 @@ class VerilogBackend extends Backend {
     harness write "    if ($value$plusargs(\"saiffile=%s\", saiffile)) begin\n"
     harness write "      $set_gate_level_monitoring(\"on\");\n"
     harness write "      $set_toggle_region(%s);\n".format(c.name)
-    harness write "      dump_on = 0;\n"
-    harness write "      dump_cmd = 0;\n"
     harness write "    end\n"
     harness write "  end\n\n"
 
@@ -468,17 +465,20 @@ class VerilogBackend extends Backend {
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
       harness write "    #min $tick();\n"
       harness write "    #0.1;\n"
-      harness write "    if (is_fin) begin\n"
-      harness write "      if (vpdfile) $vcdplusoff;\n"
-      harness write "      if (vcdfile && dump_on) $dumpoff;\n"
-      harness write "      if (saiffile && dump_on) begin\n"
-      harness write "        $toggle_stop;\n"
-      harness write "        $toggle_report(\"%s.saif\", 1e-12, %s);\n".format(c.name, c.name)
-      harness write "        // Todo: $toggle_report(saiffile, 1e-12, %s);\n".format(c.name)
-      harness write "      end\n"
-      harness write "      $finish;\n"
-      harness write "    end\n"
-      harness write "    if (saiffile && dump_on && !dump_cmd) begin\n"
+      if (!resets.isEmpty) {
+        harness write s"""    if (${resets map (_.name) mkString " || "}) begin\n"""
+        harness write "      if (vcdfile && dump_on) $dumpoff;\n"
+        harness write "      if (saiffile && dump_on) begin\n"
+        harness write "        $toggle_stop;\n"
+        harness write "        $toggle_report(\"%s.saif\", 1e-12, %s);\n".format(c.name, c.name)
+        harness write "        // Todo: $toggle_report(saiffile, 1e-12, %s);\n".format(c.name)
+        harness write "        $toggle_reset;\n"
+        harness write "      end\n"
+        harness write "      dump_on = 0;\n"
+        harness write "      dump_cmd = 0;\n"
+        harness write "    end\n"
+      }
+      harness write "    else if (saiffile && dump_on && !dump_cmd) begin\n"
       harness write "      if (vcdfile) $dumpoff;\n"
       harness write "      if (saiffile) $toggle_stop;\n"
       harness write "      dump_on = 0;\n"
@@ -494,17 +494,20 @@ class VerilogBackend extends Backend {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
       harness write "    $tick();\n"
       harness write "    #0.1;\n"
-      harness write "    if (is_fin) begin\n"
-      harness write "      if (vpdfile) $vcdplusoff;\n"
-      harness write "      if (vcdfile && dump_on) $dumpoff;\n"
-      harness write "      if (saiffile && dump_on) begin\n"
-      harness write "        $toggle_stop;\n"
-      harness write "        $toggle_report(\"%s.saif\", 1e-12, %s);\n".format(c.name, c.name)
-      harness write "        // Todo: $toggle_report(saiffile, 1e-12, %s);\n".format(c.name)
-      harness write "      end\n"
-      harness write "      $finish;\n"
-      harness write "    end\n"
-      harness write "    if (saiffile && dump_on && !dump_cmd) begin\n"
+      if (!resets.isEmpty) {
+        harness write s"""    if (${resets map (_.name) mkString " || "}) begin\n"""
+        harness write "      if (vcdfile && dump_on) $dumpoff;\n"
+        harness write "      if (saiffile && dump_on) begin\n"
+        harness write "        $toggle_stop;\n"
+        harness write "        $toggle_report(\"%s.saif\", 1e-12, %s);\n".format(c.name, c.name)
+        harness write "        // Todo: $toggle_report(saiffile, 1e-12, %s);\n".format(c.name)
+        harness write "        $toggle_reset;\n"
+        harness write "      end\n"
+        harness write "      dump_on = 0;\n"
+        harness write "      dump_cmd = 0;\n"
+        harness write "    end\n"
+      }
+      harness write "    else if (saiffile && dump_on && !dump_cmd) begin\n"
       harness write "      $toggle_stop;\n"
       harness write "      dump_on = 0;\n"
       harness write "    end\n"
