@@ -1549,7 +1549,7 @@ class mem_t {
   }
   val_t get (val_t idx, int word) {
     if (/*!ispow2(d) &&*/ idx >= d)
-      return __rand_val(seedp) & (word == val_n_words(w) && val_n_word_bits(w) ? mask_val(w) : -1L);
+      return __rand_val(seedp) & ((word == val_n_full_words(w) && val_n_word_bits(w)) ? mask_val(w) : -1L);
     return contents[idx].values[word];
   }
 
@@ -1735,7 +1735,7 @@ template <int w, int d> mem_t<w,d> MEM( void );
 
 class mod_t {
  public:
-  mod_t(): dumpfile(NULL), timestep(0) { }
+  mod_t(): dumpfile(NULL), timestep(0L) { }
   virtual ~mod_t() {}
   virtual void init ( val_t rand_init=false ) = 0;
   virtual void clock_lo ( dat_t<1> reset, bool assert_fire=true ) = 0;
@@ -1745,11 +1745,11 @@ class mod_t {
 
   virtual void print ( FILE* f ) { };
   virtual void print ( std::ostream& s ) { };
-  virtual void dump ( FILE* f, int t , dat_t<1> reset=LIT<1>(0) ) { };
+  virtual void dump ( FILE* f, val_t t , dat_t<1> reset=LIT<1>(0) ) { };
 
   void set_dumpfile(FILE* f) { dumpfile = f; }
 
-  size_t timestep;
+  val_t timestep;
 
   void dump ( dat_t<1> reset=LIT<1>(0) ) {
     if (dumpfile != NULL) dump(dumpfile, timestep, reset);

@@ -11,6 +11,7 @@ int VerifSuite_CppAssertComp_1_t::clock ( dat_t<1> reset ) {
   if (clk.cnt < min) min = clk.cnt;
   clk.cnt-=min;
   if (clk.cnt == 0) clock_lo( reset );
+  if (!reset.to_bool()) print( std::cerr );
   if (clk.cnt == 0) clock_hi( reset );
   if (clk.cnt == 0) clk.cnt = clk.len;
   return min;
@@ -21,7 +22,7 @@ void VerifSuite_CppAssertComp_1_t::print ( std::ostream& s ) {
 }
 void VerifSuite_CppAssertComp_1_t::dump_init ( FILE* f ) {
 }
-void VerifSuite_CppAssertComp_1_t::dump ( FILE* f, int t, dat_t<1> reset ) {
+void VerifSuite_CppAssertComp_1_t::dump ( FILE* f, val_t t, dat_t<1> reset ) {
 }
 void VerifSuite_CppAssertComp_1_t::clock_lo ( dat_t<1> reset, bool assert_fire ) {
   val_t T0;

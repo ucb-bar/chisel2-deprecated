@@ -4,7 +4,7 @@
 SBT		?= sbt
 SBT_FLAGS	?= -Dsbt.log.noformat=true
 RM_DIRS 	:= test-outputs test-reports
-CLEAN_DIRS	:= doc
+CLEAN_DIRS	:=
 
 SRC_DIR	?= .
 #SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1

@@ -59,7 +59,7 @@ At this point you will need to [download and install sbt](http://www.scala-sbt.o
 for your favorite distribution. You will need sbt version 0.13.0 or higher
 because [recent versions of sbt](http://www.scala-sbt.org/0.13.0/docs/Community/Changes.html)
 generate jars without the scala third-point version number
-(i.e. chisel_2.10-2.0.2.jar instead of chisel_2.10*.2*-2.0.2.jar).
+(i.e. chisel_2.11-2.2.32.jar instead of chisel_2.11*.2*-2.2.32.jar).
 
 Execute sbt run to generate the C++ simulation source for your circuit, and (assuming you have a g++ compiler installed), compile it, and execute it under the tester.
 
@@ -130,32 +130,41 @@ the Chisel jar locally and remake your third-party project. Example:
 Documentation
 -------------
 
-In order to generate the Chisel documentation (html and pdf formats),
-you'll need the LaTeX tools, tex4ht, texlive, python bs4
-BeautifulSoup, imagemagick, and source-highlight.
-
-To generate all the documentation:
-
-    $ cd doc
-    $ make
-
-### Dependencies
-The following
-apt-get installs should work for ubuntu 14.04 LTS
-
-    $ sudo apt-get install python-bs4 python-jinja2 imagemagick source-highlight
-    $ sudo apt-get install tex4ht texlive-latex-base
-    $ sudo apt-get install texlive-latex-recommended texlive-latex-extra
-    $ sudo apt-get install texlive-fonts-recommended texlive-fonts-extra
-    
-On Mac OsX first install [MacTeX](https://tug.org/mactex/mactex-download.html) then use brew 
-
-	$ brew install miktex
-	$ brew install imagemagick source-highlight
-	$ brew install gawk
-
-and then downaload Beautiful Soup from [site](http://www.crummy.com/software/BeautifulSoup/#Download) unpack and run inside the folder
-
-	$  python setup.py install
+Documentation has been moved to a separate [repo](https://github.com/ucb-bar/chisel-doc).
 
 
+Chisel3
+=======
+
+We're gearing up for the release of Chisel3. To facilitate the
+transition from Chisel2, you should ensure that your designs build and
+test in Chisel3 compatibility mode by passing the following arguments
+to Chisel:
+
+    --minimumCompatibility 3.0.0
+
+If you invoke chiselMain() or chiselMainTest() directly, you should
+add these arguments to your current argument list:
+
+    object hello {
+      def main(args: Array[String]): Unit = {
+        chiselMainTest(Array[String]("--backend", "c", "--compile", "--test", "--genHarness", "--minimumCompatibility", "3.0.0"),
+           () => Module(new HelloModule())){c => new HelloModuleTests(c)}
+      }
+    }
+
+This will report errors for the following Chisel3 issues:
+
+ * Vec(Reg) should be replaced with Reg(Vec),
+ * type-only vals (no associated data) must be wrapped in a Wire() if they will be the destination of a wiring operation (":=" or " < >"),
+ * masked bit patterns ('b??') should be created using BitPat(), not UInt() or Bits(),
+ * the "clone" method required for parameterized Bundles has been renamed "cloneType",
+ * the con and alt inputs to a Mux must be type-compatible - both signed or both unsigned,
+ * bulk-connection to a node that has been procedurally assigned-to is illegal,
+ * != is deprecated, use =/= instead,
+ * use SeqMem(...) instead of Mem(..., seqRead),
+ * use SeqMem(n:Int, out: => T) instead of SeqMem(out: => T, n:Int),
+ * use Mem(n:Int, t:T) instead of Mem(out:T, n:Int),
+ * use Vec(n:Int, gen: => T) instead of Vec(gen: => T, n:Int),
+ * Mem(..., orderedWrites) is no longer supported,
+ * masked writes are only supported for Mem[Vec[_]],

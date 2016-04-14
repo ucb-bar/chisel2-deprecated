@@ -37,25 +37,36 @@ import Chisel._
 import scala.collection.mutable.ArrayBuffer
 
 trait AdvTests extends Tests {
-  def cycles: Int
+  def cycles: Long
   def wire_poke(port: Bits,      target: Boolean):       Unit
   def wire_poke(port: Bits,      target: Int):           Unit
   def wire_poke(port: Bits,      target: Long):          Unit
   def wire_poke(port: Bits,      target: BigInt):        Unit
+  def wire_poke(port: Dbl,       target: Double):        Unit
   def wire_poke(port: Aggregate, target: Array[BigInt]): Unit
   def reg_poke(port: Bits,       target: BigInt):        Unit
   def reg_poke(port: Aggregate,  target: Array[BigInt]): Unit
   def takestep(work: => Unit = {}): Unit
   def takesteps(n: Int)(work: =>Unit = {}): Unit
-  def until(pred: =>Boolean, maxCycles: Int = 0)(work: =>Unit): Boolean
-  def eventually(pred: =>Boolean, maxCycles: Int = 0): Boolean
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = 0): Boolean
-
+  def until(pred: =>Boolean, maxCycles: Long = 0L)(work: =>Unit): Boolean
+  def eventually(pred: =>Boolean, maxCycles: Long = 0L): Boolean
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = 0L): Boolean
 }
 
-class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16) extends Tester[T](dut, isTrace, _base) {
-  val defaultMaxCycles = 1024
-  var cycles = 0
+object AdvTester {
+  implicit def strToOption(s: String) = if (s.isEmpty) None else Option(s)
+}
+
+class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int = 16,
+    testCmd: Option[String] = Driver.testCommand, dumpFile: Option[String] = None)
+    extends Tester[T](dut, isTrace, _base, testCmd, dumpFile) {
+  val defaultMaxCycles = 1024L
+  var _cycles = 0L
+  def cycles = _cycles
+  override def incTime(n: Int) {
+    _cycles += n
+    super.incTime(n)
+  }
 
   // List of scala objects that need to be processed along with the test benches, like sinks and sources
   val preprocessors = new ArrayBuffer[Processable]()
@@ -71,10 +82,14 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   def wire_poke(port: Bits,      target: Int)           = { super.poke(port, int(target)) }
   def wire_poke(port: Bits,      target: Long)          = { super.poke(port, int(target)) }
   def wire_poke(port: Bits,      target: BigInt)        = { super.poke(port, target) }
+  def wire_poke(port: Flo,       target: Float)         = { super.poke(port, target) }
+  def wire_poke(port: Dbl,       target: Double)        = { super.poke(port, target) }
   def wire_poke(port: Aggregate, target: Array[BigInt]) = { super.poke(port, target) }
 
-  override def poke(port: Bits, target: BigInt) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
-  override def poke(port: Aggregate, target: Array[BigInt]) = require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
+  override def poke(port: Bits, target: BigInt) =
+    require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
+  override def poke(port: Aggregate, target: Array[BigInt]) =
+    require(false, "poke hidden for AdvTester, use wire_poke or reg_poke")
 
   private val registered_bits_updates = new scala.collection.mutable.HashMap[Bits,BigInt]()
   private val registered_aggr_updates = new scala.collection.mutable.HashMap[Aggregate,Array[BigInt]]()
@@ -95,12 +110,18 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
 
   // This function replaces step in the advanced tester and makes sure all tester features are clocked in the appropriate order
   def takestep(work: => Unit = {}): Unit = {
-    cycles += 1
-    step(1)
-    do_registered_updates()
-    preprocessors.foreach(_.process()) // e.g. sinks
-    work
-    postprocessors.foreach(_.process())
+    try {
+      step(1)
+      do_registered_updates()
+      preprocessors.foreach(_.process()) // e.g. sinks
+      work
+      postprocessors.foreach(_.process())
+    } catch {
+      case e: java.lang.AssertionError =>
+        assert(false, e.toString) // catch assert
+      case e: java.lang.IllegalArgumentException =>
+        assert(false, e.toString) // catch require
+    }
   }
   def takesteps(n: Int)(work: =>Unit = {}): Unit = {
     require(n>0, "Number of steps taken must be positive integer.")
@@ -108,8 +129,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
   }
 
   // Functions to step depending on predicates
-  def until(pred: =>Boolean, maxCycles: Int = defaultMaxCycles)(work: =>Unit): Boolean = {
-    var timeout_cycles = 0
+  def until(pred: =>Boolean, maxCycles: Long = defaultMaxCycles)(work: =>Unit): Boolean = {
+    var timeout_cycles = 0L
     while(!pred && (timeout_cycles < maxCycles)) {
       takestep(work)
       timeout_cycles += 1
@@ -118,16 +139,17 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
       "until timed out after %d cycles".format(timeout_cycles))
     pred
   }
-  def eventually(pred: =>Boolean, maxCycles: Int = defaultMaxCycles) = {until(pred, maxCycles){}}
-  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Int = defaultMaxCycles): Boolean = {
+  def eventually(pred: =>Boolean, maxCycles: Long = defaultMaxCycles) = {until(pred, maxCycles){}}
+  def do_until(work: =>Unit)(pred: =>Boolean, maxCycles: Long = defaultMaxCycles): Boolean = {
     takestep(work)
     until(pred, maxCycles){work}
   }
 
   def assert(expr: Boolean, errMsg:String = "") = {
-    ok &= expr
-    failureTime = cycles
-    if(!expr && errMsg != "") { println("ASSERT FAILED: " + errMsg) }
+    if (!expr && !errMsg.isEmpty) {
+      addEvent(new DumpEvent(s"ASSERT FAILED: ${errMsg}"))
+      fail
+    }
     expr
   }
 
@@ -153,7 +175,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object DecoupledSink {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSink(socket, (socket_bits: T) => peek(socket_bits))
+    def apply[T<:Bits](socket: DecoupledIO[T]) =
+      new DecoupledSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
   class ValidSink[T <: Data, R]( socket: ValidIO[T], cvt: T=>R ) extends Processable
@@ -171,7 +194,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     preprocessors += this
   }
   object ValidSink {
-    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSink(socket, (socket_bits: T) => peek(socket_bits))
+    def apply[T<:Bits](socket: ValidIO[T]) =
+      new ValidSink(socket, (socket_bits: T) => peek(socket_bits))
   }
 
   class DecoupledSource[T <: Data, R]( socket: DecoupledIO[T], post: (T,R)=>Unit ) extends Processable
@@ -201,7 +225,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object DecoupledSource {
-    def apply[T<:Bits](socket: DecoupledIO[T]) = new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
+    def apply[T<:Bits](socket: DecoupledIO[T]) =
+      new DecoupledSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 
   class ValidSource[T <: Data, R]( socket: ValidIO[T], post: (T,R)=>Unit ) extends Processable
@@ -228,7 +253,8 @@ class AdvTester[+T <: Module](val dut: T, isTrace: Boolean = false, _base: Int =
     postprocessors += this
   }
   object ValidSource {
-    def apply[T<:Bits](socket: ValidIO[T]) = new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
+    def apply[T<:Bits](socket: ValidIO[T]) =
+      new ValidSource(socket, (socket_bits: T, in: BigInt) => reg_poke(socket_bits, in))
   }
 }
 

@@ -1,21 +1,20 @@
-ChangeLog for Chisel v2.2.32
+ChangeLog for Chisel v2.2.33
 
-#627 Dump vcd in module->clock()
-#624 Try to avoid IndexOutOfBoundsException at the start of simulation.
-#623 Print warning and return random for peeks of uwritten signales.
-#621 Use low-level Extract instead of implementing it with shifts and masks.
-#609 Fix incorrect VCD.
- Bump dependent package versions.
- Update copyright notice (date).
- Add ScalaStyle changes.
- Include class hierarchy diagrams in scaladoc
- Add support for non-JUint tests.
- Removed new line in tester to avoid lots of blank lines for multiple steps.
- Fixeds are signed nodes too.
- Treat chisel3 compatibility warnings as errors.
- Add Chisel3 asUInt()/asSInt().
- Flo and Dbl widths are really fixed (and known).
- Add support for Chisel3-style "testers as hardware".
- Small documentation fixes and comments/questions
- Be more selective when re-running to enable line numbers.
- Fix broken subword support.
+#678,#180 [Tester] shut down processes when exceptions occur
+#677 Changed index literals to base 10. for example, somewire[2'h3:1'h0] to somewire[3:0]
+#675 [emulator] dump printfs between clock_lo & hi
+#665,#692 Don't initialize the channels until we know how big they need to be.
+#658 Issue informative error messages if errors at startup.
+#655 Add Option types for Bundle.
+ Move documentation to a separate repo https://github.com/ucb-bar/chisel-doc
+ Fix memory access masking bug for nonPow2 memories
+ Bump sbt to version 0.13.11
+ Do not extract a single bit wire
+ Ensure reg_status is initialized.
+ Don't try Verilog tests if we don't have vcs available.
+ Make the package structure of hwiotesters in chisel2 emulate the two repo model used in chisel3
+ Add expect(Bool, Boolean) methods
+ Fix problem where isTrace is ignored for Flo & Dbl
+ Support wire_poke for Flo & Dbl.
+ Generate code compatible with the 1.7 JVM (cherry-pick from release).
+ Make vcd/vpd dump file configurable

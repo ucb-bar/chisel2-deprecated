@@ -35,19 +35,18 @@ import sys.process.stringSeqToProcess
 trait FileSystemUtilities {
   /** Ensures a directory *dir* exists on the filesystem. */
   def ensureDir(dir: String) = {
-    val d = dir + (if (dir == "" || dir(dir.length-1) == '/') "" else "/")
-    val file = new java.io.File(d)
+    val file = new java.io.File(dir)
     if (!file.exists) file.mkdirs
-    d
+    dir
   }
 
   def createOutputFile(name: String) = {
     val baseDir = ensureDir(Driver.targetDir)
-    new java.io.FileWriter(baseDir + name)
+    new java.io.FileWriter(s"${baseDir}/${name}")
   }
 
   def copyToTarget(filename: String) = {
-    val resourceStream = getClass().getResourceAsStream("/" + filename)
+    val resourceStream = getClass().getResourceAsStream(s"/${filename}")
     if( resourceStream != null ) {
       val classFile = createOutputFile(filename)
       while(resourceStream.available > 0) {
@@ -78,14 +77,15 @@ trait FileSystemUtilities {
 
   def cc(dir: String, name: String, flags: String = "", isCC: Boolean = false) {
     val compiler = if (isCC) CC else CXX
-    val cmd = List(compiler, "-c", "-o", dir + name + ".o", flags, dir + name + ".cpp").mkString(" ")
+    val cmd = List(compiler, "-c", "-o", s"${dir}/${name}.o", flags, s"${dir}/${name}.cpp").mkString(" ")
     if (!run(cmd)) throwException("failed to compile " + name + ".cpp")
   }
 
   def link(dir: String, target: String, objects: Seq[String], isCC: Boolean = false, isLib: Boolean = false) {
     val compiler = if (isCC) CC else CXX
     val shared = if (isLib) "-shared" else ""
-    val ac = (List(compiler, LDFLAGS, shared, "-o", dir + target) ++ (objects map (dir + _))).mkString(" ")
+    val ac = (List(compiler, LDFLAGS, shared, "-o", s"${dir}/${target}") ++
+      (objects map (obj => s"${dir}/${obj}"))).mkString(" ")
     if (!run(ac)) throwException("failed to link " + objects.mkString(", "))
   }
 }

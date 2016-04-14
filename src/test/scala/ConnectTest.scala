@@ -230,7 +230,7 @@ class ConnectSuite extends TestSuite {
         val wdata = UInt(INPUT, 4)
         val status = new RegStatus().asOutput
       }
-      val reg_status = Reg(new RegStatus)
+      val reg_status = Reg(new RegStatus, init = new RegStatus().fromBits(UInt(0)))
       when (io.wen) {
         reg_status := new RegStatus().fromBits(io.wdata)
       }
