@@ -563,6 +563,7 @@ class Tester[+T <: Module](c: T, isTrace: Boolean = true, _base: Int = 16,
       mwhile(!recvOutputs) { }
     }
     dumpon
+    _pokeMap.clear
   }
 
   protected def update {
