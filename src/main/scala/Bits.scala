@@ -325,11 +325,20 @@ abstract class Bits extends Data with proc {
     Bool(OUTPUT).asTypeFor(ReductionOp(this, opName))
   }
 
-  /** Assignment operator */
-  override protected def colonEquals(that: Bits) {
+  /** Allows assigning of bits to types which may convert it in colonEquals such as Flo and Dbl
+    * @example
+    * {{{
+    * val x = RegInit(Flo(0))
+    * x.equalsBits(myUInt)
+    * }}}
+    */
+  def equalsBits( that : Bits ) {
     checkCompatibility(that)
     (comp match { case None => this case Some(p) => p}) procAssign that
   }
+
+  /** Assignment operator */
+  override protected def colonEquals(that: Bits) { equalsBits(that) }
 
   // bitwise operators
   // =================
