@@ -16,7 +16,11 @@ public:
 
   virtual void tick() {
     while(!forces.empty()) {
-      vpi_put_value(forces.front(), NULL, NULL, vpiReleaseFlag);
+      s_vpi_value value_s;
+      value_s.format = vpiHexStrVal;
+      vpi_get_value(forces.front(), &value_s);
+      vpi_put_value(forces.front(), &value_s, NULL, vpiReleaseFlag);
+      vpi_put_value(forces.front(), &value_s, NULL, vpiNoDelay);
       forces.pop();
     }
     sim_api_t::tick();
@@ -238,7 +242,15 @@ private:
           std::string regpath = modname + "." + regname;
           if (!wire || wirename == regname) {
             size_t regid = add_signal(reg_handle, regpath);
-            if (wire) { id = regid; break; }
+            if (wire) {
+              id = regid; break;
+            } else {
+              // Initialize it
+              s_vpi_value value_s;
+              value_s.format    = vpiHexStrVal;
+              value_s.value.str = (PLI_BYTE8*) "0";
+              vpi_put_value(reg_handle, &value_s, NULL, vpiNoDelay);
+            }
           } else if (arrname == regname) {
             vpiHandle bit_iter = vpi_iterate(vpiBit, reg_handle);
             while (vpiHandle bit_handle = vpi_scan(bit_iter)) {
@@ -246,7 +258,7 @@ private:
               std::string bitpath = modname + "." + bitname;
               size_t bitid = add_signal(bit_handle, bitpath);
               id = regname == bitname ? bitid : id;
-            } 
+            }
           }
         }
         if (id > 0) break;
@@ -283,8 +295,7 @@ private:
           if (vpi_get(vpiPrimType, udp_handle) == vpiSeqPrim) {
             size_t udpid = add_signal(udp_handle, modname);
             if (wire) {
-              id = udpid;
-              break;
+              id = udpid; break;
             } else {
               // Initialize it
               s_vpi_value value_s;
