@@ -104,6 +104,20 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg] && Driver.minimumCompatibility > "2") {
     ChiselError.error("Vec(Reg) is deprecated. Please use Reg(Vec)")
   }
+  def checkClone(element: T): Unit = {
+    // Clone or complain.
+    val dummy = element.cloneType()
+  }
+  // Chisel3 - compatibility checks
+  if (Driver.minimumCompatibility > "2") {
+    if (self != null && !self.isEmpty) {
+      if (self(0).getNode.isInstanceOf[Reg]) {
+        ChiselError.error("Vec(Reg) is deprecated. Please use Reg(Vec)")
+      }
+      checkClone(self(0))
+    }
+    checkClone(gen(0))
+  }
   val readPorts = new HashMap[UInt, T]
   override def apply(idx: Int): T = self(idx)
 
