@@ -195,10 +195,12 @@ abstract class Data extends Node {
               if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
                 constructor.newInstance(null).asInstanceOf[this.type]
               } else {
-                throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+                ChiselError.error(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+                this
               }
             } else {
-             throwException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+             ChiselError.error(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
+             this
             }
           }
         }
@@ -206,9 +208,11 @@ abstract class Data extends Node {
 
     } catch {
       case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable", npe)
+        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable" + npe)
+        this
       case e: java.lang.Exception =>
-        throwException("Parameterized Bundle " + this.getClass + " needs cloneType method", e)
+        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method" + e)
+        this
     }
   }
 
