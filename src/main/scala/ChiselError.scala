@@ -56,6 +56,7 @@ object ChiselError {
 
   def clear() {
     ChiselErrors.clear()
+    ChiselChecks.clear()
     hasErrors = false
   }
 

@@ -167,12 +167,16 @@ abstract class Data extends Node {
 
   def cloneType(): this.type = {
     try {
-      val result = checkClone() match {
-        case (None, Some(string: String)) =>
-          ChiselError.error(string)
-          this
-        case (Some(t: this.type), None) =>
-          t
+      val result = {
+        val check = checkClone()
+        // If checkClone returns anything other than None for the string component of the tuple, it's an error.
+        check match {
+          case (None, Some(string: String)) =>
+            ChiselError.error(string)
+            this
+          case (Some(_), None) =>
+            check._1.get
+        }
       }
       result.asInstanceOf[this.type ]
     } catch {

@@ -117,7 +117,7 @@ class UInt extends Bits with Num[UInt] {
       case l: Literal =>
         if (l.isZ) {
           // Chisel3 compatibility - generic don't care UInts/Bits are deprecated.
-          ChiselError.check("General don't care UInts are deprecated. Please use BitPat().", Version("3.0)"))
+          ChiselError.check("General don't care UInts are deprecated. Please use BitPat().", Version("3.0"))
         }
       case _ =>
     }
