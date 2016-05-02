@@ -115,9 +115,9 @@ class UInt extends Bits with Num[UInt] {
     // res.width_ = n.width_.clone()
     n match {
       case l: Literal =>
-        if (l.isZ && Driver.minimumCompatibility > "2") {
+        if (l.isZ) {
           // Chisel3 compatibility - generic don't care UInts/Bits are deprecated.
-          ChiselError.error("General don't care UInts are deprecated. Please use BitPat().")
+          ChiselError.check("General don't care UInts are deprecated. Please use BitPat().", Version("3.0)"))
         }
       case _ =>
     }

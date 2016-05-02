@@ -597,7 +597,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
       val nodeNames = nodes.map(_.name).mkString(", ")
       val plural = if (nodes.length > 1) "s" else ""
       val errorString = "Chisel3 compatibility: node%s %s should be wrapped in a Wire()".format(plural, nodeNames)
-      ChiselError.error(errorString, errorLine)
+      ChiselError.check(errorString, Version("3.0"), errorLine)
     }
   }
 

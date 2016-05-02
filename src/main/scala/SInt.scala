@@ -116,9 +116,7 @@ class SInt extends Bits with Num[SInt] {
   def >= (b: SInt): Bool = b <= this
   @deprecated("Use =/= rather than !=", "3")
   def !=  (b: UInt): Bool = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("!= is deprecated, use =/= instead")
-    }
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead", Version("3.0"))
     this =/= b.zext
   }
   def =/=  (b: UInt): Bool = this =/= b.zext

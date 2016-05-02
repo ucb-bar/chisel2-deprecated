@@ -31,7 +31,7 @@
 package Chisel
 
 /** This trait enforces numerical properties on the data
-  such as being able to add, subtract, multiply, divide etc */
+  * such as being able to add, subtract, multiply, divide etc */
 abstract trait Num[T <: Data] {
   // def << (b: T): T
   // def >> (b: T): T
@@ -55,12 +55,12 @@ object Data {
 }
 
 /** *Data* is part of the *Node* Composite Pattern class hierarchy.
-  It is the root of the type system which includes composites (Bundle, Vec)
-  and atomic types (UInt, SInt, etc.).
-
-  Instances of Data are meant to help with construction and correctness
-  of a logic graph. They will trimmed out of the graph before a *Backend*
-  generates target code.
+  * It is the root of the type system which includes composites (Bundle, Vec)
+  * and atomic types (UInt, SInt, etc.).
+  **
+  *Instances of Data are meant to help with construction and correctness
+  *of a logic graph. They will trimmed out of the graph before a *Backend*
+  *generates target code.
   */
 abstract class Data extends Node {
   var comp: Option[proc] = None // TODO: better name?
@@ -77,6 +77,7 @@ abstract class Data extends Node {
   }
 
   /** Try to convert this data to a Bool
+    *
     * @throws ChiselException if the width is not 1*/
   def toBool(): Bool = {
     val gotWidth = this.getWidth()
@@ -89,7 +90,7 @@ abstract class Data extends Node {
   }
 
   /** Interface required by [[Chisel.Cat Cat]]
-    is an operator to combine data nodes together */
+    *is an operator to combine data nodes together */
   def ##[T <: Data](right: T): this.type = {
     throwException("## not defined on " + this.getClass + " and " + right.getClass)
   }
@@ -109,8 +110,9 @@ abstract class Data extends Node {
   def asInput(): this.type = this
 
   /** Sets the direction (*dir*) of instances derived from Bits to OUTPUT
-    or recursively sets members of Bundle/Vec to OUTPUT.
-    @return this instance with its exact type.
+    *or recursively sets members of Bundle/Vec to OUTPUT.
+    *
+    *@return this instance with its exact type.
     */
   def asOutput(): this.type
   /** set this node as directionless */
@@ -119,7 +121,7 @@ abstract class Data extends Node {
   def isDirectionless: Boolean = true
 
   /** Factory method to create and assign a leaf-type instance out of a subclass
-    of *Node* instance which we have lost the concrete type. */
+    *of *Node* instance which we have lost the concrete type. */
   def fromNode(n: Node): this.type = {
     val res = this.cloneType
     val packet = res.flatten.reverse.zip(this.flatten.reverse.map(_._2.getWidth))
@@ -164,6 +166,27 @@ abstract class Data extends Node {
   override def clone(): this.type = this.cloneType()
 
   def cloneType(): this.type = {
+    try {
+      val result = checkClone() match {
+        case (None, Some(string: String)) =>
+          ChiselError.error(string)
+          this
+        case (Some(t: this.type), None) =>
+          t
+      }
+      result.asInstanceOf[this.type ]
+    } catch {
+      case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
+        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable" + npe)
+        this
+      case e: java.lang.Exception =>
+        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method" + e)
+        this
+    }
+  }
+
+  def checkClone(): (Option[this.type], Option[String]) = {
+
     def getCloneMethod(c: Class[_]): Option[java.lang.reflect.Method] = {
       val methodNames = c.getDeclaredMethods.map(_.getName())
       if (methodNames.contains("cloneType")) {
@@ -175,48 +198,37 @@ abstract class Data extends Node {
       }
     }
 
-    try {
-      val clazz = this.getClass
-      getCloneMethod(clazz) match {
-        case Some(p) => p.invoke(this).asInstanceOf[this.type]
-        case _ => {
-          val constructor = clazz.getConstructors.head
-          if(constructor.getParameterTypes.size == 0) {
-            val obj = constructor.newInstance()
-            obj.asInstanceOf[this.type]
-          } else {
-            val params = constructor.getParameterTypes.toList
-            if(constructor.getParameterTypes.size == 1) {
-              val paramtype = constructor.getParameterTypes.head
-              // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
-              //    added by scalac for nested classes and closures. Thus, try faking the constructor
-              //    by not supplying said class or closure (pass null).
-              // CONSIDER: Don't try to create this
-              if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-                constructor.newInstance(null).asInstanceOf[this.type]
-              } else {
-                ChiselError.error(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
-                this
-              }
+    val clazz = this.getClass
+    getCloneMethod(clazz) match {
+      case Some(p) => (Some(p.invoke(this).asInstanceOf[this.type]), None)
+      case _ => {
+        val constructor = clazz.getConstructors.head
+        if(constructor.getParameterTypes.size == 0) {
+          val obj = constructor.newInstance()
+          (Some(obj.asInstanceOf[this.type]), None)
+        } else {
+          val params = constructor.getParameterTypes.toList
+          if(constructor.getParameterTypes.size == 1) {
+            val paramtype = constructor.getParameterTypes.head
+            // If only 1 arg and is a Bundle or Module then this is probably the implicit argument
+            //    added by scalac for nested classes and closures. Thus, try faking the constructor
+            //    by not supplying said class or closure (pass null).
+            // CONSIDER: Don't try to create this
+            if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
+              (Some(constructor.newInstance(null).asInstanceOf[this.type]), None)
             } else {
-             ChiselError.error(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
-             this
+              (None, Some(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params))
             }
+          } else {
+           (None, Some(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params))
           }
         }
       }
-
-    } catch {
-      case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable" + npe)
-        this
-      case e: java.lang.Exception =>
-        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method" + e)
-        this
     }
   }
 
   /** name this node
+    *
     * @note use [[Chisel.Node.setName setName]] in [[Chisel.Node Node]] rather than this directly */
   override def nameIt(path: String, isNamingIo: Boolean) {
     comp match {

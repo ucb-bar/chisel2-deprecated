@@ -49,9 +49,7 @@ object VecMux {
 object Vec {
   @deprecated("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", "2.29")
   def apply[T <: Data](gen: => T, n: Int): Vec[T] = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.")
-    }
+    ChiselError.check("Chisel3 compatibility: Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", Version("3.0"))
     apply(n, gen)
   }
 
@@ -101,22 +99,26 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
 
 class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
-  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg] && Driver.minimumCompatibility > "2") {
-    ChiselError.error("Vec(Reg) is deprecated. Please use Reg(Vec)")
+  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
+    ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
   }
   def checkClone(element: T): Unit = {
     // Clone or complain.
-    val dummy = element.cloneType()
+    element.checkClone() match {
+      case (None, Some(string)) => ChiselError.check("Chisel3 compatibility: " + string, Version("3.0"))
+      case (_, _) =>
+    }
   }
   // Chisel3 - compatibility checks
   if (Driver.minimumCompatibility > "2") {
     if (self != null && !self.isEmpty) {
       if (self(0).getNode.isInstanceOf[Reg]) {
-        ChiselError.error("Vec(Reg) is deprecated. Please use Reg(Vec)")
+        ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
       }
       checkClone(self(0))
+    } else {
+      checkClone(gen(0))
     }
-    checkClone(gen(0))
   }
   val readPorts = new HashMap[UInt, T]
   override def apply(idx: Int): T = self(idx)
