@@ -77,13 +77,28 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] =
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
+    // If we aren't going to put any elements in the vector,
+    //  ensure the type is cloneable while we know what it is.
+    // Chisel3 - compatibility checks
+    if (Driver.minimumCompatibility > "2" && n == 0) {
+      checkClone(gen(0))
+    }
     apply((0 until n).map(i => gen(i)))
+  }
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
 
   def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
+
+  def checkClone[T <: Data](element: T): Unit = {
+    // Clone or complain.
+    element.checkClone() match {
+      case (None, Some(string)) => ChiselError.check("Chisel3 compatibility: " + string, Version("3.0"))
+      case (_, _) =>
+    }
+  }
 }
 
 class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
@@ -102,22 +117,13 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
     ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
   }
-  def checkClone(element: T): Unit = {
-    // Clone or complain.
-    element.checkClone() match {
-      case (None, Some(string)) => ChiselError.check("Chisel3 compatibility: " + string, Version("3.0"))
-      case (_, _) =>
-    }
-  }
   // Chisel3 - compatibility checks
   if (Driver.minimumCompatibility > "2") {
     if (self != null && !self.isEmpty) {
       if (self(0).getNode.isInstanceOf[Reg]) {
         ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
       }
-      checkClone(self(0))
-    } else {
-      checkClone(gen(0))
+      Vec.checkClone(self(0))
     }
   }
   val readPorts = new HashMap[UInt, T]
