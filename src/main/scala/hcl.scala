@@ -87,6 +87,15 @@ object throwException {
   }
 }
 
+// Throw a "quiet" exception. This is essentially the same as throwException,
+//  except that it leaves the recording of the error up to the caller.
+object throwQuietException {
+  def apply(s: String, t: Throwable = null) = {
+    val xcpt = new ChiselException(s, t)
+    ChiselError.findFirstUserLine(xcpt.getStackTrace) foreach { u => xcpt.setStackTrace(Array(u)) }
+    throw xcpt
+  }
+}
 
 trait proc extends Node {
   protected var procAssigned = false

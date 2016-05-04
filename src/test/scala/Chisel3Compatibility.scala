@@ -206,4 +206,25 @@ class Chisel3CompatibilitySuite extends TestSuite {
     }
     assertTrue(ChiselError.hasErrors)
   }
+
+  @Test def testNoCloneType() {
+    println("\ntestNoCloneType ...")
+
+    class NoCloneType() extends Module {
+      class MyBundle(aWidth: Int) extends Bundle {
+        val aVal = UInt(width = aWidth)
+      }
+      val io = new Bundle {
+        val ins = Vec(3, new MyBundle(8).asInput)
+      }
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since we don't define a cloneType method for MyBundle and it is needed for Vec.
+      chiselMain(testArgs, () => Module(new NoCloneType()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
 }

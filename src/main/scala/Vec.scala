@@ -31,6 +31,7 @@
 package Chisel
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
+import scala.util.{Try,Success,Failure}
 
 object VecMux {
   def apply(addr: UInt, elts: Seq[Data]): Data = {
@@ -51,6 +52,15 @@ object Vec {
   def apply[T <: Data](gen: => T, n: Int): Vec[T] = {
     ChiselError.check("Chisel3 compatibility: Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", Version("3.0"))
     apply(n, gen)
+  }
+
+  def checkCloneType[T <: Data](element: T): Unit = {
+    // Clone or complain.
+    Try(element.checkClone(Array("cloneType"))) match {
+      case Success(c) =>
+      case Failure(e) =>
+        ChiselError.check(s"Chisel3 compatibility: " + e, Version("3.0"))
+    }
   }
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
@@ -82,7 +92,7 @@ object Vec {
     //  ensure the type is cloneable while we know what it is.
     // Chisel3 - compatibility checks
     if (Driver.minimumCompatibility > "2" && n == 0) {
-      checkClone(gen(0))
+      checkCloneType(gen(0))
     }
     apply((0 until n).map(i => gen(i)))
   }
@@ -91,14 +101,6 @@ object Vec {
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
 
   def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
-
-  def checkClone[T <: Data](element: T): Unit = {
-    // Clone or complain.
-    element.checkClone() match {
-      case (None, Some(string)) => ChiselError.check("Chisel3 compatibility: " + string, Version("3.0"))
-      case (_, _) =>
-    }
-  }
 }
 
 class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
@@ -123,7 +125,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
       if (self(0).getNode.isInstanceOf[Reg]) {
         ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
       }
-      Vec.checkClone(self(0))
+      Vec.checkCloneType(self(0))
     }
   }
   val readPorts = new HashMap[UInt, T]

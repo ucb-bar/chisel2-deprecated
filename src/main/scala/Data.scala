@@ -30,6 +30,9 @@
 
 package Chisel
 
+import scala.util.{Try,Success,Failure}
+import java.lang.reflect.Method
+
 /** This trait enforces numerical properties on the data
   * such as being able to add, subtract, multiply, divide etc */
 abstract trait Num[T <: Data] {
@@ -166,50 +169,68 @@ abstract class Data extends Node {
   override def clone(): this.type = this.cloneType()
 
   def cloneType(): this.type = {
-    try {
-      val result = {
-        val check = checkClone()
-        // If checkClone returns anything other than None for the string component of the tuple, it's an error.
-        check match {
-          case (None, Some(string: String)) =>
-            ChiselError.error(string)
+    val check = Try(checkClone())
+    check match {
+      case Failure(e) =>
+        e match {
+          case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
+            ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable" + npe)
             this
-          case (Some(_), None) =>
-            check._1.get
+          case e: java.lang.Exception =>
+            ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. " + e)
+            this
         }
-      }
-      result.asInstanceOf[this.type ]
-    } catch {
-      case npe: java.lang.reflect.InvocationTargetException if npe.getCause.isInstanceOf[java.lang.NullPointerException] =>
-        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method. You are probably using an anonymous Bundle object that captures external state and hence is un-cloneable" + npe)
+        // Return something "acceptable" so we can continue. We'll report a failure before finishing.
         this
-      case e: java.lang.Exception =>
-        ChiselError.error("Parameterized Bundle " + this.getClass + " needs cloneType method" + e)
-        this
+      case Success(c) =>
+        c.get.asInstanceOf[this.type]
     }
   }
 
-  def checkClone(): (Option[this.type], Option[String]) = {
+  /** Attempt to clone this object.
+    *  @param cloneNames list of potential/allowable cloning methods. We accept more than one for backward compatibility.
+    *  @return a Scala Try. On success a cloned object. On failure a Throwable.
+    *
+    *  This is called from our generic cloneType() so we need to avoid calling it, or we'll die trying to
+    *  initialize the Try as the stack overflows.
+    *  We use throwQuietException to avoid logging errors (leaving it up to our caller), in order to support
+    *  compatibility checks.
+    */
+  private[Chisel] def checkClone(cloneNames: Array[String] = Array("cloneType", "clone")): Try[this.type] = {
+    val clazz = this.getClass
 
     def getCloneMethod(c: Class[_]): Option[java.lang.reflect.Method] = {
-      val methodNames = c.getDeclaredMethods.map(_.getName())
-      if (methodNames.contains("cloneType")) {
-        Some(c.getDeclaredMethod("cloneType"))
-      } else if (methodNames.contains("clone")) {
-        Some(c.getDeclaredMethod("clone"))
+      def chooseBestClone(methods: Array[Method]): Option[Method] = {
+        // Avoid our method, otherwise we'll end up infinitely recursing.
+        val myMethods = methods.filter(m => m.getDeclaringClass() != classOf[Chisel.Data])
+        if (myMethods.nonEmpty) {
+          val (cloneTypeMethods, otherCloneMethods) = myMethods.partition { x => x.getName() == "cloneType" }
+          if (cloneTypeMethods.nonEmpty) {
+            Some(cloneTypeMethods.last)  // We tacitly assume that the "last" method is the "highest"
+          } else if (otherCloneMethods.nonEmpty) {
+            Some(otherCloneMethods.last)  // We tacitly assume that the "last" method is the "highest"
+          } else {
+            None
+          }
+        } else {
+          None
+        }
+      }
+      val methods = c.getMethods.filter(m => cloneNames.contains(m.getName()) && m.getParameterTypes.size == 0)
+      if (methods.size > 0) {
+        chooseBestClone(methods)
       } else {
         None
       }
     }
 
-    val clazz = this.getClass
     getCloneMethod(clazz) match {
-      case Some(p) => (Some(p.invoke(this).asInstanceOf[this.type]), None)
+      case Some(p) => Try(p.invoke(this).asInstanceOf[this.type])
       case _ => {
         val constructor = clazz.getConstructors.head
         if(constructor.getParameterTypes.size == 0) {
           val obj = constructor.newInstance()
-          (Some(obj.asInstanceOf[this.type]), None)
+          Try(obj.asInstanceOf[this.type])
         } else {
           val params = constructor.getParameterTypes.toList
           if(constructor.getParameterTypes.size == 1) {
@@ -219,12 +240,12 @@ abstract class Data extends Node {
             //    by not supplying said class or closure (pass null).
             // CONSIDER: Don't try to create this
             if(classOf[Bundle].isAssignableFrom(paramtype) || classOf[Module].isAssignableFrom(paramtype)){
-              (Some(constructor.newInstance(null).asInstanceOf[this.type]), None)
+              Try(constructor.newInstance(null).asInstanceOf[this.type])
             } else {
-              (None, Some(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params))
+              throwQuietException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
             }
           } else {
-           (None, Some(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params))
+           throwQuietException(s"Cannot auto-create constructor for ${this.getClass.getName} that requires arguments: " + params)
           }
         }
       }
