@@ -65,9 +65,7 @@ class BitPat(val value: BigInt, val mask: BigInt, width: Int) {
   def === (other: Bits): Bool = UInt(value) === (other & UInt(mask))
   @deprecated("Use =/= rather than != for chisel comparison", "3")
   def != (other: Bits): Bool = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("!= is deprecated, use =/= instead")
-    }
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead", Version("3.0"))
     !(this === other)
   }
   def =/= (other: Bits): Bool = !(this === other)
