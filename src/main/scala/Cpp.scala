@@ -1175,7 +1175,7 @@ class CppBackend extends Backend {
       if (nDumpMethods > 1) {
         out_h.write(" private:\n")
         for (i <- 0 until nDumpMethods - 1) {
-          out_h.write("  void dump_" + i + " ( FILE* f );\n")
+          out_h.write("  void dump_" + i + " ( FILE* f, val_t t, dat_t<1> reset);\n")
         }
         out_h.write(" public:\n")
       }
@@ -1338,7 +1338,7 @@ class CppBackend extends Backend {
           "  fprintf(f, \"#%lu\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
-          val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
+          val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
           vcd.dumpVCD(llm.addString)
           llm.done()
           val nMethods = llm.bodies.length
