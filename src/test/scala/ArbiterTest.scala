@@ -238,8 +238,8 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(0)))
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 0.U))
 
     class ArbiterTests(c: MyLockingArbiter) extends Tester(c) {
 
@@ -290,8 +290,8 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testStableLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyStableLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(0)), true)
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyStableLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 0.U), true)
 
     class ArbiterTests(c: MyStableLockingArbiter) extends Tester(c) {
 
@@ -542,8 +542,8 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testRRLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(3)))
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 3.U))
 
     class ArbiterTests(c: MyRRLockingArbiter) extends Tester(c) {
 
@@ -594,8 +594,8 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testStableRRLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyStableRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(3)), true)
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyStableRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 3.U), true)
 
     class ArbiterTests(c: MyStableRRLockingArbiter) extends Tester(c) {
 
