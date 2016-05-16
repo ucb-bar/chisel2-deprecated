@@ -507,9 +507,7 @@ abstract class Bits extends Data with proc {
   def === (that: BitPat): Bool = that === this
   @deprecated("Use =/= rather than != for chisel comparison", "3")
   def != (that: BitPat): Bool = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("!= is deprecated, use =/= instead")
-    }
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead.", Version("3.0"))
     that =/= this
   }
   def =/= (that: BitPat): Bool = that =/= this

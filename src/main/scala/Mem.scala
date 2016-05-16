@@ -133,8 +133,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit = {
-    if (Driver.minimumCompatibility > "2")
-      throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+    ChiselError.check("Chisel3 compatibility: Chisel3 masked writes are only supported for Mem[Vec[_]].", Version("3.0"))
     doWrite(addr, Module.current.whenCond, data, wmask)
   }
 
