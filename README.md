@@ -168,3 +168,6 @@ This will report errors for the following Chisel3 issues:
  * use Vec(n:Int, gen: => T) instead of Vec(gen: => T, n:Int),
  * Mem(..., orderedWrites) is no longer supported,
  * masked writes are only supported for Mem[Vec[_]],
+ * the Node class and object no longer exist (the class should have been private in Chisel2)
+ * printf() is defined in the Chisel object and produces simulation printf()'s. To use the Scala Predef.printf(), you need to qualify it with Predef.
+ * in Chisel2, bulk-connects <> with unconnected source components do not update connections from the unconnected components. In Chisel3, bulk-connects strictly adhere to last connection semantics and unconnected OUTPUTs will be connected to INPUTs resulting in the assignment of random values to those inputs.
