@@ -160,7 +160,7 @@ abstract class Data extends Node {
 
   protected def colonEquals(that: Bits): Unit = illegalAssignment(that)
   protected def colonEquals(that: Bundle): Unit = illegalAssignment(that)
-  protected def colonEquals[T <: Data](that: Iterable[T]): Unit = illegalAssignment(that)
+  protected def colonEquals[T <: Data](that: Seq[T]): Unit = illegalAssignment(that)
 
   protected def illegalAssignment(that: Any): Unit =
     ChiselError.error(":= not defined on " + this.getClass + " and " + that.getClass)

@@ -40,18 +40,18 @@ object ROM {
     * @param elts any number of data objects for the ROM */
   def apply[T <: Data](elt0: T, elts: T*): ROM[T] = apply(elt0 +: elts.toSeq)
   /** @param elts any number of data objects for the ROM */
-  def apply[T <: Data](elts: Iterable[T]): ROM[T] = apply(elts.toSeq.zipWithIndex.map { case(z,i) => i -> z })
+  def apply[T <: Data](elts: Seq[T]): ROM[T] = apply(elts.toSeq.zipWithIndex.map { case(z,i) => i -> z })
   /** @param elt0 the first data object at address 0 in the ROM
     * @param elts any number of data objects for the ROM */
   def apply[T <: Data](elt0: (Int, T), elts: (Int, T)*): ROM[T] = apply(elt0 +: elts.toSeq)
   /** @param elts any number of data objects for the ROM
     * @param n optionally force the size of the ROM */
-  def apply[T <: Data](elts: Seq[(Int, T)], n: Option[Int]): ROM[T] = new ROM(SortedMap(elts:_*), n)
+  def apply[T <: Data](elts: Iterable[(Int, T)], n: Option[Int]): ROM[T] = new ROM(SortedMap(elts.toSeq:_*), n)
   /** @param elts any number of data objects for the ROM
     * @param n optionally force the size of the ROM */
-  def apply[T <: Data](elts: Seq[(Int, T)], n: Int): ROM[T] = apply(elts, Some(n))
+  def apply[T <: Data](elts: Iterable[(Int, T)], n: Int): ROM[T] = apply(elts, Some(n))
   /** @param elts any number of data objects for the ROM */
-  def apply[T <: Data](elts: Seq[(Int, T)]): ROM[T] = apply(elts, None)
+  def apply[T <: Data](elts: Iterable[(Int, T)]): ROM[T] = apply(elts, None)
   /** @param elts any number of data objects for the ROM */
   def apply[T <: Data](elts: Array[(Int, T)]): ROM[T] = apply(elts.toSeq, None)
   /** @param elts any number of data objects for the ROM
