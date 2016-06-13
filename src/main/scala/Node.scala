@@ -298,7 +298,7 @@ abstract class Node extends Nameable {
     * @param widthfunc the function to use to calculate the width of the node
     * @param ins Nodes that are inputs to this node
     */
-  def initOf (n: String, widthfunc: (=> Node) => Width, ins: Iterable[Node]): Node = {
+  def initOf (n: String, widthfunc: (=> Node) => Width, ins: Seq[Node]): Node = {
     name = n
     inferWidth = widthfunc
     inputs ++= ins

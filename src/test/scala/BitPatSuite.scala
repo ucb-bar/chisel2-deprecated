@@ -45,7 +45,7 @@ class BitPatSuite extends TestSuite {
       }
       io.out := Bool(false)
       switch(io.in) {
-        is(UInt(0)) { io.out := Bool(true) }
+        is(0.U) { io.out := Bool(true) }
         is(BitPat("b???1")) { io.out := Bool(true) }
       }
     }

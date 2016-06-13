@@ -217,7 +217,7 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.tail.isEmpty) in.head
     else {
       val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
@@ -225,10 +225,10 @@ object Mux1H
     }
   }
   def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
-    val (sel, data) = in.unzip
+    val (sel, data) = in.toSeq.unzip
     apply(sel, data)
   }
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
     apply((0 until in.size).map(sel(_)), in)
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
@@ -707,15 +707,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
+  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
@@ -727,9 +727,9 @@ object PriorityEncoderOH
     val outs = Vec.tabulate(in.size)(i => UInt(BigInt(1) << i, in.size))
     PriorityMux(in :+ Bool(true), outs :+ UInt(0, in.size))
   }
-  def apply(in: Seq[Bool]): Vec[Bool] = {
+  def apply(in: Seq[Bool]): Seq[Bool] = {
     val enc = encode(in)
-    Vec.tabulate(in.size)(enc(_))
+    Seq.tabulate(in.size)(enc(_))
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }

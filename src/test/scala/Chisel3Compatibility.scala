@@ -166,7 +166,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
       // The following should pass without a Wire wrapper.
       val foo = Reg(Bits(width = 16))
-      foo(0) := UInt(1)
+      foo(0) := 1.U
       io.out := foo
     }
 

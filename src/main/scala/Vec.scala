@@ -66,7 +66,7 @@ object Vec {
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
+  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
       else new Vec[T](i => elts.head.cloneType, elts)
@@ -109,7 +109,7 @@ object Vec {
   def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
 }
 
-class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
+class VecProc(enables: Seq[Bool], elms: Seq[Data]) extends proc {
   override def procAssign(src: Node): Unit = {
     for ((en, elm) <- enables zip elms) when (en) {
       elm.comp match {
@@ -120,7 +120,7 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T, elts: Seq[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
   if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
     ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
@@ -192,9 +192,9 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     }
   }
   def <>(src: Vec[T]) { (self zip src) foreach {case (s, o) => s <> o} }
-  def <>(src: Iterable[T]) { (self zip src) foreach {case (s, o) => s <> o} }
+  def <>(src: Seq[T]) { (self zip src) foreach {case (s, o) => s <> o} }
 
-  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = comp match {
+  override protected def colonEquals[T <: Data](that: Seq[T]): Unit = comp match {
     case Some(p) => p procAssign Vec(that)
     case None => {
       def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
@@ -214,8 +214,8 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   override protected def colonEquals(that: Bits): Unit = {
     for (i <- 0 until length) this(i) := that(i)
   }
-  // We need this special := because Iterable[T] is not a Data.
-  def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
+  // We need this special := because Seq[T] is not a Data.
+  def :=[T <: Data](that: Seq[T]): Unit = colonEquals(that)
   override def removeTypeNodes { self foreach (_.removeTypeNodes) }
   override def flip: this.type = { self foreach (_.flip) ; this }
 
