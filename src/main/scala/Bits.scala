@@ -524,6 +524,15 @@ abstract class Bits extends Data with proc {
   // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
   private def checkCompatibility(src: Node) {
     if (Driver.minimumCompatibility > "2") {
+      // Verify assignment type legality.
+      val mismatch = (src, this) match {
+        case (s: SInt, u: UInt) => true
+        case (u: UInt, s: SInt) => true
+        case _ => false
+      }
+      if (mismatch) {
+        ChiselError.check("Chisel3 compatibility: Connections between UInt and SInt are illegal.", Version("3.0"))
+      }
       component addAssignment this
     }
   }

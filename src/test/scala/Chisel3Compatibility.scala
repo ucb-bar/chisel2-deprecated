@@ -227,4 +227,44 @@ class Chisel3CompatibilitySuite extends TestSuite {
     }
     assertTrue(ChiselError.hasErrors)
   }
+
+  @Test def testUIntSIntConnect() {
+    println("\ntestUIntSIntConnect ...")
+
+    class UIntSIntConnect() extends Module {
+      val io = new Bundle {
+        val inU = UInt(width = 4).asInput()
+        val outS = SInt(width = 4).asOutput()
+      }
+      io.outS := io.inU
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since UInt <-> SInt connections are illegal in Chisel3.
+      chiselMain(testArgs, () => Module(new UIntSIntConnect()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
+
+  @Test def testSIntUIntConnect() {
+    println("\ntestSIntUIntConnect ...")
+
+    class SIntUIntConnect() extends Module {
+      val io = new Bundle {
+        val inS = SInt(width = 4).asInput()
+        val outU = UInt(width = 4).asOutput()
+      }
+      io.outU := io.inS
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since UInt <-> SInt connections are illegal in Chisel3.
+      chiselMain(testArgs, () => Module(new SIntUIntConnect()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
 }
