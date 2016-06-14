@@ -95,7 +95,9 @@ class SInt extends Bits with Num[SInt] {
 
   /** casting from UInt followed by assignment. */
   override protected def colonEquals(that: Bits): Unit = that match {
-    case u: UInt => this := u.zext
+    case u: UInt => 
+      ChiselError.check("Chisel3 compatibility: Connections between UInt and SInt are illegal.", Version("3.0"))
+      this := u.zext
     case _ => super.colonEquals(that)
   }
 

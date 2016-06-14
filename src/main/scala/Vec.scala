@@ -54,12 +54,13 @@ object Vec {
     apply(n, gen)
   }
 
-  def checkCloneType[T <: Data](element: T): Unit = {
+  def checkCloneType[T <: Data](element: T): Option[element.type] = {
     // Clone or complain.
     Try(element.checkClone(Array("cloneType"))) match {
-      case Success(c) =>
+      case Success(c) => Some(c.get.asInstanceOf[element.type])
       case Failure(e) =>
         ChiselError.check(s"Chisel3 compatibility: " + e, Version("3.0"))
+        None
     }
   }
 
@@ -92,7 +93,12 @@ object Vec {
     //  ensure the type is cloneable while we know what it is.
     // Chisel3 - compatibility checks
     if (Driver.minimumCompatibility > "2" && n == 0) {
+      // We need to treat empty Vec's here since apply can't deal with an empty sequence.
       checkCloneType(gen(0))
+      // In any case, return an empty Vec.
+      new Vec[T](i => gen(0), Seq[T]())
+    } else {
+      apply((0 until n).map(i => gen(i)))
     }
     apply((0 until n).map(i => gen(i)))
   }

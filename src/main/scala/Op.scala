@@ -135,6 +135,7 @@ object LogicalOp {
   def apply(x: Node, y: Node, op: String): Bool = {
     val node = op match {
       case "===" => Op("==",  fixWidth(1), x, y)
+      case "=/=" => Op("!=",  fixWidth(1), x, y)
       case "!="  => Op("!=",  fixWidth(1), x, y)
       case "<"   => Op("<",   fixWidth(1), x, y)
       case "<="  => Op("<=",  fixWidth(1), x, y)

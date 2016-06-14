@@ -361,13 +361,13 @@ abstract class Bits extends Data with proc {
   /** reduction and, and all bits together */
   def andR(): Bool           = newLogicalOp(SInt(-1), "===")
   /** reduction or, or all bits together */
-  def orR(): Bool            = newLogicalOp(UInt(0), "!=")
+  def orR(): Bool            = newLogicalOp(UInt(0), "=/=")
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
   @deprecated("Use =/= rather than != for chisel comparison", "3")
   def != (b: Bits): Bool = {
     ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead", Version("3.0"))
-    newLogicalOp(b, "!=");
+    newLogicalOp(b, "=/=");
   }
   /** not equal to */
   def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
@@ -506,7 +506,10 @@ abstract class Bits extends Data with proc {
 
   def === (that: BitPat): Bool = that === this
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (that: BitPat): Bool = that =/= this
+  def != (that: BitPat): Bool = {
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead.", Version("3.0"))
+    that =/= this
+  }
   def =/= (that: BitPat): Bool = that =/= this
 
   /** Cat bits together to into a single data object with the width of both combined */
@@ -521,6 +524,15 @@ abstract class Bits extends Data with proc {
   // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
   private def checkCompatibility(src: Node) {
     if (Driver.minimumCompatibility > "2") {
+      // Verify assignment type legality.
+      val mismatch = (src, this) match {
+        case (s: SInt, u: UInt) => true
+        case (u: UInt, s: SInt) => true
+        case _ => false
+      }
+      if (mismatch) {
+        ChiselError.check("Chisel3 compatibility: Connections between UInt and SInt are illegal.", Version("3.0"))
+      }
       component addAssignment this
     }
   }
