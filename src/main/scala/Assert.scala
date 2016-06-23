@@ -110,3 +110,8 @@ class Printf(condIn: Bool, formatIn: String, argsIn: Seq[Node]) extends PrintfBa
   def cond: Node = inputs.last
   def cond_=(x: Bool) { inputs(inputs.size-1) = x }
 }
+
+// Chisel3 compatibility
+object stop {
+  def apply(): Unit = Module.current.assert(Bool(false), "stop")
+}
