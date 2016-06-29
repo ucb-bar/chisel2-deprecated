@@ -28,7 +28,7 @@
  MODIFICATIONS.
 */
 
-package Chisel.hwiotesters
+package Chisel.iotesters
 
 import Chisel._
 

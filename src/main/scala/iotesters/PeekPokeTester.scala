@@ -30,42 +30,34 @@
 
 package Chisel.iotesters
 
+import Chisel.{ Backend => ChiselBackend }
 import Chisel._
-import Chisel.testers.BasicTester
 
-// scalastyle:off regex
-// scalastyle:off method.name
-/**
-  * provide common facilities for step based testing and decoupled interface testing
-  */
-abstract class HWIOTester extends BasicTester {
-  val device_under_test:     Module
-  var io_info:               IOAccessor = null
-  def finish():              Unit
+class Backend
 
-  def int(x: Bits):    BigInt = x.litValue()
+class PeekPokeTester[+T <: Module](
+    val dut: T,
+    verbose: Boolean = true,
+    _base: Int = 16,
+    logFile: Option[String] = None,
+    waveform: Option[String] = None,
+    _backend: Option[Backend] = None,
+    _seed: Long = System.currentTimeMillis
+    ) extends Tester[T](dut, verbose, _base)
 
-  override val io = new Bundle {
-    val running       = Bool(INPUT)
-    val error         = Bool(OUTPUT)
-    val pc            = UInt(OUTPUT, 32)
-    val done          = Bool(OUTPUT)
-  }
-  io.done  := setDone
-  io.error := setError
-
-  val rnd = new scala.util.Random(Driver.testerSeed)
-
-  var enable_scala_debug     = false
-  var enable_printf_debug    = false
-  var enable_all_debug       = false
-
-  def logScalaDebug(msg: => String): Unit = {
-    //noinspection ScalaStyle
-    if(enable_all_debug || enable_scala_debug) println(msg)
-  }
-
-  def logPrintfDebug(fmt: String, args: Bits*): Unit = {
-    if(enable_all_debug || enable_scala_debug) printf(fmt, args :_*)
+object runPeekPokeTester {
+  def apply[T <: Module](dutGen: () => T, backendType: String = "")(testerGen: (T, Option[Backend]) => PeekPokeTester[T]): Boolean = {
+    val testArgs = Array[String]("--backend", "c", "--compile", "--genHarness", "--test") ++ chiselEnvironmentArguments()
+    val res: Boolean = {
+      try {
+        val oldTesterGen = testerGen(_: T, None)
+        chiselMainTest(testArgs, dutGen)(oldTesterGen)
+        true
+      }
+      catch {
+        case e: Throwable => false
+      }
+    }
+    res
   }
 }
