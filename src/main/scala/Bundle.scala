@@ -103,7 +103,7 @@ class Bundle(val view: Seq[String] = Seq()) extends Aggregate {
           val stack = Thread.currentThread().getStackTrace
           ChiselError.findFirstUserLine(stack) getOrElse stack(0)
         }
-        ChiselError.error("method \"clone\" is deprecated. Please use \"cloneType\"", errorLine)
+        ChiselError.check("method \"clone\" is deprecated. Please use \"cloneType\"", Version("3,0"), errline = errorLine)
       }
     }
     elts

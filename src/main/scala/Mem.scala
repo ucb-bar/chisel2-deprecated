@@ -57,13 +57,11 @@ object Mem {
   def apply[T <: Data](out: => T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
-      if (seqRead)
-        ChiselError.error("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
-      if (orderedWrites)
-        ChiselError.error("Mem(..., orderedWrites) is deprecated.")
-    }
+    ChiselError.check("Chisel3 compatibility: Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.", Version("3.0"))
+    if (seqRead)
+      ChiselError.check("Chisel3 compatibility: Mem(..., seqRead) is deprecated. Please use SeqMem(...)", Version("3.0"))
+    if (orderedWrites)
+      ChiselError.check("Chisel3 compatibility: Mem(..., orderedWrites) is deprecated.", Version("3.0"))
     construct(n, out, seqRead, orderedWrites, clock)
   }
 }
@@ -135,8 +133,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit = {
-    if (Driver.minimumCompatibility > "2")
-      throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+    ChiselError.check("Chisel3 compatibility: Chisel3 masked writes are only supported for Mem[Vec[_]].", Version("3.0"))
     doWrite(addr, Module.current.whenCond, data, wmask)
   }
 
@@ -306,9 +303,7 @@ object SeqMem {
 
   @deprecated("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", "2.29")
   def apply[T <: Data](out: => T, n: Int): SeqMem[T] = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.")
-    }
+    ChiselError.check("Chisel3 compatibility: SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", Version("3.0"))
     apply(n, out)
   }
 }

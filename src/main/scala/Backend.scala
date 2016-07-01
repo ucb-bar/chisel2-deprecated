@@ -927,6 +927,11 @@ class Backend extends FileSystemUtilities{
       printStack
     }
 
+    if (ChiselError.hasChecks) {
+      ChiselError.error("COMPATIBILITY ERRORS")
+    }
+    ChiselError.checkpoint()
+
     // generate chisel names
     Driver.dfs { _.chiselName }
     execute(c, analyses)

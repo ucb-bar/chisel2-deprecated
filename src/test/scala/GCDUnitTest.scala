@@ -30,7 +30,7 @@
 
 import Chisel._
 import Chisel.testers.TesterDriver
-import hwiotesters.SteppedHWIOTester
+import iotesters.SteppedHWIOTester
 import org.junit.Assert._
 import org.junit.Test
 import org.junit.Ignore

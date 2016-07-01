@@ -28,62 +28,44 @@
  MODIFICATIONS.
 */
 
-import org.junit.Assert._
-import org.junit.Test
-import org.junit.Ignore
+package Chisel.iotesters
 
 import Chisel._
+import Chisel.testers.BasicTester
 
-class BitPatSuite extends TestSuite {
-  // BitPat ? literals
-  @Test def testBitPat() {
-    println("\ntestBitPat...")
-    class BitPatModule extends Module {
-      val io = new Bundle {
-        val in = UInt(INPUT,4)
-        val out = Bool(OUTPUT)
-      }
-      io.out := Bool(false)
-      switch(io.in) {
-        is(0.U) { io.out := Bool(true) }
-        is(BitPat("b???1")) { io.out := Bool(true) }
-      }
-    }
+// scalastyle:off regex
+// scalastyle:off method.name
+/**
+  * provide common facilities for step based testing and decoupled interface testing
+  */
+abstract class HWIOTester extends BasicTester {
+  val device_under_test:     Module
+  var io_info:               IOAccessor = null
+  def finish():              Unit
 
-    class BitPatModuleTests(m: BitPatModule) extends Tester(m) {
-      (0 until 8).map { i =>
-        poke(m.io.in, i)
-        step(1)
-        expect(m.io.out, if(i == 0) (1) else (i % 2))
-      }
-    }
+  def int(x: Bits):    BigInt = x.litValue()
 
-    launchCppTester((m: BitPatModule) => new BitPatModuleTests(m))
+  override val io = new Bundle {
+    val running       = Bool(INPUT)
+    val error         = Bool(OUTPUT)
+    val pc            = UInt(OUTPUT, 32)
+    val done          = Bool(OUTPUT)
+  }
+  io.done  := setDone
+  io.error := setError
+
+  val rnd = new scala.util.Random(Driver.testerSeed)
+
+  var enable_scala_debug     = false
+  var enable_printf_debug    = false
+  var enable_all_debug       = false
+
+  def logScalaDebug(msg: => String): Unit = {
+    //noinspection ScalaStyle
+    if(enable_all_debug || enable_scala_debug) println(msg)
   }
 
-  @Test def testBitPatBool() {
-    println("\ntestBitPatBool...")
-    class BitPatBoolModule extends Module {
-      val io = new Bundle {
-        val in = Bool(INPUT)
-        val out = Bool(OUTPUT)
-      }
-      io.out := Bool(false)
-      val testDC = Bool.DC
-      val testTrue = Bool(true)
-      switch(io.in) {
-        is(testDC) { io.out := Bool(true) }
-      }
-    }
-
-    class BitPatBoolModuleTests(m: BitPatBoolModule) extends Tester(m) {
-      (0 until 8).map { i =>
-        poke(m.io.in, i)
-        step(1)
-        expect(m.io.out, 1)
-      }
-    }
-
-    launchCppTester((m: BitPatBoolModule) => new BitPatBoolModuleTests(m))
+  def logPrintfDebug(fmt: String, args: Bits*): Unit = {
+    if(enable_all_debug || enable_scala_debug) printf(fmt, args :_*)
   }
 }

@@ -57,7 +57,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
 
   @Test def testRTAssert() {
     println("\ntestRTAssert...")
-    val assertMessage = "io.dataIn == UInt(8)"
+    val assertMessage = "io.dataIn == 8.U"
     class mkAssert extends Module{
       val io = new Bundle{
         val dataIn = UInt(INPUT,8)
@@ -65,7 +65,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
       }
 
       io.dataOut := OHToUInt(io.dataIn)
-      assert(io.dataIn =/= UInt(8), assertMessage)
+      assert(io.dataIn =/= 8.U, assertMessage)
     }
 
     class TBAssert(c: mkAssert) extends Tester(c) {

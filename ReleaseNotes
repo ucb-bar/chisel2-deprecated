@@ -1,6 +1,7 @@
-ReleaseNotes for Chisel v2.2.33
+ReleaseNotes for Chisel v2.2.34
 
-This release of Chisel is largely a maintenance release.
+This release of Chisel is largely a maintenance release, incorporating some Chisel3 features and additional compatibility checks.
+
 See the associated Changelog for issues resolved with this release.
 
 We will be removing support for Scala 2.10 in future Chisel

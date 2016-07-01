@@ -33,33 +33,39 @@ import scala.math.{ceil, floor, log}
 import scala.collection.mutable.ArrayBuffer
 
 /** Compute the log2 rounded up with min value of 1 */
-object log2Up
-{
-  def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
+object log2Up {
+  def apply(in: BigInt): Int = {
+    require(in >= 0)
+    1 max (in-1).bitLength
+  }
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded up */
-object log2Ceil
-{
-  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+object log2Ceil {
+  def apply(in: BigInt): Int = {
+    require(in > 0)
+    (in-1).bitLength
+  }
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded down with min value of 1 */
-object log2Down
-{
-  def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+object log2Down {
+  def apply(in: BigInt): Int = log2Up(in) - (if (isPow2(in)) 0 else 1)
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded down */
-object log2Floor
-{
-  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
+object log2Floor {
+  def apply(in: BigInt): Int = log2Ceil(in) - (if (isPow2(in)) 0 else 1)
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Check if an Integer is a power of 2 */
-object isPow2
-{
-  def apply(in: Int): Boolean = in > 0 && ((in & (in-1)) == 0)
+object isPow2 {
+  def apply(in: BigInt): Boolean = in > 0 && ((in & (in-1)) == 0)
+  def apply(in: Int): Boolean = apply(BigInt(in))
 }
 
 /** Fold Right with a function */
@@ -211,7 +217,7 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.tail.isEmpty) in.head
     else {
       val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
@@ -219,10 +225,10 @@ object Mux1H
     }
   }
   def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
-    val (sel, data) = in.unzip
+    val (sel, data) = in.toSeq.unzip
     apply(sel, data)
   }
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
     apply((0 until in.size).map(sel(_)), in)
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
@@ -701,15 +707,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
+  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
@@ -721,9 +727,9 @@ object PriorityEncoderOH
     val outs = Vec.tabulate(in.size)(i => UInt(BigInt(1) << i, in.size))
     PriorityMux(in :+ Bool(true), outs :+ UInt(0, in.size))
   }
-  def apply(in: Seq[Bool]): Vec[Bool] = {
+  def apply(in: Seq[Bool]): Seq[Bool] = {
     val enc = encode(in)
-    Vec.tabulate(in.size)(enc(_))
+    Seq.tabulate(in.size)(enc(_))
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }

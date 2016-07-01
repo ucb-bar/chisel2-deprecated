@@ -95,7 +95,9 @@ class SInt extends Bits with Num[SInt] {
 
   /** casting from UInt followed by assignment. */
   override protected def colonEquals(that: Bits): Unit = that match {
-    case u: UInt => this := u.zext
+    case u: UInt => 
+      ChiselError.check("Chisel3 compatibility: Connections between UInt and SInt are illegal.", Version("3.0"))
+      this := u.zext
     case _ => super.colonEquals(that)
   }
 
@@ -116,9 +118,7 @@ class SInt extends Bits with Num[SInt] {
   def >= (b: SInt): Bool = b <= this
   @deprecated("Use =/= rather than !=", "3")
   def !=  (b: UInt): Bool = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.error("!= is deprecated, use =/= instead")
-    }
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead", Version("3.0"))
     this =/= b.zext
   }
   def =/=  (b: UInt): Bool = this =/= b.zext

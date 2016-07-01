@@ -48,7 +48,7 @@ object Log2 {
   */
 object PriorityEncoder
 {
-  def apply(in: Iterable[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
+  def apply(in: Seq[Bool]): UInt = PriorityMux(in, (0 until in.size).map(UInt(_)))
   def apply(in: Bits): UInt = UInt().asTypeFor(new PriorityEncoder(in))
 }
 

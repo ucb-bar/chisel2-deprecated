@@ -1,7 +1,7 @@
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.33",
-    version := "2.2.33",
+    // version := "2.2.34",
+    version := "2.2.34",
     name := "chisel",
     scalaVersion := "2.11.7",
     crossScalaVersions := Seq("2.10.6", "2.11.7"),
@@ -44,8 +44,8 @@ lazy val chiselBuildSettings = Seq (
     },
 
     resolvers ++= Seq(
-      "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
-      "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.sonatypeRepo("releases")
     ),
 
     /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail

@@ -37,7 +37,7 @@ object MuxLookup {
     * @param mapping a sequence to search of keys and values
     * @return the value found or the default if not
     */
-  def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: UInt, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -117,7 +117,7 @@ object Mux {
     // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
     if (Driver.minimumCompatibility > "2") {
       if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
-        ChiselError.error("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+        ChiselError.check("Chisel3 compatibility: Unable to have mixed type mux CON " + tc + " ALT " + fc, Version("3.0"))
       }
     }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases
