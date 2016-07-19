@@ -42,9 +42,9 @@ object Fill {
   /** Fan out mod n times */
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   /** Fan out mod n times */
-  @deprecated("Fill(gen: => T, n:Int) is deprecated. Please use Fill(n:Int, gen: => T) instead.", "3.0")
+  @deprecated("Fill(mod: UInt, n: Int) is deprecated. Please use Fill(n: Int, mode: UInt) instead.", "3.0")
   def apply(mod: UInt, n: Int): UInt = {
-    ChiselError.check("Chisel3 compatibility: Fill(gen: => T, n:Int) is deprecated. Please use Fill(n:Int, gen: => T) instead.", Version("3.0"))
+    ChiselError.check("Chisel3 compatibility: Fill(mod: UInt, n:Int) is deprecated. Please use Fill(n: Int, mod: UInt) instead.", Version("3.0"))
     apply(n, mod)
   }
 }
