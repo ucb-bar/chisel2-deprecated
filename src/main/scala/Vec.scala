@@ -100,7 +100,6 @@ object Vec {
     } else {
       apply((0 until n).map(i => gen(i)))
     }
-    apply((0 until n).map(i => gen(i)))
   }
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
