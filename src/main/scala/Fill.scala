@@ -42,7 +42,11 @@ object Fill {
   /** Fan out mod n times */
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   /** Fan out mod n times */
-  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
+  @deprecated("Fill(gen: => T, n:Int) is deprecated. Please use Fill(n:Int, gen: => T) instead.", "3.0")
+  def apply(mod: UInt, n: Int): UInt = {
+    ChiselError.check("Chisel3 compatibility: Fill(gen: => T, n:Int) is deprecated. Please use Fill(n:Int, gen: => T) instead.", Version("3.0"))
+    apply(n, mod)
+  }
 }
 
 /** NodeFill copys an instance of a Node multiple times or fans it out
