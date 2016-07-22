@@ -1,25 +1,3 @@
-ChangeLog for Chisel v2.2.34
+ChangeLog for Chisel v2.2.35
 
-#710 Chisel3 compatibility: Allow asserts with empty messages
-
- Rename testers to match chisel3.
- Add chisel3 compatiblity stop()
- MuxLookup should take Data, not just Bits
- Add check for SInt <-> UInt connections.
- Return Seq, not Vec, from PriorityEncoderOH
- Use Seq, not Iterable, when order matters
- Chisel3 compatibility: asUInt/asSInt must accept ()
- Update to current sbt resolver idiom.
- Added additional Chisel3 incompatibilities.
- Compatibility check fixes
- add package object with new literal creation implicits
- Use the "real" cloneType mechanism to determine Chisel3 compatibility
- Deal with empty Vec's when checking for element cloneType()
- Revert to a single error list containing errors, checks, and warnings.
- Convert exceptions into ChiselErrors so we don't give up on the first.
- Migrated black box to separate file
- Correct signature for vcd dump methods (lacked t and reset arguments).
- Add SystemVerilog keywords to reserved word list
- add /cpp directory to .gitignore
- Improve log2* functions, as with Chisel3
- Replace != with =/=
+#718 Remove extraneous apply() from vec.tabulate - Vec.fill appears to be badly broken

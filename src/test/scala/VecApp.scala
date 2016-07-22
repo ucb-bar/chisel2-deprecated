@@ -44,4 +44,28 @@ class VecSuite extends TestSuite {
     }
     assertTrue(ChiselError.hasErrors)
   }
+  // Issue #718 - Vec.fill with vec initializer
+  @Test def testVecFillFromVec() {
+    println("\ntestVecFillFromVec ...")
+
+    class VecApp(n: Int) extends Module {
+      val io = new Bundle {
+        val a = UInt(INPUT, n)
+      }
+      val z = Vec(32, UInt(32, width=16))
+      var i = 0
+      val x = Vec.fill( 32 )
+      {
+        val y = z(i)
+        i = i + 1
+        y
+      }
+    }
+    
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          /* "--minimumCompatibility", "3.0.0", "--wError",*/ "--backend", "null")
+    chiselMain(testArgs, () => Module(new VecApp(32)))
+    assertFalse(ChiselError.hasErrors)
+    
+  }
 }

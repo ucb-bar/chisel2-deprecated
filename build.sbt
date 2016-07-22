@@ -1,7 +1,7 @@
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.34",
-    version := "2.2.34",
+    // version := "2.2.35",
+    version := "2.2.35",
     name := "chisel",
     scalaVersion := "2.11.7",
     crossScalaVersions := Seq("2.10.6", "2.11.7"),
