@@ -59,7 +59,11 @@ lazy val chiselBuildSettings = Seq (
      *    - use of "Tx" vs. "Tx.values"
      */
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5" % "test",
+    // scalatest and scalacheck ordinarily are needed only for testing,
+    //  but since ChiselSpec is in main for clients of chisel and their tests,
+    //  these are now required for the main build.
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5",
+    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.12.5",
     libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.

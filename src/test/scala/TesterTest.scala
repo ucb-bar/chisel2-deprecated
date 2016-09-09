@@ -34,6 +34,7 @@ import org.junit.Test
 import Chisel._
 import Chisel.Implicits._
 import Chisel.AdvTester._
+import Chisel.testers.TesterDriver
 
 /** This testsuite checks the primitives of the standard library
   that will generate basic common graphs of *Node*.
@@ -48,7 +49,7 @@ import Chisel.AdvTester._
 
 class TesterTest extends TestSuite {
 
-  val backends = List("c") ++ {if (Driver.isVCSAvailable) "v" :: Nil else Nil}
+  val backends: List[String] = TesterDriver.backends
 
   /** Test poking various numbers.
    *  This is primarily a test of the Tester and its peek/poke/expect interface.
