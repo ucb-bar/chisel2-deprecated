@@ -54,7 +54,7 @@ abstract class HWIOTester extends BasicTester {
   io.done  := setDone
   io.error := setError
 
-  val rnd = new scala.util.Random(Driver.testerSeed)
+  val rnd = new scala.util.Random(Chisel.Driver.testerSeed)
 
   var enable_scala_debug     = false
   var enable_printf_debug    = false
