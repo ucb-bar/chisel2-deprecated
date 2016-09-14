@@ -68,4 +68,27 @@ class VecSuite extends TestSuite {
     assertFalse(ChiselError.hasErrors)
     
   }
+
+  @Test def constVecTest {
+    class UserMod( testCond : Boolean ) extends Module {
+      val io = new Bundle {
+        val in = UInt( INPUT, 4 )
+        val out = UInt( OUTPUT, 4 )
+      }
+      val myVec = Vec( List( UInt( 3, 4 ), UInt( 1, 4 ), UInt( 5, 4 ), UInt( 8, 4 ) ) )
+      val idx = {
+        if ( testCond )
+          UInt( 2, 4 )
+        else
+          io.in
+      }
+      io.out := myVec(idx)
+    }
+
+    chiselMain(Array[String]("--backend", "v",
+      "--targetDir", dir.getPath.toString()),
+      () => Module(new UserMod(true)))
+    assertFile("VecSuite_UserMod_1.v")
+  }
+
 }
