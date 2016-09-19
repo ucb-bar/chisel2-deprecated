@@ -1,3 +1,4 @@
+
 package object Chisel {
   import Chisel.Width
   implicit class fromBigIntToLiteral(val x: BigInt) extends AnyVal {
@@ -13,5 +14,15 @@ package object Chisel {
   }
   implicit class fromBooleanToLiteral(val x: Boolean) extends AnyVal {
     def B: Bool = Bool(x)
+  }
+  // Chisel3 compatibility.
+  object Input {
+    def apply[T<:Data](source: T): T = source.asInput()
+  }
+  object Output {
+    def apply[T<:Data](source: T): T = source.asOutput()
+  }
+  object Flipped {
+    def apply[T<:Data](source: T): T = source.flip()
   }
 }

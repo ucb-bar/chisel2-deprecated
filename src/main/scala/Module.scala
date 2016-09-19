@@ -616,4 +616,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     result
   }
+
+  // Chisel3 compatibility - IO() wrapper.
+  def IO[T<:Data](iodef: T): iodef.type = iodef
 }
