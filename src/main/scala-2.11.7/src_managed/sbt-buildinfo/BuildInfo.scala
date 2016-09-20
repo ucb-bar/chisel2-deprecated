@@ -13,16 +13,16 @@ case object BuildInfo {
   val version: String = "2.3-SNAPSHOT"
   /** The value is "2.11.7". */
   val scalaVersion: String = "2.11.7"
-  /** The value is "0.13.8". */
-  val sbtVersion: String = "0.13.8"
-  /** The value is Some("2.2.26-511-g1ea9574"). */
-  val gitDescription: Option[String] = Some("2.2.26-511-g1ea9574")
+  /** The value is "0.13.11". */
+  val sbtVersion: String = "0.13.11"
+  /** The value is Some("2.2.26-512-ga9c8f92"). */
+  val gitDescription: Option[String] = Some("2.2.26-512-ga9c8f92")
   /** The value is "buildinfo". */
   val branch: String = "buildinfo"
-  /** The value is "2016-01-19 22:18:15.834". */
-  val builtAtString: String = "2016-01-19 22:18:15.834"
-  /** The value is 1453241895834L. */
-  val builtAtMillis: Long = 1453241895834L
+  /** The value is "2016-09-19 23:54:12.149". */
+  val builtAtString: String = "2016-09-19 23:54:12.149"
+  /** The value is 1474329252149L. */
+  val builtAtMillis: Long = 1474329252149L
   override val toString: String = {
     "name: %s, version: %s, scalaVersion: %s, sbtVersion: %s, gitDescription: %s, branch: %s, builtAtString: %s, builtAtMillis: %s" format (
       name, version, scalaVersion, sbtVersion, gitDescription, branch, builtAtString, builtAtMillis

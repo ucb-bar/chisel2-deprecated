@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -40,7 +40,7 @@ class ArbiterSuite extends TestSuite {
     class MyArbiter extends Arbiter(UInt(width=4), 4)
 
     class ArbiterTests(c: MyArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,0,0,0,0)
       val in1_val = Array[BigInt](0,0,0,1,0,0,0,0,0)
@@ -70,7 +70,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -90,7 +90,7 @@ class ArbiterSuite extends TestSuite {
     class MyStableArbiter extends Arbiter(UInt(width=4), 4, true)
 
     class ArbiterTests(c: MyStableArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,0,0,0,0)
       val in1_val = Array[BigInt](0,0,0,1,1,1,1,0,1)
@@ -120,7 +120,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -140,7 +140,7 @@ class ArbiterSuite extends TestSuite {
     class MyDefaultLockingArbiter extends LockingArbiter(UInt(width=4), 4, 2)
 
     class ArbiterTests(c: MyDefaultLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,1,0)
       val in1_val = Array[BigInt](0,0,0,1,0,1,1,0,0,0)
@@ -170,7 +170,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -190,7 +190,7 @@ class ArbiterSuite extends TestSuite {
     class MyDefaultStableLockingArbiter extends LockingArbiter(UInt(width=4), 4, 2, None, true)
 
     class ArbiterTests(c: MyDefaultStableLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,1,0)
       val in1_val = Array[BigInt](0,0,0,1,1,1,1,1,1,1)
@@ -220,7 +220,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -238,11 +238,11 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(0)))
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 0.U))
 
     class ArbiterTests(c: MyLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,0,1,0,0,0)
       val in1_val = Array[BigInt](0,0,0,1,0,0,1,1,0,0)
@@ -272,7 +272,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -290,11 +290,11 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testStableLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyStableLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(0)), true)
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyStableLockingArbiter extends LockingArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 0.U), true)
 
     class ArbiterTests(c: MyStableLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,0,1,0,0,0)
       val in1_val = Array[BigInt](0,0,0,1,1,1,1,1,0,0)
@@ -324,7 +324,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -344,7 +344,7 @@ class ArbiterSuite extends TestSuite {
     class MyRRArbiter extends RRArbiter(UInt(width=4), 4)
 
     class ArbiterTests(c: MyRRArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,0)
       val in1_val = Array[BigInt](0,0,0,1,0,0,0,0,0)
@@ -374,7 +374,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -394,7 +394,7 @@ class ArbiterSuite extends TestSuite {
     class MyStableRRArbiter extends RRArbiter(UInt(width=4), 4, true)
 
     class ArbiterTests(c: MyStableRRArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,0,0)
       val in1_val = Array[BigInt](0,0,0,1,1,1,1,1,0)
@@ -424,7 +424,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -444,7 +444,7 @@ class ArbiterSuite extends TestSuite {
     class MyDefaultRRLockingArbiter extends LockingRRArbiter(UInt(width=4), 4, 2)
 
     class ArbiterTests(c: MyDefaultRRLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,1,1)
       val in1_val = Array[BigInt](0,0,0,1,0,1,1,0,0,0)
@@ -474,7 +474,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -494,7 +494,7 @@ class ArbiterSuite extends TestSuite {
     class MyDefaultStableRRLockingArbiter extends LockingRRArbiter(UInt(width=4), 4, 2, None, true)
 
     class ArbiterTests(c: MyDefaultStableRRLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,1,1)
       val in1_val = Array[BigInt](0,0,0,1,1,1,1,1,1,1)
@@ -524,7 +524,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -542,11 +542,11 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testRRLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(3)))
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 3.U))
 
     class ArbiterTests(c: MyRRLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,1,0)
       val in1_val = Array[BigInt](0,0,0,1,0,0,0,0,0)
@@ -576,7 +576,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))
@@ -594,11 +594,11 @@ class ArbiterSuite extends TestSuite {
 
   @Test def testStableRRLockingArbiter() {
 
-    //def hasDat(d: UInt):Bool = d === UInt(0)
-    class MyStableRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === UInt(3)), true)
+    //def hasDat(d: UInt):Bool = d === 0.U
+    class MyStableRRLockingArbiter extends LockingRRArbiter[UInt](UInt(width=4), 4, 2, Some((d:UInt) => d === 3.U), true)
 
     class ArbiterTests(c: MyStableRRLockingArbiter) extends Tester(c) {
-      
+
       // driver
       val in0_val = Array[BigInt](0,0,0,0,1,1,1,0,0)
       val in1_val = Array[BigInt](0,0,0,1,1,1,0,0,0)
@@ -628,7 +628,7 @@ class ArbiterSuite extends TestSuite {
         poke(c.io.in(2).valid, in2_val(t))
         poke(c.io.in(3).valid, in3_val(t))
         poke(c.io.out.ready, out_rdy(t))
-        
+
         expect(c.io.in(0).ready, in0_rdy(t))
         expect(c.io.in(1).ready, in1_rdy(t))
         expect(c.io.in(2).ready, in2_rdy(t))

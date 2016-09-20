@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -31,26 +31,6 @@
 package Chisel
 import scala.collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap}
 import scala.collection.immutable.ListSet
-
-object VerilogBackend {
-  val keywords = Set[String](
-    "always", "and", "assign", "attribute", "begin", "buf", "bufif0", "bufif1",
-    "case", "casex", "casez", "cmos", "deassign", "default", "defparam",
-    "disable", "edge", "else", "end", "endattribute", "endcase", "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable", "endtask", "event",
-    "for", "force", "forever", "fork", "function", "highz0", "highz1", "if",
-    "ifnone", "initial", "inout", "input", "integer", "initvar", "join",
-    "medium", "module", "large", "macromodule", "nand", "negedge", "nmos",
-    "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos",
-    "posedge", "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos",
-    "real", "realtime", "reg", "release", "repeat", "rnmos", "rpmos", "rtran",
-    "rtranif0", "rtranif1", "scalared", "signed", "small", "specify",
-    "specparam", "strength", "strong0", "strong1", "supply0", "supply1",
-    "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0",
-    "tri1", "triand", "trior", "trireg", "unsigned", "vectored", "wait",
-    "wand", "weak0", "weak1", "while", "wire", "wor", "xnor", "xor",
-    "SYNTHESIS", "PRINTF_COND", "VCS")
-}
 
 class VerilogBackend extends Backend {
   override val needsLowering = Set("PriEnc", "OHToUInt", "Log2")
@@ -109,20 +89,20 @@ class VerilogBackend extends Backend {
 
   private def emitLit(x: BigInt): String =
     emitLit(x, x.bitLength + (if (x < 0) 1 else 0))
-  private def emitLit(x: BigInt, w: Int): String = {
-    val unsigned = if (x < 0) (BigInt(1) << w) + x else x
-    require(unsigned >= 0)
-    w + "'h" + unsigned.toString(16)
+  private def emitLit(x: BigInt, w: Int, base10: Boolean = false): String = {
+    val unsigned = if (x < 0) (BigInt(1) << w) + x else x // drop leading 1's on negative numbers to get the necessary width
+    require(unsigned >= 0)  // only positive numbers are used for constants
+    if (base10) unsigned.toString(10) else w + "'h" + unsigned.toString(16) // write base 10 or hex constant
   }
 
   // $random only emits 32 bits; repeat its result to fill the Node
   private def emitRand(node: Node): String =
-    "{" + ((node.needWidth()+31)/32) + "{$random}}"
+    "{" + ((node.needWidth() + 31)/32) + "{$random}}"
 
   def emitPortDef(m: MemAccess, idx: Int): String = {
     def str(prefix: String, ports: (String, Option[String])*): String =
-      ports.toList filter (_._2 != None) map { 
-        case (x, y) => List("    .", prefix, idx, x, "(", y.get, ")").mkString 
+      ports.toList filter (_._2 != None) map {
+        case (x, y) => List("    .", prefix, idx, x, "(", y.get, ")").mkString
       } mkString ",\n"
 
     m match {
@@ -161,7 +141,7 @@ class VerilogBackend extends Backend {
 
   def emitDef(c: Module): StringBuilder = {
     val spacing = (if(c.verilog_parameters != "") " " else "")
-    var res = new StringBuilder 
+    var res = new StringBuilder
     List("  ", c.moduleName, " ", c.verilog_parameters, spacing, c.name, "(") addString res
     def getMapClk(x : Clock) : String = if ( c.isInstanceOf[BlackBox] ) c.asInstanceOf[BlackBox].mapClock(emitRef(x)) else emitRef(x)
     c.clocks map (x => "." + getMapClk(x) + "(" + emitRef(x) + ")") addString (res, ", ")
@@ -195,12 +175,12 @@ class VerilogBackend extends Backend {
           // } removed this warning because pruneUnconnectedsIOs should have picked it up
           portDec insert (0, "//")
         case OUTPUT => c.parent.findBinding(io) match {
-          case None => 
+          case None =>
             if (Driver.saveConnectionWarnings) {
-              ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" + 
+              ChiselError.warning("" + io + "(" + io.component + ") OUTPUT UNCONNECTED (" +
                                   io.consumers.size + ") IN " + c.parent) }
             portDec insert (0, "//")
-          case Some(consumer) => 
+          case Some(consumer) =>
             if (io.prune) portDec insert (0, "//")
             portDec append emitRef(consumer)
         }
@@ -216,7 +196,7 @@ class VerilogBackend extends Backend {
     res append "\n  );\n"
     val driveRandPorts = c.wires filter (_._2.driveRand)
     if (!driveRandPorts.isEmpty) res append if_not_synthesis
-    driveRandPorts map { case (n ,w) =>  
+    driveRandPorts map { case (n ,w) =>
       List("    assign ", c.name, ".", n, " = ", emitRand(w), ";\n").mkString } addString res
     if (!driveRandPorts.isEmpty) res append endif_not_synthesis
     res
@@ -225,7 +205,7 @@ class VerilogBackend extends Backend {
   override def emitDef(node: Node): String = {
     val res = node match {
       case x: Bits if x.isIo && x.dir == INPUT => ""
-      case x: Bits if node.inputs.isEmpty => 
+      case x: Bits if node.inputs.isEmpty =>
         if (Driver.saveConnectionWarnings) ChiselError.warning("UNCONNECTED " + node + " IN " + node.component)
         List("  assign ", emitTmp(node), " = ", emitRand(node), ";\n").mkString
       case x: Bits =>
@@ -234,29 +214,55 @@ class VerilogBackend extends Backend {
       case x: Mux =>
         List("  assign ", emitTmp(x), " = ", emitRef(x.inputs(0)), " ? ", emitRef(x.inputs(1)), " : ", emitRef(x.inputs(2)), ";\n").mkString
 
-      case o: Op if o.op == "##" => 
+      case o: Op if o.op == "##" =>
         List("  assign ", emitTmp(o), " = ", "{", emitRef(node.inputs(0)), ", ", emitRef(node.inputs(1)), "}", ";\n").mkString
-      case o: Op if o.inputs.size == 1 => 
+      case o: Op if o.inputs.size == 1 =>
         List("  assign ", emitTmp(o), " = ", o.op, " ", emitRef(node.inputs(0)), ";\n").mkString
-      case o: Op if o.op == "s*s" || o.op == "s*u" || o.op == "s%s" || o.op == "s/s" => 
+      case o: Op if o.op == "s*s" || o.op == "s*u" || o.op == "s%s" || o.op == "s/s" =>
         List("  assign ", emitTmp(o), " = ", "$signed(", emitRef(node.inputs(0)), ") ", o.op(1), " $signed(", emitRef(node.inputs(1)), ")", ";\n").mkString
-      case o: Op if o.op == "s<" || o.op == "s<=" => 
+      case o: Op if o.op == "s<" || o.op == "s<=" =>
         List("  assign ", emitTmp(o), " = ", "$signed(", emitRef(node.inputs(0)), ") ", o.op.tail, " $signed(", emitRef(node.inputs(1)), ")", ";\n").mkString
-      case o: Op if o.op == "s>>" => 
+      case o: Op if o.op == "s>>" =>
         List("  assign ", emitTmp(o), " = ", "$signed(", emitRef(node.inputs(0)), ") >>> ", emitRef(node.inputs(1)), ";\n").mkString
-      case o: Op => 
+      case o: Op =>
         List("  assign ", emitTmp(o), " = ", emitRef(node.inputs(0)), " ", o.op, " ", emitRef(node.inputs(1)), ";\n").mkString
 
       case x: Extract =>
         node.inputs.tail.foreach(x.validateIndex)
-        val gotWidth = node.inputs(0).needWidth()
-        List("  assign " + emitTmp(node) + " = " + emitRef(node.inputs(0)),
-          if (node.inputs.size < 3 && gotWidth > 1) List("[", emitRef(node.inputs(1)), "]").mkString 
-          else if (gotWidth > 1) List("[", emitRef(node.inputs(1)) , ":", emitRef(node.inputs(2)), "]").mkString
-          else "",
-        ";\n").mkString
+        val source = emitRef(node.inputs(0))
+        val hi = node.inputs(1) match { // if the high bit is a literal, we want it in base 10. ex io_something[7:3]
+          case x: Literal => emitLit(x.value, x.width, true)
+          case x => emitRef(x)}
+        List("  assign " + emitTmp(node) + " = ",
+          // Is this a no-op - extract all the source bits.
+          if (x.isNop) {
+            source
+          } else
+          // Is source a single bit? - no need to extract
+            if (node.inputs(0).needWidth == 1) {
+            source
+          } else
+          // Is this a single bit extraction?
+            if (x.isOneBit) {
+            List(source, "[", hi, "]").mkString
+          } else {
+            // We have three inputs.
+            val lo = node.inputs(2) match { // if the low bit is a literal, we want it in base 10. ex io_something[7:3]
+              case x: Literal => emitLit(x.value, x.width, true)
+              case x => emitRef(x)}
+            // Are hi and lo constant expressions?
+            if (x.isStaticWidth) {
+              List(source, "[", hi , ":", lo, "]").mkString
+            } else {
+              // The extraction operands are different and at least one of them is not an integer.
+              // We need to generate the equivalent sequence of shifts and masks.
+              val resultWidth = node.needWidth
+              List( "(", source, " >> ", lo, ") & ((", resultWidth, "'h1 << (", hi, " - ", lo, " + 1)) - 1)").mkString
+           }
+         }
+        , ";\n").mkString
 
-      case m: Mem[_] if !m.isInline => 
+      case m: Mem[_] if !m.isInline =>
         def gcd(a: Int, b: Int) : Int = { if(b == 0) a else gcd(b, a%b) }
         def find_gran(x: Node) : Int = x match {
           case _: Literal => x.needWidth()
@@ -284,7 +290,7 @@ class VerilogBackend extends Backend {
         List("  assign ", emitTmp(node), " = ", emitRef(m.mem), "[", emitRef(m.addr), "];\n").mkString
 
       case r: ROMRead =>
-        val inits = r.rom.sparseLits map { case (i, v) => 
+        val inits = r.rom.sparseLits map { case (i, v) =>
           s"    ${i}: ${emitRef(r)} = ${emitRef(v)};\n" } addString (new StringBuilder)
         (List(s"  always @(*) case (${emitRef(r.inputs.head)})\n",
         inits.result,
@@ -317,7 +323,7 @@ class VerilogBackend extends Backend {
       case x: Bits if x.isIo => ""
 
       case _: Assert =>
-        emitDecReg(node) 
+        emitDecReg(node)
 
       case _: Reg =>
         emitDecReg(node)
@@ -349,7 +355,7 @@ class VerilogBackend extends Backend {
   def emitInit(node: Node): String = node match {
     case r: Reg =>
       List("    ", emitRef(r), " = ", emitRand(r), ";\n").mkString
-    case m: Mem[_] if m.isInline => 
+    case m: Mem[_] if m.isInline =>
       "    for (initvar = 0; initvar < " + m.n + "; initvar = initvar+1)\n" +
       "      " + emitRef(m) + "[initvar] = " + emitRand(m) + ";\n"
     case a: Assert =>
@@ -367,15 +373,15 @@ class VerilogBackend extends Backend {
     val resets = c.resets.values.toList
 
     harness write "module test;\n"
-    ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node))) 
-    outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node))) 
-    clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name)) 
+    ins foreach (node => harness write "  reg[%d:0] %s = 0;\n".format(node.needWidth()-1, emitRef(node)))
+    outs foreach (node => harness write "  wire[%d:0] %s;\n".format(node.needWidth()-1, emitRef(node)))
+    clocks foreach (clk => harness write "  reg %s = 0;\n".format(clk.name))
     resets foreach (rst => harness write "  reg %s = 1;\n".format(rst.name))
-    clocks foreach (clk => harness write "  integer %s_len;\n".format(clk.name)) 
-    clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name)) 
+    clocks foreach (clk => harness write "  integer %s_len;\n".format(clk.name))
+    clocks foreach (clk => harness write "  always #%s_len %s = ~%s;\n".format(clk.name, clk.name, clk.name))
     if (clocks.size > 1) {
       harness write "  integer min = 1 << 31 - 1;\n\n"
-      clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name)) 
+      clocks foreach (clk => harness write "  integer %s_cnt;\n".format(clk.name))
     }
     harness write "  reg vcdon = 0;\n"
     harness write "  reg [1023:0] vcdfile = 0;\n"
@@ -383,9 +389,9 @@ class VerilogBackend extends Backend {
 
     harness write "\n  /*** DUT instantiation ***/\n"
     harness write "  %s %s(\n".format(c.moduleName, c.name)
-    c.clocks foreach (clk => harness write "    .%s(%s),\n".format(clk.name, clk.name)) 
-    resets   foreach (rst => harness write "    .%s(%s),\n".format(rst.name, rst.name)) 
-    
+    c.clocks foreach (clk => harness write "    .%s(%s),\n".format(clk.name, clk.name))
+    resets   foreach (rst => harness write "    .%s(%s),\n".format(rst.name, rst.name))
+
     harness write ((ins ++ outs) map (node => "    .%s(%s)".format(emitRef(node), emitRef(node))) mkString ",\n")
     harness write ");\n\n"
 
@@ -398,7 +404,7 @@ class VerilogBackend extends Backend {
           " * " + (clk.period / src.period).round)
         harness write "    %s_len = %s;\n".format(clk.name, initStr)
     })
-    if (clocks.size > 1) clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name)) 
+    if (clocks.size > 1) clocks foreach (clk => harness write "    %s_cnt = %s_len;\n".format(clk.name, clk.name))
     harness write "    $init_clks(" + (clocks map (_.name + "_len") mkString ", ") + ");\n"
     harness write "    $init_rsts(" + (resets map (_.name) mkString ", ") + ");\n"
     harness write "    $init_ins(" + (ins map (emitRef(_)) mkString ", ") + ");\n"
@@ -424,7 +430,7 @@ class VerilogBackend extends Backend {
 
     if (clocks.size > 1) {
       harness write "  initial forever begin\n"
-      clocks foreach (clk => harness write "    if (%s_cnt < min) min = %s_cnt;\n".format(clk.name, clk.name))   
+      clocks foreach (clk => harness write "    if (%s_cnt < min) min = %s_cnt;\n".format(clk.name, clk.name))
       clocks foreach (clk => harness write "    %s_cnt = %s_cnt - min;\n".format(clk.name, clk.name))
       clocks foreach (clk => harness write "    if (%s_cnt == 0) %s_cnt = %s_len;\n".format(clk.name, clk.name, clk.name))
       harness write "    #min $tick();\n"
@@ -438,7 +444,7 @@ class VerilogBackend extends Backend {
         harness write "      vcdon = 1;\n"
         harness write "    end\n"
       }
-      harness write "    #min ;\n"    
+      harness write "    #min ;\n"
       harness write "  end\n"
     } else {
       harness write "  always @(negedge %s) begin\n".format(mainClk.name)
@@ -515,10 +521,10 @@ class VerilogBackend extends Backend {
     c.nodes foreach (m => m.clock match {
       case Some(clk) if clkDomains contains clk =>
         clkDomains(clk) append emitReg(m)
-      case _ => 
+      case _ =>
     })
     c.printfs foreach (p => p.clock match {
-      case Some(clk) if clkDomains contains clk => 
+      case Some(clk) if clkDomains contains clk =>
         clkDomains(clk) append emitPrintf(p)
       case _ =>
     })
@@ -532,7 +538,7 @@ class VerilogBackend extends Backend {
   }
 
   def emitPrintf(p: Printf): String = {
-    val file = "32'h80000002" 
+    val file = "32'h80000002"
     (List(if_not_synthesis,
     "`ifdef PRINTF_COND\n",
     "    if (`PRINTF_COND)\n",
@@ -542,7 +548,7 @@ class VerilogBackend extends Backend {
     endif_not_synthesis) addString (new StringBuilder)).result
   }
   def emitAssert(a: Assert): String = {
-    val file = "32'h80000002" 
+    val file = "32'h80000002"
     (List(if_not_synthesis,
     "  if(", emitRef(a.reset), ") ", emitRef(a), " <= 1'b1;\n",
     "  if(!", emitRef(a.cond), " && ", emitRef(a), " && !", emitRef(a.reset), ") begin\n",
@@ -563,10 +569,10 @@ class VerilogBackend extends Backend {
           case m: Mux => (cond(m.inputs(0)) + sep + assign(r, m.inputs(1))) :: traverseMuxes(r, m.inputs(2))
           case _ => if (x eq r) Nil else List(uncond + sep + assign(r, x))
         }
-        reg.next match { 
-          case _: Mux =>  
+        reg.next match {
+          case _: Mux =>
             List("    ", traverseMuxes(reg, reg.next) mkString "    end else ", "    end\n").mkString
-          case _ => 
+          case _ =>
             List("    ", assign(reg, reg.next)).mkString
         }
 
@@ -600,7 +606,7 @@ class VerilogBackend extends Backend {
   }
 
   def emitModuleText(c: Module): StringBuilder = c match {
-    case _: BlackBox => new StringBuilder 
+    case _: BlackBox => new StringBuilder
     case _ =>
 
     val res = new StringBuilder()
@@ -757,8 +763,7 @@ class VerilogBackend extends Backend {
     val dir = Driver.targetDir + "/"
     val ccFlags = List("-I$VCS_HOME/include", "-I" + dir, "-fPIC", "-std=c++11") mkString " "
     val vcsFlags = List("-full64", "-quiet", "-timescale=1ns/1ps", "-debug_pp", "-Mdir=" + n + ".csrc",
-      "-licwait 5",
-      "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
+      "+vcs+lic+wait", "+v2k", "+vpi", "+define+CLOCK_PERIOD=1", "+vcs+initreg+random") mkString " "
     val vcsSrcs = List(n + ".v", n + "-harness.v") mkString " "
     val cmd = List("cd", dir, "&&", "vcs", vcsFlags, "-P", "vpi.tab", "vpi.o", "-o", n, vcsSrcs) mkString " "
     cc(dir, "vpi", ccFlags)
@@ -769,3 +774,234 @@ class VerilogBackend extends Backend {
   private def endif_not_synthesis = "// synthesis translate_on\n`endif\n"
 }
 
+object VerilogBackend {
+  val keywords = Set[String](
+    "alias",
+    "always",
+    "always_comb",
+    "always_ff",
+    "always_latch",
+    "and",
+    "assert",
+    "assign",
+    "assume",
+    "attribute",
+    "automatic",
+    "before",
+    "begin",
+    "bind",
+    "bins",
+    "binsof",
+    "bit",
+    "break",
+    "buf",
+    "bufif0",
+    "bufif1",
+    "byte",
+    "case",
+    "casex",
+    "casez",
+    "cell",
+    "chandle",
+    "class",
+    "clocking",
+    "cmos",
+    "config",
+    "const",
+    "constraint",
+    "context",
+    "continue",
+    "cover",
+    "covergroup",
+    "coverpoint",
+    "cross",
+    "deassign",
+    "default",
+    "defparam",
+    "design",
+    "disable",
+    "dist",
+    "do",
+    "edge",
+    "else",
+    "end",
+    "endattribute",
+    "endcase",
+    "endclass",
+    "endclocking",
+    "endconfig",
+    "endfunction",
+    "endgenerate",
+    "endgroup",
+    "endinterface",
+    "endmodule",
+    "endpackage",
+    "endprimitive",
+    "endprogram",
+    "endproperty",
+    "endsequence",
+    "endspecify",
+    "endtable",
+    "endtask",
+    "enum",
+    "event",
+    "expect",
+    "export",
+    "extends",
+    "extern",
+    "final",
+    "first_match",
+    "for",
+    "force",
+    "foreach",
+    "forever",
+    "fork",
+    "forkjoin",
+    "function",
+    "generate",
+    "genvar",
+    "highz0",
+    "highz1",
+    "if",
+    "iff",
+    "ifnone",
+    "ignore_bins",
+    "illegal_bins",
+    "import",
+    "incdir",
+    "include",
+    "initial",
+    "initvar",
+    "inout",
+    "input",
+    "inside",
+    "instance",
+    "int",
+    "integer",
+    "interface",
+    "intersect",
+    "join",
+    "join_any",
+    "join_none",
+    "large",
+    "liblist",
+    "library",
+    "local",
+    "localparam",
+    "logic",
+    "longint",
+    "macromodule",
+    "matches",
+    "medium",
+    "modport",
+    "module",
+    "nand",
+    "negedge",
+    "new",
+    "nmos",
+    "nor",
+    "noshowcancelled",
+    "not",
+    "notif0",
+    "notif1",
+    "null",
+    "or",
+    "output",
+    "package",
+    "packed",
+    "parameter",
+    "pmos",
+    "posedge",
+    "primitive",
+    "priority",
+    "program",
+    "property",
+    "protected",
+    "pull0",
+    "pull1",
+    "pulldown",
+    "pullup",
+    "pulsestyle_ondetect",
+    "pulsestyle_onevent",
+    "pure",
+    "rand",
+    "randc",
+    "randcase",
+    "randsequence",
+    "rcmos",
+    "real",
+    "realtime",
+    "ref",
+    "reg",
+    "release",
+    "repeat",
+    "return",
+    "rnmos",
+    "rpmos",
+    "rtran",
+    "rtranif0",
+    "rtranif1",
+    "scalared",
+    "sequence",
+    "shortint",
+    "shortreal",
+    "showcancelled",
+    "signed",
+    "small",
+    "solve",
+    "specify",
+    "specparam",
+    "static",
+    "strength",
+    "string",
+    "strong0",
+    "strong1",
+    "struct",
+    "super",
+    "supply0",
+    "supply1",
+    "table",
+    "tagged",
+    "task",
+    "this",
+    "throughout",
+    "time",
+    "timeprecision",
+    "timeunit",
+    "tran",
+    "tranif0",
+    "tranif1",
+    "tri",
+    "tri0",
+    "tri1",
+    "triand",
+    "trior",
+    "trireg",
+    "type",
+    "typedef",
+    "union",
+    "unique",
+    "unsigned",
+    "use",
+    "uwire",
+    "var",
+    "vectored",
+    "virtual",
+    "void",
+    "wait",
+    "wait_order",
+    "wand",
+    "weak0",
+    "weak1",
+    "while",
+    "wildcard",
+    "wire",
+    "with",
+    "within ",
+    "wor",
+    "xnor",
+    "xor",
+    "SYNTHESIS",
+    "PRINTF_COND",
+    "VCS")
+}

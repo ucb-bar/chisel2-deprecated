@@ -1,6 +1,6 @@
 /*
  Copyright (c) 2011, 2012, 2013, 2014 The University of Sydney.
- All Rights Reserved.  Redistribution and use in source and 
+ All Rights Reserved.  Redistribution and use in source and
  binary forms, with or without modification, are permitted
  provided that the following conditions are met:
 
@@ -81,7 +81,7 @@ object Fixed {
       * @param fracWidth the integer fractional width to use
       * @return A fixed node with the specified parameters
       */
-    def apply(x : BigInt, width : Int, fracWidth : Int) : Fixed =  { 
+    def apply(x : BigInt, width : Int, fracWidth : Int) : Fixed =  {
       val res = Lit(x, width){Fixed()}
       res.fractionalWidth = fracWidth
       res

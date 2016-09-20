@@ -116,7 +116,6 @@ private:
 
   virtual inline void reset() {
     module->clock(LIT<1>(1));
-    module->dump();
     // FIXME: should call twice to get the output for now
     module->clock_lo(LIT<1>(0), false);
   }
@@ -124,17 +123,15 @@ private:
   virtual inline void start() { }
 
   bool is_exit;
-  virtual inline void finish() { 
-    module->dump();
+  virtual inline void finish() {
+    module->clock(LIT<1>(0)); // to vcd-dump the last cycle
     is_exit = true; 
   }
 
   virtual inline void step() {
-    module->print(std::cerr);
     module->clock(LIT<1>(0));
     // FIXME: should call twice to get the output for now
     module->clock_lo(LIT<1>(0), false);
-    module->dump();
   }
  
   virtual inline void update() {

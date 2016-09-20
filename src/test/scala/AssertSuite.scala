@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011 - 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -57,17 +57,17 @@ class AssertSuite extends TestSuite with ShouldMatchers {
 
   @Test def testRTAssert() {
     println("\ntestRTAssert...")
-    val assertMessage = "io.dataIn == UInt(8)"
+    val assertMessage = "io.dataIn == 8.U"
     class mkAssert extends Module{
       val io = new Bundle{
         val dataIn = UInt(INPUT,8)
         val dataOut = UInt(OUTPUT,width=3)
       }
-    
+
       io.dataOut := OHToUInt(io.dataIn)
-      assert(io.dataIn =/= UInt(8), assertMessage)
+      assert(io.dataIn =/= 8.U, assertMessage)
     }
-    
+
     class TBAssert(c: mkAssert) extends Tester(c) {
       step(1)
       poke(c.io.dataIn, 32)
@@ -82,7 +82,7 @@ class AssertSuite extends TestSuite with ShouldMatchers {
       poke(c.io.dataIn, 0)
       peek(c.io.dataOut)
     }
-    
+
     val swArgs = Array("--backend", "c", "--genHarness","--targetDir","cpp","--compile","--test","--debug"/*, "--assertWarn"*/)
     val hwArgs = Array("--backend", "v","--genHarness","--targetDir","rtl")
 

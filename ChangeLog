@@ -1,26 +1,25 @@
-ChangeLog for Chisel v2.2.31
+ChangeLog for Chisel v2.2.34
 
-#603 When validateGen() fails in Reg, mention the failing element.
-#595 Improve Tester stability.
-#583 Check for empty _log on tester application exit.
-#581 Avoid Tester hang on bogus peek()/poke().
-#580 Ensure tester mapped memory is marked volatile.
-#573 Flo is not printed with printf.
-#569 Combinational loop detector is broken.
-#556 Module debug for aggregates.
-#535 Add more checkpoints in an attempt to report errors sooner.
-#534 Add optional message to (most of) expect(Bits, ...).
-#531 `Wire(new Bundle { ... })` does not compile.
- Bumped Scala build versions to 2.10.6 and 2.11.7
- Fix comment in QueueIO.
- Fix bad verilog translation of mem and assert (Verilog backend).
- No longer use deprecated -use_vpiobj for vcs compilation (Verilog backend).
- Add cloneType methods for ArbiterIO and QueueIO Bundles.
- Fix Queue object example and add Pipe object example.
- Draw Muxes as diamonds with fixed port connections (Dot backend).
- OnceOnlyFiles are also unoptimizedFiles (compile -O0) (C++ backend).
- Set names for anonymous mems.
- Implement rsha_n correctly (C++ backend).
- Add optional needsHold parameter to Arbiters.
- Fix vcd dump issues in verilog (Verilog backend).
- Reintroduce MuxCase / PriorityMux'ing of bundles.
+#710 Chisel3 compatibility: Allow asserts with empty messages
+
+ Rename testers to match chisel3.
+ Add chisel3 compatiblity stop()
+ MuxLookup should take Data, not just Bits
+ Add check for SInt <-> UInt connections.
+ Return Seq, not Vec, from PriorityEncoderOH
+ Use Seq, not Iterable, when order matters
+ Chisel3 compatibility: asUInt/asSInt must accept ()
+ Update to current sbt resolver idiom.
+ Added additional Chisel3 incompatibilities.
+ Compatibility check fixes
+ add package object with new literal creation implicits
+ Use the "real" cloneType mechanism to determine Chisel3 compatibility
+ Deal with empty Vec's when checking for element cloneType()
+ Revert to a single error list containing errors, checks, and warnings.
+ Convert exceptions into ChiselErrors so we don't give up on the first.
+ Migrated black box to separate file
+ Correct signature for vcd dump methods (lacked t and reset arguments).
+ Add SystemVerilog keywords to reserved word list
+ add /cpp directory to .gitignore
+ Improve log2* functions, as with Chisel3
+ Replace != with =/=

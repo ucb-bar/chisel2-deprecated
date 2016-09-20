@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -46,7 +46,7 @@ class SystemCSuite extends TestSuite {
          val a = Decoupled( UInt(width = 16) ).flip()
          val b = Decoupled( UInt(width = 16) )
        }
-    
+
        io.b.bits := io.a.bits + UInt(10)
        io.a.ready := io.b.ready
        io.b.valid := io.a.valid
@@ -57,7 +57,7 @@ class SystemCSuite extends TestSuite {
          val a = UInt(INPUT, width = 16)
          val b = UInt(OUTPUT, width = 16)
        }
-    
+
        io.b := io.a + UInt(10)
     }
 

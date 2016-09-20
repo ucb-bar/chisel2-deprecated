@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -38,7 +38,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestMissingWire ...")
 
     class OptionalWire(noWire: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
@@ -67,7 +67,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
       chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
     }
     assertTrue(ChiselError.hasErrors)
-    
+
     // This should pass
     chiselMainTest(testArgs, () => Module(new OptionalWire(false))){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -77,7 +77,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestBadWireWrap ...")
 
     class OptionalWire(noWire: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
@@ -99,7 +99,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (no Wire() wrapper)
     chiselMainTest(testArgs, () => Module(new OptionalWire(true))){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -115,7 +115,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestBadMixedMux ...")
 
     class OptionalMux(mixedTypes: Boolean) extends Module {
-    
+
       val io = new Bundle {
         val t = Bool(INPUT)
         val c = UInt(INPUT, 8)
@@ -143,7 +143,7 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (mixedTypes is false)
     chiselMainTest(testArgs, () => Module(new OptionalMux(false))){ c => new OptionalMuxTester(c) }
     assertFalse(ChiselError.hasErrors)
@@ -159,14 +159,14 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestSubwordNoWireWrap ...")
 
     class SubwordNoWire() extends Module {
-    
+
       val io = new Bundle {
         val out = UInt(OUTPUT, 16)
       }
 
       // The following should pass without a Wire wrapper.
       val foo = Reg(Bits(width = 16))
-      foo(0) := UInt(1)
+      foo(0) := 1.U
       io.out := foo
     }
 
@@ -176,9 +176,95 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
           "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
-    
+
     // This should pass (no Wire() wrapper)
     chiselMainTest(testArgs, () => Module(new SubwordNoWire())){ c => new WireTester(c) }
     assertFalse(ChiselError.hasErrors)
+  }
+
+  @Test def testSeqWire() {
+    println("\ntestSeqWire ...")
+
+    class SeqWire() extends Module {
+      val io = new Bundle {
+      }
+      val nBools = 4
+    	val seqBool = (0 until nBools).map ( a => 
+    		Bool()
+    	)
+
+      for (i <- 0 until nBools) {
+        seqBool(i) := Bool(true)
+      }
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since we don't use a Wire wrapper
+      chiselMain(testArgs, () => Module(new SeqWire()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
+
+  @Test def testNoCloneType() {
+    println("\ntestNoCloneType ...")
+
+    class NoCloneType() extends Module {
+      class MyBundle(aWidth: Int) extends Bundle {
+        val aVal = UInt(width = aWidth)
+      }
+      val io = new Bundle {
+        val ins = Vec(3, new MyBundle(8).asInput)
+      }
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since we don't define a cloneType method for MyBundle and it is needed for Vec.
+      chiselMain(testArgs, () => Module(new NoCloneType()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
+
+  @Test def testUIntSIntConnect() {
+    println("\ntestUIntSIntConnect ...")
+
+    class UIntSIntConnect() extends Module {
+      val io = new Bundle {
+        val inU = UInt(width = 4).asInput()
+        val outS = SInt(width = 4).asOutput()
+      }
+      io.outS := io.inU
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since UInt <-> SInt connections are illegal in Chisel3.
+      chiselMain(testArgs, () => Module(new UIntSIntConnect()))
+    }
+    assertTrue(ChiselError.hasErrors)
+  }
+
+  @Test def testSIntUIntConnect() {
+    println("\ntestSIntUIntConnect ...")
+
+    class SIntUIntConnect() extends Module {
+      val io = new Bundle {
+        val inS = SInt(width = 4).asInput()
+        val outU = UInt(width = 4).asOutput()
+      }
+      io.outU := io.inS
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+          "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c")
+    intercept[IllegalStateException] {
+      // This should fail since UInt <-> SInt connections are illegal in Chisel3.
+      chiselMain(testArgs, () => Module(new SIntUIntConnect()))
+    }
+    assertTrue(ChiselError.hasErrors)
   }
 }

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -33,33 +33,39 @@ import scala.math.{ceil, floor, log}
 import scala.collection.mutable.ArrayBuffer
 
 /** Compute the log2 rounded up with min value of 1 */
-object log2Up
-{
-  def apply(in: Int): Int = if(in == 1) 1 else ceil(log(in)/log(2)).toInt
+object log2Up {
+  def apply(in: BigInt): Int = {
+    require(in >= 0)
+    1 max (in-1).bitLength
+  }
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded up */
-object log2Ceil
-{
-  def apply(in: Int): Int = ceil(log(in)/log(2)).toInt
+object log2Ceil {
+  def apply(in: BigInt): Int = {
+    require(in > 0)
+    (in-1).bitLength
+  }
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded down with min value of 1 */
-object log2Down
-{
-  def apply(x : Int): Int = if (x == 1) 1 else floor(log(x)/log(2.0)).toInt
+object log2Down {
+  def apply(in: BigInt): Int = log2Up(in) - (if (isPow2(in)) 0 else 1)
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Compute the log2 rounded down */
-object log2Floor
-{
-  def apply(x : Int): Int = floor(log(x)/log(2.0)).toInt
+object log2Floor {
+  def apply(in: BigInt): Int = log2Ceil(in) - (if (isPow2(in)) 0 else 1)
+  def apply(in: Int): Int = apply(BigInt(in))
 }
 
 /** Check if an Integer is a power of 2 */
-object isPow2
-{
-  def apply(in: Int): Boolean = in > 0 && ((in & (in-1)) == 0)
+object isPow2 {
+  def apply(in: BigInt): Boolean = in > 0 && ((in & (in-1)) == 0)
+  def apply(in: Int): Boolean = apply(BigInt(in))
 }
 
 /** Fold Right with a function */
@@ -172,7 +178,7 @@ object ShiftRegister
       in
     }
   }
-  
+
   /** @param in input to delay
     * @param init reset value to use
     * @param n number of cycles to delay */
@@ -211,7 +217,7 @@ object UIntToOH
   */
 object Mux1H
 {
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = {
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = {
     if (in.tail.isEmpty) in.head
     else {
       val masked = (sel, in).zipped map ((s, i) => Mux(s, i.toBits, Bits(0)))
@@ -219,10 +225,10 @@ object Mux1H
     }
   }
   def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
-    val (sel, data) = in.unzip
+    val (sel, data) = in.toSeq.unzip
     apply(sel, data)
   }
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T =
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T =
     apply((0 until in.size).map(sel(_)), in)
   def apply(sel: Bits, in: Bits): Bool = (sel & in).orR
 }
@@ -294,9 +300,12 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
   // Perhaps should return ready rather than dat?
   /** enqueue data 'dat' by setting valid and bits */
   def enq(dat: T): T = { valid := Bool(true); bits := dat; dat }
-  valid := Bool(false);
-  for (io <- bits.flatten.map(x => x._2))
-    io := UInt(0)
+  def init() {
+    valid := Bool(false);
+    for (io <- bits.flatten.map(x => x._2))
+      io := UInt(0)
+  }
+  init()
   override def cloneType: this.type = new EnqIO(gen).asInstanceOf[this.type]
 }
 
@@ -304,7 +313,10 @@ class EnqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 class DeqIO[T <: Data](gen: T) extends DecoupledIO(gen)
 {
   flip()
-  ready := Bool(false);
+  def init() {
+    ready := Bool(false);
+  }
+  init()
   /* Strange that this requires a Boolean argument
    * Change to deq() : (T, Bool) = { ready := Bool(true); (bits, valid) }
    */
@@ -596,26 +608,26 @@ class AsyncFifo[T<:Data](gen: T, entries: Int, enq_clk: Clock, deq_clk: Clock) e
   val io = new QueueIO(gen, entries)
   val asize = log2Up(entries)
 
-  val s1_rptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
-  val s2_rptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
+  val s1_rptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
+  val s2_rptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
   val s1_rst_deq = Reg(init=Bool(false), clock=enq_clk)
   val s2_rst_deq = Reg(init=Bool(false), clock=enq_clk)
 
-  val s1_wptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
-  val s2_wptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
+  val s1_wptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
+  val s2_wptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
   val s1_rst_enq = Reg(init=Bool(false), clock=deq_clk)
   val s2_rst_enq = Reg(init=Bool(false), clock=deq_clk)
 
-  val wptr_bin = Reg(init=UInt(0, asize+1), clock=enq_clk)
-  val wptr_gray = Reg(init=UInt(0, asize+1), clock=enq_clk)
+  val wptr_bin = Reg(init=UInt(0, asize + 1), clock=enq_clk)
+  val wptr_gray = Reg(init=UInt(0, asize + 1), clock=enq_clk)
   val not_full = Reg(init=Bool(false), clock=enq_clk)
 
   val wptr_bin_next = wptr_bin + (io.enq.valid & not_full)
   val wptr_gray_next = (wptr_bin_next >> UInt(1)) ^ wptr_bin_next
   val not_full_next = !(wptr_gray_next === Cat(~s2_rptr_gray(asize,asize-1), s2_rptr_gray(asize-2,0)))
 
-  val rptr_bin = Reg(init=UInt(0, asize+1), clock=deq_clk)
-  val rptr_gray = Reg(init=UInt(0, asize+1), clock=deq_clk)
+  val rptr_bin = Reg(init=UInt(0, asize + 1), clock=deq_clk)
+  val rptr_gray = Reg(init=UInt(0, asize + 1), clock=deq_clk)
   val not_empty = Reg(init=Bool(false), clock=deq_clk)
 
   val rptr_bin_next = rptr_bin + (io.deq.ready & not_empty)
@@ -695,15 +707,15 @@ object Pipe
   */
 object PriorityMux
 {
-  def apply[T <: Data](in: Iterable[(Bool, T)]): T = {
+  def apply[T <: Data](in: Seq[(Bool, T)]): T = {
     if (in.size == 1) {
       in.head._2
     } else {
       Mux(in.head._1, in.head._2, apply(in.tail))
     }
   }
-  def apply[T <: Data](sel: Iterable[Bool], in: Iterable[T]): T = apply(sel zip in)
-  def apply[T <: Data](sel: Bits, in: Iterable[T]): T = apply((0 until in.size).map(sel(_)), in)
+  def apply[T <: Data](sel: Seq[Bool], in: Seq[T]): T = apply(sel zip in)
+  def apply[T <: Data](sel: Bits, in: Seq[T]): T = apply((0 until in.size).map(sel(_)), in)
 }
 
 /** Returns a bit vector in which only the least-significant 1 bit in
@@ -715,9 +727,9 @@ object PriorityEncoderOH
     val outs = Vec.tabulate(in.size)(i => UInt(BigInt(1) << i, in.size))
     PriorityMux(in :+ Bool(true), outs :+ UInt(0, in.size))
   }
-  def apply(in: Seq[Bool]): Vec[Bool] = {
+  def apply(in: Seq[Bool]): Seq[Bool] = {
     val enc = encode(in)
-    Vec.tabulate(in.size)(enc(_))
+    Seq.tabulate(in.size)(enc(_))
   }
   def apply(in: Bits): UInt = encode((0 until in.getWidth).map(i => in(i)))
 }
@@ -737,7 +749,7 @@ object Wire
     apply(Option(t), Option(init))
 
   def apply[T <: Data](t: Option[T], init: Option[T]): T = {
-    t match { 
+    t match {
       case Some(p) if !p.isTypeOnly =>
         ChiselError.error("Wire() must not wrap a node with data %s".format(p))
       case _ =>
@@ -811,7 +823,7 @@ object DelayBetween {
   /** Finds to shortest path between two nodes using a multi-stage depth first search */
   private def nodeShortestPathSearch(startList : List[Node], end : Node) : Int = {
     // We what this to operate in two different stages, first is to find either a register or the end
-    // if the end is found return the value, otherwise start the search again from the registers 
+    // if the end is found return the value, otherwise start the search again from the registers
     var searchNodes = startList
     val visited = new ArrayBuffer[Int]
     var count = -1
@@ -825,7 +837,7 @@ object DelayBetween {
           val delayLevel = nodeFindRegOrEnd(List(node), end, new ArrayBuffer[Node]).toList
           found = delayLevel.contains(end)
           delayLevel.foreach(n => nodesToSearch.append(n))
-        } 
+        }
       }
       searchNodes = nodesToSearch.toList
     }

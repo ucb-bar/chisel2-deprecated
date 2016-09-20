@@ -20,6 +20,6 @@ module DelaySuite_MemReadModule_1(input clk,
 
   assign io_out = T0;
   assign T0 = mem[T1];
-  assign T1 = io_addr[2'h2:1'h0];
+  assign T1 = io_addr[2:0];
 endmodule
 

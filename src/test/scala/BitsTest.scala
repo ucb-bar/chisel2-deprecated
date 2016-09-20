@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -46,7 +46,7 @@ class BitsSuite extends TestSuite {
   @Test def testExtractConstantFixed() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = UInt(5)(0)
+      val res = 5.U(0)
       assertTrue( res.getWidth == 1 )
       assertTrue( res.litValue() == 1 )
     }
@@ -57,7 +57,7 @@ class BitsSuite extends TestSuite {
   @Test def testExtractConstantRangeFixed() {
     class Dummy extends Module {
       val io = UInt(INPUT, 0)
-      val res = UInt(5)((1, 0))
+      val res = 5.U((1, 0))
       assertTrue( res.getWidth == 2 )
     }
     val dummyInst = Module(new Dummy)

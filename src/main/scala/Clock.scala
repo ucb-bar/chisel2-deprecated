@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -41,14 +41,19 @@ object Clock {
     new Clock(reset, src, period)
   }
 
+  // For Chisel3 compatibility.
+  def apply(dir: IODirection): Clock = {
+    apply()
+  }
+
   implicit def toOption(c: Clock) = Option(c)
 }
 
 /** Create a new clock
   * @param reset The reset for this clock
   */
-class Clock(reset: Bool = Driver.implicitReset, 
-  private[Chisel] val srcClock: Option[Clock] = None, 
+class Clock(reset: Bool = Driver.implicitReset,
+  private[Chisel] val srcClock: Option[Clock] = None,
   private[Chisel] val period: Double = 1.0 /* in ps */) extends Node {
 
   init("", 1)
@@ -72,4 +77,8 @@ class Clock(reset: Bool = Driver.implicitReset,
   /** divide the clock period
     * Will create another clock with the respective period */
   def / (x: Int) = Clock(reset, Some(this), period / x.toDouble)
+
+  def := (that: Clock): Unit = {
+    this.getReset := that.getReset
+  }
 }

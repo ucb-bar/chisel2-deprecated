@@ -200,6 +200,14 @@ private:
           if (!wire && netname[0] != 'T' || wirename == netname) {
             size_t netid = add_signal(net_handle, netpath);
             if (wire) { id = netid; break; }
+          } else if (arrname == netname) {
+            vpiHandle bit_iter = vpi_iterate(vpiBit, net_handle);
+            while (vpiHandle bit_handle = vpi_scan(bit_iter)) {
+              std::string bitname = vpi_get_str(vpiName, bit_handle);
+              std::string bitpath = modname + "." + bitname;
+              size_t bitid = add_signal(bit_handle, bitpath);
+              id = wirename == bitname ? bitid : id;
+            } 
           }
         }
         if (id > 0) break;
@@ -209,9 +217,17 @@ private:
         while (vpiHandle reg_handle = vpi_scan(reg_iter)) {
           std::string regname = vpi_get_str(vpiName, reg_handle);
           std::string regpath = modname + "." + regname;
-          if (!wire || wire == regname) {
+          if (!wire || wirename == regname) {
             size_t regid = add_signal(reg_handle, regpath);
             if (wire) { id = regid; break; }
+          } else if (arrname == regname) {
+            vpiHandle bit_iter = vpi_iterate(vpiBit, reg_handle);
+            while (vpiHandle bit_handle = vpi_scan(bit_iter)) {
+              std::string bitname = vpi_get_str(vpiName, bit_handle);
+              std::string bitpath = modname + "." + bitname;
+              size_t bitid = add_signal(bit_handle, bitpath);
+              id = regname == bitname ? bitid : id;
+            } 
           }
         }
         if (id > 0) break;
@@ -222,12 +238,11 @@ private:
           std::string memname = vpi_get_str(vpiName, mem_handle);
           if (!wire || arrname == memname) {
             vpiHandle elm_iter = vpi_iterate(vpiReg, mem_handle);
-            size_t idx = vpi_get(vpiSize, mem_handle);
             while (vpiHandle elm_handle = vpi_scan(elm_iter)) {
               std::string elmname = vpi_get_str(vpiName, elm_handle);
               std::string elmpath = modname + "." + elmname;
               size_t elmid = add_signal(elm_handle, elmpath);
-              id = wire ? elmid : id;
+              id = (wire && wirename == elmname) ? elmid : id;
             }
           }
           if (id > 0) break;
@@ -243,6 +258,7 @@ private:
             if (wire) { id = udpid; break; }
           }
         }
+
       }
       if (id > 0) break;
 

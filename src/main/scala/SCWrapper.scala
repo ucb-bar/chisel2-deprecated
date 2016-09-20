@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -345,7 +345,7 @@ class ComponentDef(a_type: String, a_name: String) {
 
 case class CStruct(val name: String, val fields: Array[(String, Bits)]) {
    override def toString(): String = {
-     "struct " + name + 
+     "struct " + name +
      " {\n" +
      fields.map { case (name, bits) => "  dat_t<" + bits.width + "> " + name + ";" }.mkString("\n") +
      "\n};\n"

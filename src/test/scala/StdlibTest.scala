@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -285,7 +285,7 @@ try {
   }
 
   /** Concatenate two nodes X and Y in a node Z such that
-    Z[0..wx+wy] = X[0..wx] :: Y[0..wy]. */
+    Z[0..wx + wy] = X[0..wx] :: Y[0..wy]. */
   @Test def testCat() {
     println("\ntestCat ...")
     class CatComp extends Module {
@@ -396,10 +396,10 @@ try {
         for (s <- 0 until m.nSections) {
           accumulatedDelay += s
           // The expected value is either the delayed poked value,
-          // initial values are not necessarily 0 
+          // initial values are not necessarily 0
           if (d >= accumulatedDelay) {
             expect(m.io.stages(s), pokeVal + accumulatedDelay)
-          } 
+          }
         }
         step(1)
       }
@@ -890,7 +890,7 @@ try {
    */
   @Test def testLitAddSubDoesntWiden () {
     println("\ntestLitAddSubDoesntWiden ...")
-    
+
     class LitAddSub extends Module {
       val io = new Bundle {
         val out1 = UInt(OUTPUT)
@@ -915,7 +915,7 @@ try {
 
   @Test def testLitAddSub () {
     println("\ntestLitAddSub ...")
-    
+
     // If we had a "Tester" backend that allowed us to examine
     // the constructed graph, we wouldn't need this.
     class LitAddSub extends Module {
@@ -1016,7 +1016,7 @@ try {
         }
         io.out := Mux(io.in === (Bits("b?110") | Bits("b1???")), io.in, UInt(0))
       }
-  
+
       chiselMain(testArgs,
         () => Module(new LitDontCare()))
     } catch {

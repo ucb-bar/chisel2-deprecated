@@ -4,7 +4,7 @@
 SBT		?= sbt
 SBT_FLAGS	?= -Dsbt.log.noformat=true
 RM_DIRS 	:= test-outputs test-reports
-CLEAN_DIRS	:= doc
+CLEAN_DIRS	:=
 
 SRC_DIR	?= .
 #SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
@@ -25,10 +25,10 @@ publish-local:
 	$(SBT) $(SBT_FLAGS) +publish-local
 
 smoke:
-	$(SBT) $(SBT_FLAGS) "testOnly $(SMOKE_TESTS)"
+	$(SBT) $(SBT_FLAGS) "test-only $(SMOKE_TESTS) -- -l org.scalatest.tags.Slow"
 
 style:
-	$(SBT) $(SBT_FLAGS) scalastyle
+	$(SBT) $(SBT_FLAGS) scalastyle test:scalastyle
 
 check test:
 	$(SBT) $(SBT_FLAGS) test

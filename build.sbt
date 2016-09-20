@@ -2,7 +2,7 @@ def versionToArray(v: String): Array[String] = v.split('.')
 
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.32",
+    // version := "2.2.36",
     version := "2.3-SNAPSHOT",
     name := "chisel",
     scalaVersion := "2.11.7",
@@ -46,8 +46,8 @@ lazy val chiselBuildSettings = Seq (
     },
 
     resolvers ++= Seq(
-      "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
-      "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.sonatypeRepo("releases")
     ),
 
     /* Bumping "com.novocode" % "junit-interface" % "0.11", causes DelayTest testSeqReadBundle to fail
@@ -61,15 +61,20 @@ lazy val chiselBuildSettings = Seq (
      *    - use of "Tx" vs. "Tx.values"
      */
     libraryDependencies += "com.novocode" % "junit-interface" % "0.10" % "test",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    // scalatest and scalacheck ordinarily are needed only for testing,
+    //  but since ChiselSpec is in main for clients of chisel and their tests,
+    //  these are now required for the main build.
+    libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.5",
+    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.12.5",
     libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _),
 
     // Execute tests in the current project serially.
     // Tests from other projects may still run concurrently.
     parallelExecution in Test := false,
     scalacOptions ++= Seq("-deprecation", "-feature", "-language:reflectiveCalls", "-language:implicitConversions", "-language:existentials"),
+    javacOptions ++= Seq("-target", "1.7"),
     scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("chisel"), version) map { (bd, v) =>
-      Seq("-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
+      Seq("-diagrams", "-diagrams-max-classes", "25", "-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/ucb-bar/chisel/tree/master/€{FILE_PATH}.scala")
     }
  )
 

@@ -2,6 +2,9 @@
 #define __SIM_API_H
 
 #include <cassert>
+#include <cstdio>
+#include <cerrno>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -15,6 +18,9 @@
 #include <time.h>
 
 enum SIM_CMD { RESET, STEP, UPDATE, POKE, PEEK, FORCE, GETID, GETCHK, SETCLK, FIN };
+const int SIM_CMD_MAX_BYTES = 1024;
+const int channel_data_offset_64bw = 4;		// Offset from start of channel buffer to actual user data in 64bit words.
+static size_t gSystemPageSize;
 
 template<class T> struct sim_data_t {
   std::vector<T> resets;
@@ -23,22 +29,63 @@ template<class T> struct sim_data_t {
   std::vector<T> signals;
   std::map<std::string, size_t> signal_map;
   std::map<std::string, T> clk_map;
+  // Calculate the size (in bytes) of data stored in a vector.
+  size_t storage_size(const std::vector<T> vec) {
+    int nitems = vec.size();
+#ifdef VPI_USER_H
+    return nitems * sizeof(T);
+#else
+    size_t result = 0;
+    for (int i = 0; i < nitems; i++) {
+      result += vec[i]->get_num_words();
+    }
+    return result * sizeof(val_t);
+#endif
+  }
 };
 
 class channel_t {
 public:
-  channel_t(int _fd): fd(_fd) {
-    uintptr_t pgsize = sysconf(_SC_PAGESIZE);
-    assert(fd != -1);
-    assert(lseek(fd, pgsize-1, SEEK_SET) != -1);
-    assert(write(fd, "", 1) != -1);
-    assert(fsync(fd) != -1);	// ensure the data is available
-    channel = (char*)mmap(NULL, pgsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0); 
-    assert(channel != MAP_FAILED);
+#define ROUND_UP(N, S) ((((N) + (S) -1 ) & (~((S) - 1))))
+  void init_map() {
+	static std::string m_prefix("channel_t::init_map - ");
+	// ensure the data is available (a full page worth).
+    if (lseek(fd, map_size-1, SEEK_SET) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " seek to end of page").c_str());
+    	exit(1);
+    }
+    if (write(fd, "", 1) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " write byte").c_str());
+    	exit(1);
+    }
+    if (fsync(fd) == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " fsync").c_str());
+    	exit(1);
+    }
+    channel = (char*)mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (channel == MAP_FAILED) {
+    	perror((m_prefix + "file: " + full_file_path + " mmap").c_str());
+    	exit(1);
+    }
   }
+  channel_t(std::string _file_name, size_t _data_size): file_name(_file_name), fd(open(file_name.c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600)),
+		  map_size(ROUND_UP(_data_size + channel_data_offset_64bw * 8, gSystemPageSize)) {
+	static std::string m_prefix("channel_t::channel_t: ");
+    char * rp = realpath(file_name.c_str(), NULL);
+    full_file_path = std::string(rp == NULL ? file_name : rp);
+    if (rp != NULL) {
+    	free(rp);
+    	rp = NULL;
+    }
+	if (fd == -1) {
+    	perror((m_prefix + "file: " + full_file_path + " open").c_str());
+		exit(1);
+	}
+	init_map();
+  }
+
   ~channel_t() {
-    uintptr_t pgsize = sysconf(_SC_PAGESIZE);
-    munmap((void *)channel, pgsize);
+    munmap((void *)channel, map_size);
     close(fd);
   }
   inline void aquire() {
@@ -51,8 +98,8 @@ public:
   inline void consume() { channel[3] = 0; }
   inline bool ready() { return channel[3] == 0; }
   inline bool valid() { return channel[3] == 1; }
-  inline uint64_t* data() { return (uint64_t*)(channel+4); }
-  inline char* str() { return ((char *)channel+4); }
+  inline uint64_t* data() { return (uint64_t*)(channel + channel_data_offset_64bw); }
+  inline char* str() { return ((char *)channel + channel_data_offset_64bw); }
   inline uint64_t& operator[](int i) { return data()[i*sizeof(uint64_t)]; }
 private:
   // Dekker's alg for sync
@@ -62,20 +109,32 @@ private:
   // channel[3] -> flag
   // channel[4:] -> data
   char volatile * channel;
+  const std::string file_name;
+  std::string full_file_path;
   const int fd;
+  const size_t map_size;
 };
 
 template <class T> class sim_api_t {
 public:
   sim_api_t() {
+    // This is horrible, but we'd rather not have to generate another .cpp initialization file,
+    //  and have all our clients update their Makefiles (if they don't use ours) to build the simulator.
+    if (gSystemPageSize == 0) {
+      gSystemPageSize = sysconf(_SC_PAGESIZE);
+    }
+  }
+  void init_channels() {
     pid_t pid = getpid();
     std::ostringstream in_ch_name, out_ch_name, cmd_ch_name;
     in_ch_name  << std::dec << std::setw(8) << std::setfill('0') << pid << ".in";
     out_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".out";
     cmd_ch_name << std::dec << std::setw(8) << std::setfill('0') << pid << ".cmd";
-    in_channel  = new channel_t(open(in_ch_name.str().c_str(),  O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
-    out_channel = new channel_t(open(out_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
-    cmd_channel = new channel_t(open(cmd_ch_name.str().c_str(), O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600));
+    size_t input_size = this->sim_data.storage_size(this->sim_data.inputs);
+    in_channel  = new channel_t(in_ch_name.str(), input_size);
+    size_t output_size = this->sim_data.storage_size(this->sim_data.outputs);
+    out_channel = new channel_t(out_ch_name.str(), output_size);
+    cmd_channel = new channel_t(cmd_ch_name.str(), SIM_CMD_MAX_BYTES);
     
     // Init channels
     out_channel->consume();
@@ -135,6 +194,7 @@ public:
       }
     } while (!exit);
   }
+
 private:
   channel_t *in_channel;
   channel_t *out_channel;
