@@ -35,12 +35,18 @@ import Chisel._
 
 object Driver {
   val basicTestArgs = Array[String]("--compile", "--genHarness", "--test") ++ chiselEnvironmentArguments()
-  var backendName = "c"
-  def testArgs: Array[String] = basicTestArgs ++ Array("--backend", backendName)
+  var backendName: Option[String] = None
+  def testArgs: Array[String] = basicTestArgs ++ (if (backendName != None) {
+    Array("--backend", backendName.get)
+  } else {
+    Array[String]()
+  })
 
-  def apply[T <: Module](dutGen: () => T, backendType: String = "c")(testerGen: T => PeekPokeTester[T]): Boolean = {
+  def apply[T <: Module](dutGen: () => T, backendType: String = "")(testerGen: T => PeekPokeTester[T]): Boolean = {
     // Save the current backend name.
-    backendName = backendType
+    if (backendType != "") {
+      backendName = Some(backendType)
+    }
     val res: Boolean = {
       try {
 //        val oldTesterGen = testerGen(_: T, None)
