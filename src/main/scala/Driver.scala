@@ -510,13 +510,7 @@ object Driver extends FileSystemUtilities{
   var chiselConfigDump: Boolean = false
   var startTime = 0L
   val version = BuildInfo.version
-  // If we aren't at a tag matching version, incorporate the output of `git describe`
-  val gitDescription = BuildInfo.gitDescription match {
-    case Some(s: String) if s != version => s
-    case _ => ""
-  }
-  val chiselVersionString = Array[String]("Chisel", version, BuildInfo.branch, gitDescription).filter(_ != "").mkString(" ") + ", " + BuildInfo.builtAtString
-  println(chiselVersionString)
+  val chiselVersionString = BuildInfo.toString
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0

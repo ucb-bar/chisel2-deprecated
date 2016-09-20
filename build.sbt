@@ -79,14 +79,10 @@ lazy val chiselBuildSettings = Seq (
  )
 
 lazy val chisel = (project in file(".")).
-  enablePlugins(BuildInfoPlugin, GitVersioning).
-  settings(chiselBuildSettings: _*).
+  enablePlugins(BuildInfoPlugin).
   settings(
     buildInfoOptions += BuildInfoOption.BuildTime,
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion,
-      "gitDescription" -> git.gitDescribedVersion.value,
-      "branch" -> git.gitCurrentBranch.value
-    ),
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     // We should really be using name.value, but currently, the package is "Chisel" (uppercase first letter)
     buildInfoPackage := /* name.value */ "Chisel",
     // Move the managed source directory where git won't complain about it,
@@ -101,4 +97,5 @@ lazy val chisel = (project in file(".")).
     sourceManaged in Compile <<= (sourceDirectory in Compile, scalaVersion){ (s,v) => s / ("scala-" + v + "/src_managed") },
     // Add the generated sources to the packagedSrc artifact since they are excluded by default.
     mappings in (Compile, packageSrc) += { ((sourceManaged in Compile).value / "sbt-buildinfo" / "BuildInfo.scala") -> "BuildInfo.scala" }
-  )
+  ).
+  settings(chiselBuildSettings: _*)
