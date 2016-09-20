@@ -81,10 +81,10 @@ lazy val chiselBuildSettings = Seq (
 lazy val chisel = (project in file(".")).
   enablePlugins(BuildInfoPlugin).
   settings(
-    buildInfoOptions += BuildInfoOption.BuildTime,
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     // We should really be using name.value, but currently, the package is "Chisel" (uppercase first letter)
     buildInfoPackage := /* name.value */ "Chisel",
+    buildInfoOptions += BuildInfoOption.BuildTime,
+    buildInfoKeys := Seq[BuildInfoKey](buildInfoPackage, version, scalaVersion, sbtVersion),
     // Move the managed source directory where git won't complain about it,
     //  and where we can easily package its files as part of the source jar artifact.
     //  We'd like to use versionToArray(), slice(), and mkString() to convert an explicit
