@@ -444,7 +444,16 @@ object Driver extends FileSystemUtilities{
       case "fpga" => new FPGABackend
       case "sysc" => new SysCBackend
       case "v" => new VerilogBackend
-      case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
+      case _ =>
+        try {
+          Class.forName(backendName).newInstance.asInstanceOf[Backend]
+        }
+        catch {
+          case cnf: ClassNotFoundException =>
+            println("Chisel.Driver: backend %s not found: %s, using default backend".format(backendName, cnf))
+            backend
+
+        }
     }
   }
 
