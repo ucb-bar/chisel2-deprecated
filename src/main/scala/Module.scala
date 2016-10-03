@@ -575,6 +575,7 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     }
     for ((node, assignmentLine) <- assignments) {
       // Is the node type-only (no data) and isn't io and hasn't been Wire() wrapped?
+      // NOTE: We deal with IO() wrapping elsewhere.
       if (node.isTypeOnly && !(node.isWired || node.isIo)) {
         // Do we have line numbers?
         val errorLine = if (node.line != null) {
@@ -606,8 +607,13 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
     */
   private[Chisel] def verify: Boolean = {
     var result = true
-    // If we're verifying Chisel3 compatibility, verify Wire() wrapping.
+    // If we're verifying Chisel3 compatibility, verify Wire(), IO() wrapping.
     if (Driver.minimumCompatibility > "2") {
+      // Verify that ios are wrapped in IO()
+      if (!isIOWrapped) {
+        val errorString = "Chisel3 compatibility: io's should be wrapped in IO()"
+        ChiselError.check(errorString, Version("3.0"), this.io.line)
+      }
       val neededWireWraps = verifyWireWrap
       if (!neededWireWraps.isEmpty) {
         reportWireWrap(neededWireWraps)
@@ -618,5 +624,9 @@ abstract class Module(var _clock: Option[Clock] = None, private[Chisel] var _res
   }
 
   // Chisel3 compatibility - IO() wrapper.
-  def IO[T<:Data](iodef: T): iodef.type = iodef
+  private var isIOWrapped = false
+  def IO[T<:Data](iodef: T): iodef.type = {
+    isIOWrapped = true
+    iodef
+  }
 }
