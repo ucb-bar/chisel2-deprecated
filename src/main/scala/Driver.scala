@@ -427,6 +427,7 @@ object Driver extends FileSystemUtilities{
         }
         case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
         case "--wError" => wError = true
+        case "--version" => println(chiselVersionString)
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -561,4 +562,6 @@ object Driver extends FileSystemUtilities{
   }
 
   lazy val isVCSAvailable = isCommandAvailable("vcs")
+  // Print Chisel version when driver object is constructed, hopefully, just once.
+  println(chiselVersionString)
 }
