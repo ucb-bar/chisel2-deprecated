@@ -39,9 +39,9 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     class OptionalWire(noWire: Boolean) extends Module {
 
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val out = UInt(OUTPUT, 16)
-      }
+      })
 
       val aLit = UInt(42, 16)
       // The following should fail without a Wire wrapper.
@@ -73,14 +73,51 @@ class Chisel3CompatibilitySuite extends TestSuite {
     assertFalse(ChiselError.hasErrors)
   }
 
+  @Test def testMissingIO() {
+    println("\ntestMissingIO ...")
+
+    class OptionalIO(noIO: Boolean) extends Module {
+
+      val io = if (noIO) {
+        // The following should fail without an IO wrapper.
+        new Bundle {
+          val out = UInt(OUTPUT, 16)
+        }
+      } else {
+        IO(new Bundle {
+          val out = UInt(OUTPUT, 16)
+        })
+      }
+
+      val aLit = UInt(42, 16)
+      io.out := aLit
+    }
+
+    class IOTester(c: OptionalIO) extends Tester(c) {
+      expect(c.io.out, 42)
+    }
+
+    val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
+      "--minimumCompatibility", "3.0.0", "--wError", "--backend", "c", "--genHarness", "--compile", "--test")
+    intercept[IllegalStateException] {
+      // This should fail since we don't use a Wire wrapper
+      chiselMainTest(testArgs, () => Module(new OptionalIO(true))){ c => new IOTester(c) }
+    }
+    assertTrue(ChiselError.hasErrors)
+
+    // This should pass
+    chiselMainTest(testArgs, () => Module(new OptionalIO(false))){ c => new IOTester(c) }
+    assertFalse(ChiselError.hasErrors)
+  }
+
   @Test def testBadWireWrap() {
     println("\ntestBadWireWrap ...")
 
     class OptionalWire(noWire: Boolean) extends Module {
 
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val out = UInt(OUTPUT, 16)
-      }
+      })
 
       val aLit = UInt(42, 16)
       // The following should pass without a Wire wrapper.
@@ -116,13 +153,13 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     class OptionalMux(mixedTypes: Boolean) extends Module {
 
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val t = Bool(INPUT)
         val c = UInt(INPUT, 8)
         val ua = UInt(INPUT, 8)
         val sa = SInt(INPUT, 8)
         val out = UInt(OUTPUT)
-      }
+      })
 
       // The following should fail if mixedTypes is true.
       if (mixedTypes) {
@@ -160,9 +197,9 @@ class Chisel3CompatibilitySuite extends TestSuite {
 
     class SubwordNoWire() extends Module {
 
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val out = UInt(OUTPUT, 16)
-      }
+      })
 
       // The following should pass without a Wire wrapper.
       val foo = Reg(Bits(width = 16))
@@ -186,8 +223,8 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestSeqWire ...")
 
     class SeqWire() extends Module {
-      val io = new Bundle {
-      }
+      val io = IO(new Bundle {
+      })
       val nBools = 4
     	val seqBool = (0 until nBools).map ( a => 
     		Bool()
@@ -214,9 +251,9 @@ class Chisel3CompatibilitySuite extends TestSuite {
       class MyBundle(aWidth: Int) extends Bundle {
         val aVal = UInt(width = aWidth)
       }
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val ins = Vec(3, new MyBundle(8).asInput)
-      }
+      })
     }
 
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
@@ -232,10 +269,10 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestUIntSIntConnect ...")
 
     class UIntSIntConnect() extends Module {
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val inU = UInt(width = 4).asInput()
         val outS = SInt(width = 4).asOutput()
-      }
+      })
       io.outS := io.inU
     }
 
@@ -252,10 +289,10 @@ class Chisel3CompatibilitySuite extends TestSuite {
     println("\ntestSIntUIntConnect ...")
 
     class SIntUIntConnect() extends Module {
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val inS = SInt(width = 4).asInput()
         val outU = UInt(width = 4).asOutput()
-      }
+      })
       io.outU := io.inS
     }
 
