@@ -33,6 +33,7 @@ package Chisel
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import sys.process.{BasicIO,stringSeqToProcess}
+import BuildInfo._
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -517,6 +518,8 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  val version = BuildInfo.version
+  val chiselVersionString = BuildInfo.toString
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0
