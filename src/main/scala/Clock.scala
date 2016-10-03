@@ -41,6 +41,11 @@ object Clock {
     new Clock(reset, src, period)
   }
 
+  // For Chisel3 compatibility.
+  def apply(dir: IODirection): Clock = {
+    apply()
+  }
+
   implicit def toOption(c: Clock) = Option(c)
 }
 
@@ -72,4 +77,8 @@ class Clock(reset: Bool = Driver.implicitReset,
   /** divide the clock period
     * Will create another clock with the respective period */
   def / (x: Int) = Clock(reset, Some(this), period / x.toDouble)
+
+  def := (that: Clock): Unit = {
+    this.getReset := that.getReset
+  }
 }

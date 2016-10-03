@@ -169,6 +169,7 @@ This will report errors for the following Chisel3 issues:
  * Mem(..., orderedWrites) is no longer supported,
  * masked writes are only supported for Mem[Vec[_]],
  * connections between UInt and SInt are illegal.
+ * module io's must be wrapped in IO().
 
 In addition, the following incompatibilities require code changes:
 

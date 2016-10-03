@@ -33,6 +33,7 @@ package Chisel
 import collection.mutable.{ArrayBuffer, HashSet, HashMap, LinkedHashMap, Stack, Queue => ScalaQueue}
 import scala.collection.immutable.ListSet
 import sys.process.{BasicIO,stringSeqToProcess}
+import BuildInfo._
 
 object Driver extends FileSystemUtilities{
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
@@ -426,6 +427,7 @@ object Driver extends FileSystemUtilities{
         }
         case "--minimumCompatibility" => minimumCompatibility = Version(args(i + 1)); i += 1
         case "--wError" => wError = true
+        case "--version" => println(chiselVersionString)
         case any => ChiselError.warning("'" + arg + "' is an unknown argument.")
       }
       i += 1
@@ -444,7 +446,16 @@ object Driver extends FileSystemUtilities{
       case "fpga" => new FPGABackend
       case "sysc" => new SysCBackend
       case "v" => new VerilogBackend
-      case _ => Class.forName(backendName).newInstance.asInstanceOf[Backend]
+      case _ =>
+        try {
+          Class.forName(backendName).newInstance.asInstanceOf[Backend]
+        }
+        catch {
+          case cnf: ClassNotFoundException =>
+            println("Chisel.Driver: backend %s not found: %s, using default backend".format(backendName, cnf))
+            backend
+
+        }
     }
   }
 
@@ -508,6 +519,8 @@ object Driver extends FileSystemUtilities{
   var chiselConfigMode: Option[String] = None
   var chiselConfigDump: Boolean = false
   var startTime = 0L
+  val version = BuildInfo.version
+  val chiselVersionString = BuildInfo.toString
   /* For tester */
   val signalMap = LinkedHashMap[Node, Int]()
   var nodeId = 0
@@ -549,4 +562,6 @@ object Driver extends FileSystemUtilities{
   }
 
   lazy val isVCSAvailable = isCommandAvailable("vcs")
+  // Print Chisel version when driver object is constructed, hopefully, just once.
+  println(chiselVersionString)
 }

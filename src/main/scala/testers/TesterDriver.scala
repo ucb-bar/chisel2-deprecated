@@ -80,4 +80,6 @@ object TesterDriver {
       tester
     }
   }
+
+  val backends = List("c") ++ {if (Driver.isVCSAvailable) "v" :: Nil else Nil}
 }

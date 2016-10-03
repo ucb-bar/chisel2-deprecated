@@ -11,11 +11,11 @@ class VecSuite extends TestSuite {
       class MyBundle(aWidth: Int) extends Bundle {
         val aUInt = UInt(width = aWidth)
       }
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val a = UInt(INPUT, n)
         val i = Vec(n, Bits(INPUT, W))
         val d = Bits(OUTPUT, W)
-      }
+      })
       io.d := io.i(io.a)
     }
     
@@ -32,9 +32,9 @@ class VecSuite extends TestSuite {
       class MyBundle(aWidth: Int) extends Bundle {
         val aUInt = UInt(width = aWidth)
       }
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val empty = Vec(0, new MyBundle(n).asOutput)
-      }
+      })
     }
     
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
@@ -49,9 +49,9 @@ class VecSuite extends TestSuite {
     println("\ntestVecFillFromVec ...")
 
     class VecApp(n: Int) extends Module {
-      val io = new Bundle {
+      val io = IO(new Bundle {
         val a = UInt(INPUT, n)
-      }
+      })
       val z = Vec(32, UInt(32, width=16))
       var i = 0
       val x = Vec.fill( 32 )
