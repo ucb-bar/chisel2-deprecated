@@ -10,8 +10,7 @@ language, which raises the level of hardware design abstraction by providing
 concepts including object orientation, functional programming, parameterized
 types, and type inference.
 
-Chisel can generate a high-speed C++-based cycle-accurate software simulator,
-or low-level Verilog designed to pass on to standard ASIC or FPGA tools
+Chisel can generate low-level Verilog designed to pass on to standard ASIC or FPGA tools
 for synthesis and place and route.
 
 Visit the [community website](http://chisel.eecs.berkeley.edu/) for more
