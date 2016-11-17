@@ -17,6 +17,11 @@ for synthesis and place and route.
 Visit the [community website](http://chisel.eecs.berkeley.edu/) for more
 information.
 
+**NOTE**: This README.md describes (and associated repository contains)
+version 2.x of Chisel, and while we continue to support this version of
+Chisel, we encourage people to migrate to the new version:
+[Chisel3](https://github.com/ucb-bar/chisel3)
+
 Getting started
 ===============
 
@@ -28,6 +33,11 @@ and scala source file containing your Chisel code as follow.
 
     $ cat build.sbt
     scalaVersion := "2.11.7"
+
+    resolvers ++= Seq(
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.sonatypeRepo("releases")
+    )
 
     libraryDependencies += "edu.berkeley.cs" %% "chisel" % "latest.release"
 
@@ -136,7 +146,7 @@ Documentation has been moved to a separate [repo](https://github.com/ucb-bar/chi
 Chisel3
 =======
 
-We're gearing up for the release of Chisel3. To facilitate the
+We're releasing snapshot versions of Chisel3. To facilitate the
 transition from Chisel2, you should ensure that your designs build and
 test in Chisel3 compatibility mode by passing the following arguments
 to Chisel:
