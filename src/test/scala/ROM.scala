@@ -34,14 +34,14 @@ import org.junit.Test
 import Chisel._
 
 class ROMSuite extends TestSuite {
-
-  @Test def testROM() {
-    println("\ntestROM...")
+  // Verify we can initialize a ROM wider then 64 bits.
+  @Test def testWideROMInit() {
+    println("\ntestWideROMInit...")
     class DUT extends Module {
 
       val DATAWIDTH = 133
 
-      def matchLookUpRows() = {
+      val wideROM = {
         val inits = (1 to 2).map(i => UInt(i, width = DATAWIDTH))
         ROM(inits)
       }
@@ -53,15 +53,22 @@ class ROMSuite extends TestSuite {
 
       val inpBitStrReg = RegInit(Bits(0, width = DATAWIDTH))
 
-      inpBitStrReg := matchLookUpRows.read(io.m)
+      inpBitStrReg := wideROM.read(io.m)
       io.fState := inpBitStrReg
     }
 
     class DUTTester(c: DUT) extends Tester(c) {
       poke(c.io.m, 0)
-      peek(c.inpBitStrReg)
+      // We expect a one-cycle delay in memory response.
+      expect(c.io.fState, 0)
       step(1)
-      peek(c.inpBitStrReg)
+      expect(c.io.fState, 1)
+      step(1)
+      poke(c.io.m, 1)
+      expect(c.io.fState, 1)
+      step(1)
+      // We expect a one-cycle delay in memory response.
+      expect(c.io.fState, 2)
     }
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
       "--backend", "c", "--genHarness", "--compile", "--test", "--debug")

@@ -1116,7 +1116,7 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
-      // If we have a constant pool, output it.
+      // If we have a constant pool, output its definitions.
       for (((_, _),l) <- constantPool) {
         out_h.write(s"  static const val_t T${l.emitIndex}[${words(l)}];\n")
       }
@@ -1222,7 +1222,8 @@ class CppBackend extends Backend {
         // The ROM init code may generate multi-word constants.
         // Ensure they're in the constant pool if we're generating one.
         // NOTE: We call emitInit() only for its side-effects (allocating constants to the constant pool if the latter is enabled).
-        // We throw away the generated intialization strings.
+        // We throw away the generated intialization strings created during this invocation.
+        // We'll accumulate and output them later (aftet the constants have been assigned their values).
         def collectConstants(): Unit = {
           Driver.orderedNodes foreach (emitInit(_))
         }
