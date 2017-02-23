@@ -175,14 +175,9 @@ class CppBackend extends Backend {
       case x: Binding => List()
       case l: Literal if isInObject(l) && words(l) > 1 =>
         // Are we maintaining a constant pool?
+        // If yes, we'll output it separately.
         if (coalesceConstants) {
-          // Is this the node that actually defines the constant?
-          // If so, output the definition (we must do this only once).
-          if (constantPool.contains((l.name, l.width_)) && constantPool((l.name, l.width_)) == l) {
-            List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
-          } else {
-            List()
-          }
+          List()
         } else {
           List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
         }
@@ -1121,6 +1116,10 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
+      // If we have a constant pool, output its definitions.
+      for (((_, _),l) <- constantPool) {
+        out_h.write(s"  static const val_t T${l.emitIndex}[${words(l)}];\n")
+      }
       // Header declarations should be unique, add a simple check
       for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc)) {
         assertUnique(emitDec(m), "redeclaration in header for nodes")
@@ -1220,6 +1219,14 @@ class CppBackend extends Backend {
       // If we're putting literals in the class as static const's,
       // generate the code to initialize them here.
       if (multiwordLiteralInObject) {
+        // The ROM init code may generate multi-word constants.
+        // Ensure they're in the constant pool if we're generating one.
+        // NOTE: We call emitInit() only for its side-effects (allocating constants to the constant pool if the latter is enabled).
+        // We throw away the generated intialization strings created during this invocation.
+        // We'll accumulate and output them later (after the constants have been assigned their values).
+        def collectConstants(): Unit = {
+          Driver.orderedNodes foreach (emitInit(_))
+        }
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
           s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_ + ", " + _) + "};\n"
@@ -1227,6 +1234,8 @@ class CppBackend extends Backend {
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
         if (coalesceConstants) {
+          // Ensure any constants we will use are accounted for.
+          collectConstants()
           for (((v,w),l) <- constantPool) {
             writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
