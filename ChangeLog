@@ -1,11 +1,5 @@
-ChangeLog for Chisel v2.2.36
+ChangeLog for Chisel v2.2.37
 
- Print Chisel version when Driver object is created.
- Generate 'buildinfo' when Chisel jar is built.
- Update sbt project name from "chisel" to "Chisel" (to match package name).
- Add support for chisel3 wrappers (IO(), Input(), Output()).
- Warn about uninstantiable backends.
- Add scalacheck as a library dependency.
- Move ChiselSpec.scala from test to main (required for new tester support).
- Add Chisel3 clock methods.
- Deprecate Fill(Chisel.Data, Int) and generate error in compatibility mode.
+#740 Wide rom fix
+ Remove Getting Started and refer to Chisel3.
+ Update README.md (point to Chisel3, add Resolvers to getting started build.sbt
