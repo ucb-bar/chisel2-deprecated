@@ -1223,7 +1223,7 @@ class CppBackend extends Backend {
         // Ensure they're in the constant pool if we're generating one.
         // NOTE: We call emitInit() only for its side-effects (allocating constants to the constant pool if the latter is enabled).
         // We throw away the generated intialization strings created during this invocation.
-        // We'll accumulate and output them later (aftet the constants have been assigned their values).
+        // We'll accumulate and output them later (after the constants have been assigned their values).
         def collectConstants(): Unit = {
           Driver.orderedNodes foreach (emitInit(_))
         }
