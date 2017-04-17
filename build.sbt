@@ -2,7 +2,7 @@ def versionToArray(v: String): Array[String] = v.split('.')
 
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.37",
+    // version := "2.2.38",
     version := "2.3-SNAPSHOT",
     name := "Chisel",
     scalaVersion := "2.11.7",

@@ -13,7 +13,7 @@ class FillSuite extends TestSuite {
       val io = new Bundle {
         val a = UInt(INPUT, 4)
       }
-      val f = Fill(UInt(1,1), 3)
+      val f = Fill(3, UInt(1,1))
     }
     
     val testArgs = chiselEnvironmentArguments() ++ Array("--targetDir", dir.getPath.toString(),
