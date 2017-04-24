@@ -1,5 +1,4 @@
-ChangeLog for Chisel v2.2.37
+ChangeLog for Chisel v2.2.38
 
-#740 Wide rom fix
- Remove Getting Started and refer to Chisel3.
- Update README.md (point to Chisel3, add Resolvers to getting started build.sbt
+Move {as,to}{U,S}Int definitions to Node.scala, and add them as Bundle key words.
+Update deprecated Fill() usage in FillApp.scala.

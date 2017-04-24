@@ -1,6 +1,6 @@
-ReleaseNotes for Chisel v2.2.37
+ReleaseNotes for Chisel v2.2.38
 
-This release of Chisel is a maintenance release, incorporating a bug fix for issue #740 - unable to create a ROM with datawidth more than 64 bits.
+This release of Chisel is a maintenance release, incorporating support for Chisel3's {as,to}{U,S}Int methods in all Chisel Data types.
 
 We will be removing support for Scala 2.10 in future Chisel
 releases. Please verify your code compiles and runs correctly under
