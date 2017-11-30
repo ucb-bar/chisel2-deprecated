@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011 - 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -75,7 +75,7 @@ class ConnectSuite extends TestSuite {
         step(1)
         expect(m.io.out.valid, int(true))
         expect(m.io.in.ready,  int(true))
-        expect(m.io.out.bits,  i+1)
+        expect(m.io.out.bits,  i + 1)
       }
     }
     launchCppTester((m: UsesShimParent) => new ShimConnectionsTests(m))
@@ -230,7 +230,7 @@ class ConnectSuite extends TestSuite {
         val wdata = UInt(INPUT, 4)
         val status = new RegStatus().asOutput
       }
-      val reg_status = Reg(new RegStatus)
+      val reg_status = Reg(new RegStatus, init = new RegStatus().fromBits(UInt(0)))
       when (io.wen) {
         reg_status := new RegStatus().fromBits(io.wdata)
       }
@@ -359,43 +359,43 @@ class ConnectSuite extends TestSuite {
    */
   @Test def testUnspecifiedBundleValues () {
     println("\ntestUnspecifiedBundleValues ...")
-    
+
     class myBundle extends Bundle
     {
        val a = Bool()
        val b = Bool()
        override def cloneType = new myBundle().asInstanceOf[this.type]
     }
-    
+
     class UnspecifiedBundleValues extends Module {
-    
-       val io = new Bundle 
+
+       val io = new Bundle
        {
           val in = new myBundle().asInput
           val something = Bool(INPUT)
           val out = Bool(OUTPUT)
        }
-    
+
        def NullMyBundle(): myBundle =
        {
           val bun = new myBundle
           bun.a := Bool(false)
           bun
        }
-    
+
        val my_reg = Reg(init= NullMyBundle)
-    
+
        when (io.something)
        {
           my_reg := io.in
-       }  
-    
+       }
+
        io.out := my_reg.a || my_reg.b
-    
-    
+
+
        printf("Hello World!\n")
-    }  
-    
+    }
+
     chiselMain(Array[String]("--backend", "v",
         "--targetDir", dir.getPath.toString()),
         () => Module(new UnspecifiedBundleValues()))
@@ -404,7 +404,7 @@ class ConnectSuite extends TestSuite {
 
   /* Signals only used as resets are trimmed (#346)
    *
-   * 
+   *
    */
   @Test def testUnconnectedResets() {
     class SubModule(reset: Bool) extends Module(null, reset) {
@@ -413,24 +413,24 @@ class ConnectSuite extends TestSuite {
         val out = Bool(OUTPUT)
       }
       val io = new IO
-    
+
       val r = Reg(init = Bool(true))
       r := io.in
       io.out := r
     }
-    
+
     class UnconnectedResets extends Module {
       class IO extends Bundle {
         val in  = Bool(INPUT)
         val out = Bool(OUTPUT)
       }
       val io = new IO
-    
+
       val regs = Reg(Vec(3, Bool()))
       regs(0) := reset
       for (i <- 1 until 3)
         regs(i) := regs(i-1)
-    
+
       val sub = Module(new SubModule(regs(2)))
       sub.io.in := io.in
       io.out := sub.io.out /* | regs(2) */
@@ -439,7 +439,7 @@ class ConnectSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new UnconnectedResets()))
-    
+
     assertFile("ConnectSuite_UnconnectedResets_1.v")
   }
 
@@ -481,10 +481,10 @@ class ConnectSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new SubmoduleInputUse()))
-    
+
     assertFile("ConnectSuite_SubmoduleInputUse_1.v")
   }
-  
+
   // More extensive test that submodule bindings are connected to appropriate logic
   @Test def testAddBindings() {
     class CrossingBlock extends Module {
@@ -568,13 +568,13 @@ class ConnectSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "v",
       "--targetDir", dir.getPath.toString()),
       () => Module(new BindingTest()))
-    
+
     assertFile("ConnectSuite_BindingTest_1.v")
   }
 
   /* Unused top level IOs are preserved (#172)
    *
-   * 
+   *
    */
   @Test def testUnconnectedIOs() {
     println("\ntestUnconnectedIOs ...")
@@ -586,12 +586,12 @@ class ConnectSuite extends TestSuite {
         val ncOut = Bool(OUTPUT)
       }
       val io = new IO
-    
+
       val r = Reg(init = Bool(true))
       r := io.in
       io.out := r
     }
-    
+
     class UnconnectedIOs extends Module {
       class IO extends Bundle {
         val in  = Bool(INPUT)
@@ -600,12 +600,12 @@ class ConnectSuite extends TestSuite {
         val ncOut = Bool(OUTPUT)
       }
       val io = new IO
-    
+
       val regs = Reg(Vec(3, Bool()))
       regs(0) := reset
       for (i <- 1 until 3)
         regs(i) := regs(i-1)
-    
+
       val sub = Module(new SubModule(regs(2)))
       sub.io.in := io.in
       io.out := sub.io.out /* | regs(2) */
@@ -614,12 +614,12 @@ class ConnectSuite extends TestSuite {
     chiselMain(Array[String]("--backend", "c",
       "--targetDir", dir.getPath.toString()),
       () => Module(new UnconnectedIOs()))
-    
+
     assertFile("ConnectSuite_UnconnectedIOs_1.h")
   }
 
   /* Missing default produces reasonable error message
-   * (and not a bare "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements." 
+   * (and not a bare "java.lang.IllegalArgumentException: Flat hash tables cannot contain null elements."
    * Issue #513
    */
   @Test def testNoDefaultIOs() {

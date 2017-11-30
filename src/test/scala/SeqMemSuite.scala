@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -52,7 +52,7 @@ class SeqMemSuite extends TestSuite {
       val rdata = mem.read(io.addr, io.rEnable)
       io.out := rdata
     }
-    
+
     class CreateSeqMemTester(c: CreateSeqMem, size: Int) extends Tester(c) {
       for (t <- 0 until 4) {
         val test_addr = rnd.nextInt(size)

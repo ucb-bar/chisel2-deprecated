@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -57,13 +57,11 @@ object Mem {
   def apply[T <: Data](out: => T, n: Int, seqRead: Boolean = false,
                        orderedWrites: Boolean = false,
                        clock: Clock = null): Mem[T] = {
-    if (Driver.minimumCompatibility > "2") {
-      ChiselError.warning("Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.")
-      if (seqRead)
-        ChiselError.warning("Mem(..., seqRead) is deprecated. Please use SeqMem(...)")
-      if (orderedWrites)
-        ChiselError.warning("Mem(..., orderedWrites) is deprecated.")
-    }
+    ChiselError.check("Chisel3 compatibility: Mem(out:T, n:Int) is deprecated. Please use Mem(n:Int, t:T) instead.", Version("3.0"))
+    if (seqRead)
+      ChiselError.check("Chisel3 compatibility: Mem(..., seqRead) is deprecated. Please use SeqMem(...)", Version("3.0"))
+    if (orderedWrites)
+      ChiselError.check("Chisel3 compatibility: Mem(..., orderedWrites) is deprecated.", Version("3.0"))
     construct(n, out, seqRead, orderedWrites, clock)
   }
 }
@@ -103,7 +101,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   def doWrite(addr: UInt, condIn: Bool, wdata: Node, wmaskIn: Option[UInt]): Unit = {
     val cond = // add bounds check if depth is not a power of 2
       condIn && (Bool(isPow2(n)) || addr(log2Up(n)-1,0) < UInt(n))
-    val wmask = wmaskIn match { // remove constant-1 write masks 
+    val wmask = wmaskIn match { // remove constant-1 write masks
       case Some(mask) => mask.litOpt match {
         case Some(l) if l.value == (BigInt(1) << data.getWidth)-1 => None
         case _ => wmaskIn
@@ -135,8 +133,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
   }
 
   def write(addr: UInt, data: T, wmask: UInt): Unit = {
-    if (Driver.minimumCompatibility > "2")
-      throwException("Chisel3 masked writes are only supported for Mem[Vec[_]]")
+    ChiselError.check("Chisel3 compatibility: Chisel3 masked writes are only supported for Mem[Vec[_]].", Version("3.0"))
     doWrite(addr, Module.current.whenCond, data, wmask)
   }
 
@@ -174,7 +171,7 @@ class Mem[T <: Data](gen: () => T, val n: Int, val seqRead: Boolean, val ordered
         val read = readPortCache getOrElseUpdate (addr, gen().fromNode(new MemRead(this, addr)))
         write.data = data.toBits & mask | read.toBits & ~mask
       }
-    } 
+    }
   }
 
   def computePorts = {
@@ -306,6 +303,7 @@ object SeqMem {
 
   @deprecated("SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", "2.29")
   def apply[T <: Data](out: => T, n: Int): SeqMem[T] = {
+    ChiselError.check("Chisel3 compatibility: SeqMem(out: => T, n:Int) is deprecated. Please use SeqMem(n:Int, out: => T) instead.", Version("3.0"))
     apply(n, out)
   }
 }

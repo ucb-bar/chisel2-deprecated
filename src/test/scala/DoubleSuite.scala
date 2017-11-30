@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011 - 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -58,7 +58,7 @@ class DoubleSuite extends TestSuite {
         for (i <- 0 to 100) {
           val dbl1 = rnd.nextDouble
           val dbl2 = rnd.nextDouble
-          
+
           poke(m.io.in1, dbl1)
           poke(m.io.in2, dbl2)
           expect(m.io.outLT, if (dbl1 < dbl2) 1 else 0)

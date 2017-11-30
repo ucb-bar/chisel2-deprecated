@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -47,9 +47,9 @@ class OuterSuite extends TestSuite {
       }
       io.out := io.in + Bits(1)
     }
-    
+
     class Outer extends Module {
-      val io = new Bundle { 
+      val io = new Bundle {
         val in  = Bits(INPUT, 8)
         val out = Bits(OUTPUT, 8)
       }
@@ -60,7 +60,7 @@ class OuterSuite extends TestSuite {
       c(0).io.in := io.in
       io.out  := (c(0).io.out * Bits(2))(7,0)
     }
-    
+
     class OuterTester(c: Outer) extends Tester(c) {
       for (t <- 0 until 16) {
         val test_in = rnd.nextInt(256)

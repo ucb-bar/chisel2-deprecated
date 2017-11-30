@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -72,8 +72,6 @@ abstract class Bits extends Data with proc {
   }
 
   def fromInt(x: Int): this.type
-  def toSInt(): SInt = chiselCast(this){SInt()}
-  def toUInt(): UInt = chiselCast(this){UInt()}
   override def getNode: Node = if (procAssigned) this else super.getNode
 
   // internal, non user exposed connectors
@@ -96,8 +94,8 @@ abstract class Bits extends Data with proc {
 
   override def assign(src: Node): Unit = {
     if (Driver.topComponent != None || checkAssign(src)) {
-      if (procAssigned && Driver.minimumCompatibility > "2")
-        ChiselError.warning("Bulk-connection to a node that has been procedurally assigned-to is deprecated.")
+      if (procAssigned)
+        ChiselError.check("Chisel3 compatibility: Bulk-connection to a node that has been procedurally assigned-to is deprecated.", Version("3.0"))
 
       assigned = true
       if (!procAssigned) inputs += src
@@ -182,10 +180,10 @@ abstract class Bits extends Data with proc {
         case (INPUT, OUTPUT) if p == q && !isTypeNode => other assign this //passthrough
         case (INPUT, OUTPUT) if p.parent == q.parent || isTypeNode => q match { //producer - consumer
           // includes when a child is a blackbox
-          case _: BlackBox => this assign other 
+          case _: BlackBox => this assign other
           // only do assignment if output has stuff connected to it
-          case _ if !other.inputs.isEmpty => this assign other 
-          case _ => 
+          case _ if !other.inputs.isEmpty => this assign other
+          case _ =>
         }
         case (INPUT, OUTPUT) =>
           ChiselError.error("Undefined connections between " + this + " and " + other)
@@ -199,13 +197,13 @@ abstract class Bits extends Data with proc {
           case _ if !inputs.isEmpty => other assign this
           case _ =>
         }
-        case (OUTPUT, INPUT) => 
+        case (OUTPUT, INPUT) =>
             ChiselError.error("Undefined connection between " + this + " and " + other)
 
         // input <> input conections
         case (INPUT, INPUT) if p == q.parent => other assign this // parent <> child
         case (INPUT, INPUT) if p.parent == q => this assign other //child <> parent
-        case (INPUT, INPUT) => 
+        case (INPUT, INPUT) =>
           ChiselError.error("Can't connect Input " + this + " Input " + other)
 
         // output <> output connections
@@ -213,14 +211,14 @@ abstract class Bits extends Data with proc {
           // includes when a child is a black box
           case _: BlackBox => this assign other
           // only do connection if child is assigning to that output
-          case _ if !other.inputs.isEmpty => this assign other 
+          case _ if !other.inputs.isEmpty => this assign other
           case _ =>
         }
         case (OUTPUT, OUTPUT) if p.parent == q => p match { // child <> parent
           // includes when a child is a black box
           case _: BlackBox => other assign this
           // only do connection if child (me) is assinging that output
-          case _ if !inputs.isEmpty => other assign this 
+          case _ if !inputs.isEmpty => other assign this
           case _ =>
         }
         case (OUTPUT, OUTPUT) if isTypeNode && other.isTypeNode => //connecting two type nodes together
@@ -265,7 +263,7 @@ abstract class Bits extends Data with proc {
           ChiselError.error("Connecting Input " + this + " to IO without direction " + src)
         case OUTPUT =>
           ChiselError.error("Connecting Output " + this + " to an IO withouth direction " + src)
-        case NODIR =>        
+        case NODIR =>
           ChiselError.error("Undefined connection between " + this + " and " + src)
       }
     }
@@ -357,11 +355,14 @@ abstract class Bits extends Data with proc {
   /** reduction and, and all bits together */
   def andR(): Bool           = newLogicalOp(SInt(-1), "===")
   /** reduction or, or all bits together */
-  def orR(): Bool            = newLogicalOp(UInt(0), "!=")
+  def orR(): Bool            = newLogicalOp(UInt(0), "=/=")
   /** reduction xor, xor all bits together */
   def xorR(): Bool           = newReductionOp("^");
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (b: Bits): Bool     = newLogicalOp(b, "!=");
+  def != (b: Bits): Bool = {
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead", Version("3.0"))
+    newLogicalOp(b, "=/=");
+  }
   /** not equal to */
   def =/= (b: Bits): Bool     = newLogicalOp(b, "!=");
   /** Bitwise and */
@@ -499,7 +500,10 @@ abstract class Bits extends Data with proc {
 
   def === (that: BitPat): Bool = that === this
   @deprecated("Use =/= rather than != for chisel comparison", "3")
-  def != (that: BitPat): Bool = that =/= this
+  def != (that: BitPat): Bool = {
+    ChiselError.check("Chisel3 compatibility: != is deprecated, use =/= instead.", Version("3.0"))
+    that =/= this
+  }
   def =/= (that: BitPat): Bool = that =/= this
 
   /** Cat bits together to into a single data object with the width of both combined */
@@ -514,6 +518,15 @@ abstract class Bits extends Data with proc {
   // Chisel3 - Check version compatibility (assignments requiring Wire() wrappers)
   private def checkCompatibility(src: Node) {
     if (Driver.minimumCompatibility > "2") {
+      // Verify assignment type legality.
+      val mismatch = (src, this) match {
+        case (s: SInt, u: UInt) => true
+        case (u: UInt, s: SInt) => true
+        case _ => false
+      }
+      if (mismatch) {
+        ChiselError.check("Chisel3 compatibility: Connections between UInt and SInt are illegal.", Version("3.0"))
+      }
       component addAssignment this
     }
   }

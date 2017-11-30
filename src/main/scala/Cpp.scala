@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -100,6 +100,11 @@ class CppBackend extends Backend {
     }
   }
 
+  // Emit the address of a node's values.
+  def emitValueAddress(node: Node): String = {
+    "&" + emitLoWordRef(node)
+  }
+
   // Manage a constant pool.
   protected[this] val coalesceConstants = multiwordLiteralInObject
   protected[this] val constantPool = HashMap[(String, Width), Literal]()
@@ -150,12 +155,12 @@ class CppBackend extends Backend {
           assert(multiwordLiteralInObject, ChiselError.error("Internal Error: multiword literal reference without object to refer to"))
           wordMangle(x, w.toString)
         }
-      case _ => 
+      case _ =>
         wordMangle(x, w.toString)
     }
   }
 
-  protected[this] def isLit(node: Node): Boolean = 
+  protected[this] def isLit(node: Node): Boolean =
     node.isLit || node.isInstanceOf[Bits] && node.inputs.length == 1 && isLit(node.inputs.head)
 
   def emitWordRef(node: Node, w: Int): String = {
@@ -175,14 +180,9 @@ class CppBackend extends Backend {
       case x: Binding => List()
       case l: Literal if isInObject(l) && words(l) > 1 =>
         // Are we maintaining a constant pool?
+        // If yes, we'll output it separately.
         if (coalesceConstants) {
-          // Is this the node that actually defines the constant?
-          // If so, output the definition (we must do this only once).
-          if (constantPool.contains((l.name, l.width_)) && constantPool((l.name, l.width_)) == l) {
-            List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
-          } else {
-            List()
-          }
+          List()
         } else {
           List((s"  static const val_t", s"T${l.emitIndex}[${words(l)}]"))
         }
@@ -511,38 +511,70 @@ class CppBackend extends Backend {
 
       case x: Extract =>
         x.inputs.tail.foreach(e => x.validateIndex(e))
-        emitTmpDec(node, declarations) +
-        (if (node.inputs.length < 3 || node.needWidth() == 1) {
-          if (node.inputs(1).isLit) {
-            val value = node.inputs(1).litValue().toInt
-            "  " + emitLoWordRef(node) + " = (" + emitWordRef(node.inputs(0), value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
-          } else if (node.inputs(0).needWidth() <= bpw) {
-            "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(node.inputs(0)) + " >> " + emitLoWordRef(node.inputs(1)) + ") & 1;\n"
-          } else {
-            val inputWord = wordMangle(node.inputs(0), emitLoWordRef(node.inputs(1)) + "/" + bpw)
-            s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(node.inputs(1))} % ${bpw}) & 1"
-          }
+        val source = node.inputs(0)
+        val hi = node.inputs(1)
+        val lo = if (node.inputs.length < 3) {
+          hi
         } else {
-          val rsh = node.inputs(2).litValue().toInt
-          if (rsh % bpw == 0) {
-            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(node.inputs(0), i + rsh/bpw))) + trunc(node)
-          } else {
-            block((0 until words(node)).map(i => emitWordRef(node, i)
-              + " = " + emitWordRef(node.inputs(0), i + rsh/bpw) + " >> "
-              + (rsh % bpw) + (
-                if (i + rsh/bpw + 1 < words(node.inputs(0))) {
-                  " | " + emitWordRef(node.inputs(0), i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
-                } else {
-                  ""
-                }))) + trunc(node)
+          node.inputs(2)
+        }
+        // Is this a no-op - (i.e., all the source bits are extracted)?
+        if (x.isNop) {
+          emitTmpDec(node, declarations) + {
+            // A straight assignment.
+            block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i)))
           }
-        })
+        } else if (x.isOneBit) {
+          emitTmpDec(node, declarations) + {
+            // Ensure all the other bits are zero.
+            if (words(node) > 1) {
+              if (node.isInObject) {
+                emitRef(node) + " = 0;\n"
+              } else {
+                "  memset(" + emitValueAddress(node) + ", 0, sizeof(" + emitRef(node) + "));\n"
+              }
+            } else {
+              ""
+            }
+          } + {
+            if (hi.isLit) {
+              val value = hi.litValue().toInt
+                  "  " + emitLoWordRef(node) + " = (" + emitWordRef(source, value/bpw) + " >> " + (value%bpw) + ") & 1;\n"
+            } else if (source.needWidth() <= bpw) {
+              "  " + emitLoWordRef(node) + " = (" + emitLoWordRef(source) + " >> " + emitLoWordRef(hi) + ") & 1;\n"
+            } else {
+              val inputWord = wordMangle(source, emitLoWordRef(hi) + "/" + bpw)
+                  s"${emitLoWordRef(node)} = ${inputWord} >> (${emitLoWordRef(hi)} % ${bpw}) & 1;\n"
+            }
+          }
+        } else if (x.isStaticWidth) {
+            emitTmpDec(node, declarations) + {
+              val rsh = lo.litValue().toInt
+              if (rsh % bpw == 0) {
+                block((0 until words(node)).map(i => emitWordRef(node, i) + " = " + emitWordRef(source, i + rsh/bpw))) + trunc(node)
+              } else {
+                block((0 until words(node)).map(i => emitWordRef(node, i)
+                    + " = " + emitWordRef(source, i + rsh/bpw) + " >> "
+                    + (rsh % bpw) + (
+                        if (i + rsh/bpw + 1 < words(source)) {
+                          " | " + emitWordRef(source, i + rsh/bpw + 1) + " << " + (bpw - rsh % bpw)
+                        } else {
+                          ""
+                        }))) + trunc(node)
+              }
+            }
+        } else {
+          // Use the low level extract code.
+          val nw = words(node)
+          emitTmpDec(node, declarations) + ";\n  " + "  bit_word_funs<" + nw + ">::extract(" + emitValueAddress(node) + ", " + emitValueAddress(source) + ", " + emitRef(hi) + ", " + emitRef(lo) + ");\n"
+        }
 
       case x: Clock => ""
 
-      case x: Bits if x.isInObject && x.inputs.length == 1 => 
+      case x: Bits if x.isInObject && x.inputs.length == 1 => {
         emitTmpDec(x, declarations) + block((0 until words(x)).map(i => emitWordRef(x, i)
           + " = " + emitWordRef(x.inputs(0), i)))
+      }
       case x: Bits if x.inputs.length == 0 && !(x.isTopLevelIO && x.dir == INPUT) =>
         emitTmpDec(x, declarations) + block("val_t __r = this->__rand_val()" +:
           (0 until words(x)).map(i => s"${emitWordRef(x, i)} = __r")) + trunc(x)
@@ -558,7 +590,7 @@ class CppBackend extends Backend {
           + i + ")"))
 
       case a: Assert =>
-        val cond = 
+        val cond =
           if (emitRef(a.cond) == "reset" || emitRef(a.cond) == Driver.implicitReset.name) emitLoWordRef(a.cond)
           else s"${emitLoWordRef(a.cond)} || !assert_fire || ${Driver.implicitReset.name}.lo_word()"
         if (!Driver.isAssert) ""
@@ -574,7 +606,7 @@ class CppBackend extends Backend {
 
       case l: Literal if !l.isInObject && words(l) > 1 =>
         // Have we already allocated this literal in the main class definition?
-        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_+", "+_) + "};\n"
+        s"  val_t T${l.emitIndex}[] = {" + (0 until words(l)).map(emitWordRef(l, _)).reduce(_ + ", " + _) + "};\n"
 
       case _ =>
         ""
@@ -615,16 +647,19 @@ class CppBackend extends Backend {
 
   def emitInit(node: Node): String = {
     node match {
-      case x: Clock => List(x.srcClock match {
-        case None => 
-          "  " + emitRef(node) + ".len = %d;\n".format(x.period.round)
-        case Some(src) => 
-          val initStr = emitRef(src) + ".len" + (if (src.period > x.period) 
-            " / " + (src.period / x.period).round else 
-            " * " + (x.period / src.period).round)
-          "  " + emitRef(node) + ".len = " + initStr + ";\n"}, 
-          "  " + emitRef(node) + ".cnt = " + emitRef(node) + ".len;\n",
-          "  " + emitRef(node) + ".values[0] = 0;\n") mkString ""
+      case x: Clock => List(
+        x.srcClock match {
+          case None =>
+            s"  ${emitRef(node)}.len = ${x.period.round};\n"
+          case Some(src) =>
+            s"  ${emitRef(node)}.len = ${emitRef(src)}.len ${
+                if (src.period > x.period)
+                "/ " + (src.period / x.period).round else
+                "* " + (x.period / src.period).round
+              };\n"
+        },
+        s"  ${emitRef(node)}.cnt = 0;\n",
+        s"  ${emitRef(node)}.values[0] = 0;\n") mkString ""
       case x: Reg =>
         s"  ${emitRef(node)}.randomize(&__rand_seed);\n"
 
@@ -693,7 +728,7 @@ class CppBackend extends Backend {
           case _ =>
         }
       }
-      case _ => 
+      case _ =>
     }
     for (n <- node.inputs if regWritten.contains(n)) {
       needShadow += n
@@ -705,36 +740,40 @@ class CppBackend extends Backend {
 
   protected[this] def genHarness(c: Module, name: String) {
     val n = Driver.appendString(Some(c.name),Driver.chiselConfigClassName)
-    val harness  = createOutputFile(n + "-emulator.cpp");
-    harness.write("#include \"" + n + ".h\"\n\n");
+    val harness  = createOutputFile(n + "-emulator.cpp")
+    harness.write(s"""#include "${n}.h"\n\n""")
     if (Driver.clocks.length > 1) {
-      harness.write("void " + c.name + "_t::setClocks ( std::vector< int > &periods ) {\n");
-      var i = 0;
-      for (clock <- Driver.clocks) {
-        if (clock.srcClock == None) {
-          harness.write("  " + emitRef(clock) + ".len = periods[" + i + "];\n")
-          harness.write("  " + emitRef(clock) + ".cnt = periods[" + i + "];\n")
-          i += 1;
-        }
+      harness.write(s"void ${c.name}_t::setClocks ( std::vector< int > &periods ) {\n")
+      (Driver.clocks filter (_.srcClock == None)).zipWithIndex foreach {case (clk, i) =>
+        harness.write(s"  ${emitRef(clk)}.len = periods[${i}];\n")
+        harness.write(s"  ${emitRef(clk)}.cnt = periods[${i}];\n")
       }
-      harness.write("}\n\n");
+      harness.write("}\n\n")
     }
-    harness.write(s"""int main (int argc, char* argv[]) {\n""");
-    harness.write(s"""  ${name}_t module;\n""");
-    harness.write(s"""  ${name}_api_t api(&module);\n""");
-    harness.write(s"""  module.init();\n""");
-    harness.write(s"""  api.init_sim_data();\n""");
+    harness.write(s"""int main (int argc, char* argv[]) {\n""")
+    harness.write(s"""  ${name}_t module;\n""")
+    harness.write(s"""  ${name}_api_t api(&module);\n""")
+    harness.write(s"""  module.init();\n""")
+    harness.write(s"""  api.init_sim_data();\n""")
+    harness.write(s"""  api.init_channels();\n""")
+    harness.write(s"""  std::vector<std::string> args(argv+1, argv+argc);\n""")
+    harness.write(s"""  std::string vcdfile = "${Driver.targetDir}/${name}.vcd";\n""")
+    harness.write(s"""  std::vector<std::string>::const_iterator it;\n""")
+    harness.write(s"""  for (it = args.begin() ; it != args.end() ; it++) {\n""")
+    harness.write(s"""    if (it->find("+vcdfile=") == 0) vcdfile = it->c_str()+9;\n""")
+    harness.write(s"""  }\n""")
     if (Driver.isVCD) {
-      val basedir = Driver.targetDir
-      harness.write(s"""  FILE *f = fopen("${basedir}/${name}.vcd", "w");\n""");
+      harness.write(s"""  FILE *f = fopen(vcdfile.c_str(), "w");\n""")
     } else {
-      harness.write(s"""  FILE *f = NULL;\n""");
+      harness.write(s"""  FILE *f = NULL;\n""")
     }
-    harness.write(s"""  module.set_dumpfile(f);\n""");
-    harness.write(s"""  while(!api.exit()) api.tick();\n""");
-    harness.write(s"""  if (f) fclose(f);\n""");
-    harness.write(s"""}\n""");
-    harness.close();
+    harness.write(s"""  module.set_dumpfile(f);\n""")
+    Driver.clocks foreach {clk =>
+      harness write s"  module.${emitRef(clk)}.cnt = module.${emitRef(clk)}.len;\n"}
+    harness.write(s"""  while(!api.exit()) api.tick();\n""")
+    harness.write(s"""  if (f) fclose(f);\n""")
+    harness.write(s"""}\n""")
+    harness.close()
   }
 
   override def compile(c: Module, flagsIn: Option[String]) {
@@ -742,7 +781,7 @@ class CppBackend extends Backend {
     val cxxFlags = (flagsIn getOrElse CXXFLAGS) + c11
     val cppFlags = CPPFLAGS + " -I../ -I" + chiselENV + "/csrc/"
     val allFlags = List(cppFlags, cxxFlags).mkString(" ")
-    val dir = Driver.targetDir + "/"
+    val dir = Driver.targetDir
     val parallelMakeJobs = Driver.parallelMakeJobs
 
     def make(args: String) {
@@ -915,7 +954,7 @@ class CppBackend extends Backend {
       val genCall = "%s(%s);\n".format(name.name, callArgs)
       val prototype = "%s %s( %s );\n".format(name.ctype, name.name, argumentList)
     }
-    
+
     // Split a large method up into a series of calls to smaller methods.
     // We assume the following:
     //  - all state is maintained in the class object (there is no local state
@@ -1035,7 +1074,7 @@ class CppBackend extends Backend {
         writeCppFile(methodBody)
         accumlation += nLinesApprox
       }
-      
+
       def done() {
         // First, close off any accumulated method.
         if (accumlation > 0) {
@@ -1043,7 +1082,7 @@ class CppBackend extends Backend {
         }
       }
     }
- 
+
     def createCppFile(suffix: String = cppFileSuffix) {
       // If we're trying to coalesce cpp files (minimumLinesPerFile > 0),
       //  don't actually create a new file unless the current file has been closed or we've hit the line limit.
@@ -1091,6 +1130,10 @@ class CppBackend extends Backend {
         val bMem = b.isInstanceOf[Mem[_]] || b.isInstanceOf[ROMData]
         aMem < bMem || aMem == bMem && a.needWidth() < b.needWidth()
       }
+      // If we have a constant pool, output its definitions.
+      for (((_, _),l) <- constantPool) {
+        out_h.write(s"  static const val_t T${l.emitIndex}[${words(l)}];\n")
+      }
       // Header declarations should be unique, add a simple check
       for (m <- Driver.orderedNodes.filter(_.isInObject).sortWith(headerOrderFunc)) {
         assertUnique(emitDec(m), "redeclaration in header for nodes")
@@ -1104,8 +1147,9 @@ class CppBackend extends Backend {
         assertUnique(emitDec(clock), "redeclaration in header for clock")
         out_h.write(emitDec(clock))
       }
+      if (Driver.isVCD) out_h.write("  dat_t<1> reset__prev;\n") // also records reset
 
-      out_h.write("\n");
+      out_h.write("\n")
 
       // If we're generating multiple init methods, wrap them in private/public.
       if (nInitMethods > 1) {
@@ -1144,11 +1188,11 @@ class CppBackend extends Backend {
       if (nDumpMethods > 1) {
         out_h.write(" private:\n")
         for (i <- 0 until nDumpMethods - 1) {
-          out_h.write("  void dump_" + i + " ( FILE* f );\n")
+          out_h.write("  void dump_" + i + " ( FILE* f, val_t t, dat_t<1> reset);\n")
         }
         out_h.write(" public:\n")
       }
-      out_h.write("  void dump ( FILE* f, int t );\n")
+      out_h.write("  void dump ( FILE* f, val_t t, dat_t<1> reset=LIT<1>(0) );\n")
 
       // If we're generating multiple dump_init methods, wrap them in private/public.
       if (nDumpInitMethods > 1) {
@@ -1189,13 +1233,23 @@ class CppBackend extends Backend {
       // If we're putting literals in the class as static const's,
       // generate the code to initialize them here.
       if (multiwordLiteralInObject) {
+        // The ROM init code may generate multi-word constants.
+        // Ensure they're in the constant pool if we're generating one.
+        // NOTE: We call emitInit() only for its side-effects (allocating constants to the constant pool if the latter is enabled).
+        // We throw away the generated intialization strings created during this invocation.
+        // We'll accumulate and output them later (after the constants have been assigned their values).
+        def collectConstants(): Unit = {
+          Driver.orderedNodes foreach (emitInit(_))
+        }
         // Emit code to assign static const literals.
         def emitConstAssignment(l: Literal): String = {
-          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_+", "+_) + "};\n"
+          s"const val_t ${c.name}_t::T${l.emitIndex}[] = {" + (0 until words(l)).map(emitLitVal(l, _)).reduce(_ + ", " + _) + "};\n"
         }
         var wroteAssignments = false
         // Get the literals from the constant pool (if we're using one) ...
         if (coalesceConstants) {
+          // Ensure any constants we will use are accounted for.
+          collectConstants()
           for (((v,w),l) <- constantPool) {
             writeCppFile(emitConstAssignment(l))
             wroteAssignments = true
@@ -1214,12 +1268,8 @@ class CppBackend extends Backend {
       }
       val method = CMethod(CTypedName("void", "init"), Array[CTypedName](CTypedName("val_t", "rand_init")))
       val llm = new LineLimitedMethod(method, "  this->__srand(rand_init);\n")
-      for (m <- Driver.orderedNodes) {
-        llm.addString(emitInit(m))
-      }
-      for (clock <- Driver.clocks) {
-        llm.addString(emitInit(clock))
-      }
+      Driver.orderedNodes foreach (llm addString emitInit(_))
+      Driver.clocks foreach (llm addString emitInit(_))
       llm.done()
       val nMethods = llm.bodies.length
       writeCppFile(llm.getBodies)
@@ -1237,7 +1287,7 @@ class CppBackend extends Backend {
       }
 
       for (clock <- Driver.clocks) {
-        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) +".cnt;\n")
+        writeCppFile("  if (" + emitRef(clock) + ".cnt < min) min = " + emitRef(clock) + ".cnt;\n")
       }
       for (clock <- Driver.clocks) {
         writeCppFile("  " + emitRef(clock) + ".cnt-=min;\n")
@@ -1245,6 +1295,8 @@ class CppBackend extends Backend {
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_lo" + clkName(clock) + "( reset );\n")
       }
+      writeCppFile("  if (!reset.to_bool()) print( std::cerr );\n")
+      if (Driver.isVCD) writeCppFile("  mod_t::dump( reset );\n")
       for (clock <- Driver.clocks) {
         writeCppFile("  if (" + emitRef(clock) + ".cnt == 0) clock_hi" + clkName(clock) + "( reset );\n")
       }
@@ -1299,16 +1351,17 @@ class CppBackend extends Backend {
     }
 
     def genDumpMethod(vcd: VcdBackend): Int = {
-      val method = CMethod(CTypedName("void", "dump"), Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("int", "t")))
+      val method = CMethod(CTypedName("void", "dump"),
+        Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
       // Are we actually generating VCD?
       if (Driver.isVCD) {
         // Yes. dump is a real method.
         val codePrefix = List(
-          "  if (t == 0) return dump_init(f);\n",
-          "  fprintf(f, \"#%d\\n\", t << 1);\n") mkString ""
+          "  if (t == 0L) return dump_init(f);\n",
+          "  fprintf(f, \"#%lu\\n\", t << 1);\n") mkString ""
         // Are we generating a large dump method with gotos? (i.e., not inline)
         if (Driver.isVCDinline) {
-          val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f")))
+          val llm = new LineLimitedMethod(method, codePrefix, "", Array[CTypedName](CTypedName("FILE*", "f"), CTypedName("val_t", "t"), CTypedName("dat_t<1>", "reset")))
           vcd.dumpVCD(llm.addString)
           llm.done()
           val nMethods = llm.bodies.length
@@ -1339,11 +1392,11 @@ class CppBackend extends Backend {
       val (inputs, outputs) = c.wires.unzip._2 partition (_.dir == INPUT)
       var id = 0
       Driver.orderedNodes.map {
-        case m: Mem[_] => 
+        case m: Mem[_] =>
           Driver.signalMap(m) = id
           id += m.n
         case node if node.prune || node.driveRand =>
-        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject => 
+        case node if node.chiselName != "" && !node.isTopLevelIO && node.isInObject =>
           Driver.signalMap(node) = id
           id += 1
         case _ =>
@@ -1360,7 +1413,7 @@ class CppBackend extends Backend {
             "    sim_data.signal_map[%s_path+\"[\"+itos(i,false)+\"]\"] = %d+i;\n".format(emitRef(mem), id), "  }\n")
         case (node, id) => List(
           "  sim_data.signals.push_back(new dat_api<%d>(&mod->%s));\n".format(node.needWidth, emitRef(node)),
-          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node))) 
+          "  sim_data.signal_map[\"%s\"] = %d;\n".format(node.chiselName, Driver.signalMap(node)))
       } mkString "")
       llm addString (Driver.clocks map { clk =>
         "  sim_data.clk_map[\"%s\"] = new clk_api(&mod->%s);\n".format(clk.name, clk.name)
@@ -1599,7 +1652,7 @@ class CppBackend extends Backend {
             }
             writeCppFile(clock_xhi.tail)
           }
-          
+
           // Put the accumulated method definitions where the header
           // generation code can find them.
           for( method <- accumulatedClockLos.separateMethods ++ accumulatedClockHiIs.separateMethods ++ accumulatedClockHiXs.separateMethods) {
@@ -1675,7 +1728,7 @@ class CppBackend extends Backend {
         val trimLength = ".cpp".length()
         onceOnlyFiles += out_cpps.last.name.dropRight(trimLength)
       }
-      genInitSimDataMethod(c) 
+      genInitSimDataMethod(c)
     } else {
       0
     }

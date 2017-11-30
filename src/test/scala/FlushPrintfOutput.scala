@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014, 2015 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -61,7 +61,7 @@ class FlushPrintfOutput extends TestSuite {
     counter := counter + UInt(1)
     printf(counterString, counter);
   }
-  
+
   class FloPrintfModule extends BasePrintfModule {
     val isFloat = true
     val counterString = "counter = %e\n"
@@ -76,19 +76,9 @@ class FlushPrintfOutput extends TestSuite {
     def tests(m: BasePrintfModule) {
       for (i <- 0 until 4) {
         step(1)
-        if (m.isFloat) {
-          expectedOutputs += m.counterString.format(i.toFloat)
-        } else {
-          expectedOutputs += m.counterString.format(i)
-        }
-      }
-      // Wait for any delayed output to accumulate
-      Thread.sleep(200)
-      val outputs = printfs
-      assertResult(true, "incorrect number of outputs - %s".format(outputs)) {
-        outputs.length == expectedOutputs.length
-      }
-      (outputs zip expectedOutputs) foreach {case (output, expected) =>
+        Thread.sleep(10)
+        val output = printfs.last
+        val expected = m.counterString.format(if (m.isFloat) i.toFloat else i)
         assertResult(true, "incorrect output - %s".format(output)) {
           eliminateWhiteSpace(output) == eliminateWhiteSpace(expected)
         }
@@ -103,6 +93,9 @@ class FlushPrintfOutput extends TestSuite {
       tests(m)
     }
     launchCppTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
+    if (Driver.isVCSAvailable) {
+      launchVerilogTester((m: UIntPrintfModule) => new FlushPrintfOutputTester(m))
+    }
   }
 
   @Test def testFlushFlotPrintfOutput() {

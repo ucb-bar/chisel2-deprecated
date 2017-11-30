@@ -1,26 +1,4 @@
-ChangeLog for Chisel v2.2.31
+ChangeLog for Chisel v2.2.38
 
-#603 When validateGen() fails in Reg, mention the failing element.
-#595 Improve Tester stability.
-#583 Check for empty _log on tester application exit.
-#581 Avoid Tester hang on bogus peek()/poke().
-#580 Ensure tester mapped memory is marked volatile.
-#573 Flo is not printed with printf.
-#569 Combinational loop detector is broken.
-#556 Module debug for aggregates.
-#535 Add more checkpoints in an attempt to report errors sooner.
-#534 Add optional message to (most of) expect(Bits, ...).
-#531 `Wire(new Bundle { ... })` does not compile.
- Bumped Scala build versions to 2.10.6 and 2.11.7
- Fix comment in QueueIO.
- Fix bad verilog translation of mem and assert (Verilog backend).
- No longer use deprecated -use_vpiobj for vcs compilation (Verilog backend).
- Add cloneType methods for ArbiterIO and QueueIO Bundles.
- Fix Queue object example and add Pipe object example.
- Draw Muxes as diamonds with fixed port connections (Dot backend).
- OnceOnlyFiles are also unoptimizedFiles (compile -O0) (C++ backend).
- Set names for anonymous mems.
- Implement rsha_n correctly (C++ backend).
- Add optional needsHold parameter to Arbiters.
- Fix vcd dump issues in verilog (Verilog backend).
- Reintroduce MuxCase / PriorityMux'ing of bundles.
+Move {as,to}{U,S}Int definitions to Node.scala, and add them as Bundle key words.
+Update deprecated Fill() usage in FillApp.scala.

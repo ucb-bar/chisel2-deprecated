@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -42,7 +42,11 @@ object Fill {
   /** Fan out mod n times */
   def apply(n: Int, mod: UInt): UInt = UInt(NodeFill(n, mod))
   /** Fan out mod n times */
-  def apply(mod: UInt, n: Int): UInt = apply(n, mod)
+  @deprecated("Fill(mod: UInt, n: Int) is deprecated. Please use Fill(n: Int, mode: UInt) instead.", "3.0")
+  def apply(mod: UInt, n: Int): UInt = {
+    ChiselError.check("Chisel3 compatibility: Fill(mod: UInt, n:Int) is deprecated. Please use Fill(n: Int, mod: UInt) instead.", Version("3.0"))
+    apply(n, mod)
+  }
 }
 
 /** NodeFill copys an instance of a Node multiple times or fans it out
@@ -60,11 +64,11 @@ object NodeFill {
           Multiplex(mod, Literal((BigInt(1) << x) - 1, x), Literal(0, x))
         } else {
           /* Build up a Concatenate tree for more ILP in simulation. */
-          val p2 = Array.ofDim[Node](log2Up(x+1))
+          val p2 = Array.ofDim[Node](log2Up(x + 1))
           p2(0) = mod
           for (i <- 1 until p2.length)
-            p2(i) = Concatenate(p2(i-1), p2(i-1))
-          Concatenate((0 until log2Up(x+1)).filter(i => (x & (1 << i)) != 0).map(p2(_)))
+            p2(i) = Concatenate(p2(i-1), p2(i - 1))
+          Concatenate((0 until log2Up(x + 1)).filter(i => (x & (1 << i)) != 0).map(p2(_)))
         }
       case _ => throw new IllegalArgumentException(s"n (=$n) must be nonnegative integer.")
     }

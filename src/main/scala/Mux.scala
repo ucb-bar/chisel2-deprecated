@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -37,7 +37,7 @@ object MuxLookup {
     * @param mapping a sequence to search of keys and values
     * @return the value found or the default if not
     */
-  def apply[S <: UInt, T <: Bits] (key: S, default: T, mapping: Seq[(S, T)]): T = {
+  def apply[S <: UInt, T <: Data] (key: S, default: T, mapping: Seq[(S, T)]): T = {
     var res = default;
     for ((k, v) <- mapping.reverse)
       res = Mux(key === k, v, res);
@@ -66,8 +66,8 @@ object MuxCase {
 object Multiplex {
   /** muliplex between nodes with if (t != 0) c else a */
   def apply (t: Node, c: Node, a: Node): Node = {
-    t.litOpt match { 
-      case Some(tl) => if (tl.value == 0) a else c 
+    t.litOpt match {
+      case Some(tl) => if (tl.value == 0) a else c
       case None if a != null => (c.litOpt, a.litOpt) match {
         case (_, Some(al)) if a.isInstanceOf[Mux] && t._isComplementOf(a.inputs(0)) =>
           Multiplex(t, c, a.inputs(1))
@@ -117,7 +117,7 @@ object Mux {
     // Chisel3 - Check version compatibility (args to Mux must be derived from the same UInt/SInt parent)
     if (Driver.minimumCompatibility > "2") {
       if (tc.isInstanceOf[UInt] != fc.isInstanceOf[UInt]) {
-        ChiselError.warning("Unable to have mixed type mux CON " + tc + " ALT " + fc)
+        ChiselError.check("Chisel3 compatibility: Unable to have mixed type mux CON " + tc + " ALT " + fc, Version("3.0"))
       }
     }
     // TODO: Replace this runtime check with compiletime check using type classes and imports to add special cases

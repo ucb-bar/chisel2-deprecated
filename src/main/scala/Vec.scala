@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -31,6 +31,7 @@
 package Chisel
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
+import scala.util.{Try,Success,Failure}
 
 object VecMux {
   def apply(addr: UInt, elts: Seq[Data]): Data = {
@@ -49,12 +50,23 @@ object VecMux {
 object Vec {
   @deprecated("Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", "2.29")
   def apply[T <: Data](gen: => T, n: Int): Vec[T] = {
+    ChiselError.check("Chisel3 compatibility: Vec(gen: => T, n:Int) is deprecated. Please use Vec(n:Int, gen: => T) instead.", Version("3.0"))
     apply(n, gen)
+  }
+
+  def checkCloneType[T <: Data](element: T): Option[element.type] = {
+    // Clone or complain.
+    Try(element.checkClone(Array("cloneType"))) match {
+      case Success(c) => Some(c.get.asInstanceOf[element.type])
+      case Failure(e) =>
+        ChiselError.check(s"Chisel3 compatibility: " + e, Version("3.0"))
+        None
+    }
   }
 
   /** Returns a new *Vec* from a sequence of *Data* nodes.
     */
-  def apply[T <: Data](elts: Iterable[T]): Vec[T] = {
+  def apply[T <: Data](elts: Seq[T]): Vec[T] = {
     val res =
       if (!elts.isEmpty && elts.forall(_.isLit)) ROM(elts)
       else new Vec[T](i => elts.head.cloneType, elts)
@@ -76,8 +88,19 @@ object Vec {
   /** Returns an array containing values of a given function over
     a range of integer values starting from 0.
     */
-  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] =
-    apply((0 until n).map(i => gen(i)))
+  def tabulate[T <: Data](n: Int)(gen: (Int) => T): Vec[T] = {
+    // If we aren't going to put any elements in the vector,
+    //  ensure the type is cloneable while we know what it is.
+    // Chisel3 - compatibility checks
+    if (Driver.minimumCompatibility > "2" && n == 0) {
+      // We need to treat empty Vec's here since apply can't deal with an empty sequence.
+      checkCloneType(gen(0))
+      // In any case, return an empty Vec.
+      new Vec[T](i => gen(0), Seq[T]())
+    } else {
+      apply((0 until n).map(i => gen(i)))
+    }
+  }
 
   def tabulate[T <: Data](n1: Int, n2: Int)(f: (Int, Int) => T): Vec[Vec[T]] =
     tabulate(n1)(i1 => tabulate(n2)(f(i1, _)))
@@ -85,7 +108,7 @@ object Vec {
   def apply[T <: Data](n: Int, gen: => T): Vec[T] = fill(n)(gen)
 }
 
-class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
+class VecProc(enables: Seq[Bool], elms: Seq[Data]) extends proc {
   override def procAssign(src: Node): Unit = {
     for ((en, elm) <- enables zip elms) when (en) {
       elm.comp match {
@@ -96,10 +119,19 @@ class VecProc(enables: Iterable[Bool], elms: Iterable[Data]) extends proc {
   }
 }
 
-class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate with VecLike[T] with Cloneable {
+class Vec[T <: Data](val gen: (Int) => T, elts: Seq[T]) extends Aggregate with VecLike[T] with Cloneable {
   val self = elts.toVector
-  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg] && Driver.minimumCompatibility > "2") {
-    ChiselError.warning("Vec(Reg) is deprecated. Please use Reg(Vec)")
+  if (self != null && !self.isEmpty && self(0).getNode.isInstanceOf[Reg]) {
+    ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
+  }
+  // Chisel3 - compatibility checks
+  if (Driver.minimumCompatibility > "2") {
+    if (self != null && !self.isEmpty) {
+      if (self(0).getNode.isInstanceOf[Reg]) {
+        ChiselError.check("Chisel3 compatibility: Vec(Reg) is deprecated. Please use Reg(Vec)", Version("3.0"))
+      }
+      Vec.checkCloneType(self(0))
+    }
   }
   val readPorts = new HashMap[UInt, T]
   override def apply(idx: Int): T = self(idx)
@@ -109,8 +141,8 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     // create buckets for each elm in data type
     val buckets = (for (i <- 0 until this(0).flatten.length) yield (new ArrayBuffer[Data])).toArray
     // fill out buckets
-    for (elm <- this ; ((n, io), i) <- elm.flatten.zipWithIndex) buckets(i) += io 
-     
+    for (elm <- this ; ((n, io), i) <- elm.flatten.zipWithIndex) buckets(i) += io
+
     buckets
   }
 
@@ -143,7 +175,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
 
   override def flatten: Array[(String, Bits)] = {
     // Todo: why reverse?
-    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) => 
+    (self.zipWithIndex.reverse foldLeft Array[(String, Bits)]()){(res, x) =>
       val (elm, idx) = x
       res ++ (if (elm.name != "") elm.flatten else elm match {
         case b: Bits => Array((idx.toString, b))
@@ -159,15 +191,15 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
     }
   }
   def <>(src: Vec[T]) { (self zip src) foreach {case (s, o) => s <> o} }
-  def <>(src: Iterable[T]) { (self zip src) foreach {case (s, o) => s <> o} }
+  def <>(src: Seq[T]) { (self zip src) foreach {case (s, o) => s <> o} }
 
-  override protected def colonEquals[T <: Data](that: Iterable[T]): Unit = comp match {
+  override protected def colonEquals[T <: Data](that: Seq[T]): Unit = comp match {
     case Some(p) => p procAssign Vec(that)
-    case None => { 
+    case None => {
       def unidirectional[U <: Data](who: Iterable[(String, Bits)]) =
         who.forall(_._2.dir == who.head._2.dir)
 
-      assert(size == that.size, 
+      assert(size == that.size,
         ChiselError.error("Can't wire together Vecs of mismatched lengths"))
       assert(unidirectional(flatten),
         ChiselError.error("Cannot mix directions on left hand side of :="))
@@ -181,8 +213,8 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Iterable[T]) extends Aggregate w
   override protected def colonEquals(that: Bits): Unit = {
     for (i <- 0 until length) this(i) := that(i)
   }
-  // We need this special := because Iterable[T] is not a Data.
-  def :=[T <: Data](that: Iterable[T]): Unit = colonEquals(that)
+  // We need this special := because Seq[T] is not a Data.
+  def :=[T <: Data](that: Seq[T]): Unit = colonEquals(that)
   override def removeTypeNodes { self foreach (_.removeTypeNodes) }
   override def flip: this.type = { self foreach (_.flip) ; this }
 

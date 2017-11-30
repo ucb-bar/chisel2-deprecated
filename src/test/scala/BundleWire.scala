@@ -16,12 +16,12 @@ class Coord extends Bundle {
     res.asInstanceOf[this.type]
   }
 }
- 
+
  class BundleWireSuite extends TestSuite {
 
  @Test def testBundleWire() {
     println("\ntestBundleWire ...")
-   
+
     class BundleWire extends Module {
       val io = new Bundle {
         val in   = (new Coord).asInput
@@ -33,7 +33,7 @@ class Coord extends Bundle {
         io.outs(i) := coords(i)
       }
     }
-   
+
     trait BundleWireTests extends Tests {
       def tests(c: BundleWire) {
        for (t <- 0 until 4) {
@@ -49,7 +49,7 @@ class Coord extends Bundle {
        }
       }
     }
- 
+
     class BundleWireTester(c: BundleWire) extends Tester(c) with BundleWireTests {
       tests(c)
     }
@@ -83,7 +83,7 @@ class Coord extends Bundle {
         io.outs(i) := coords(i)
       }
     }
- 
+
     class BundleWireTester(c: BundleWire) extends Tester(c) {
       for (t <- 0 until 4) {
         val test_in_x = rnd.nextInt(256)

@@ -1,7 +1,8 @@
-ReleaseNotes for Chisel v2.2.31
+ReleaseNotes for Chisel v2.2.38
 
-This release of Chisel is largely a maintenance release.
-See the associated Changelog for issues resolved with this release.
+This release of Chisel is a maintenance release, incorporating support for Chisel3's {as,to}{U,S}Int methods in all Chisel Data types.
 
-We will be removing support for Scala 2.10 in future Chisel releases. Please verify your code compiles and runs correctly under Scala 2.11.
+We will be removing support for Scala 2.10 in future Chisel
+releases. Please verify your code compiles and runs correctly under
+Scala 2.11.
 

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2011, 2012, 2013, 2014 The Regents of the University of
+ Copyright (c) 2011 - 2016 The Regents of the University of
  California (Regents). All Rights Reserved.  Redistribution and use in
  source and binary forms, with or without modification, are permitted
  provided that the following conditions are met:
@@ -29,9 +29,9 @@
 */
 
 import org.scalatest.junit.JUnitSuite
+import org.scalatest._
 import org.junit.Before
-import java.io.File
-import scala.collection.mutable.ArrayBuffer
+import org.scalatest._
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions
 import Chisel._
@@ -44,41 +44,11 @@ object TestSuite {
   val partitionIslandsArguments = chiselEnvironmentArguments(partitionIslandsParameterName)
 }
 
-abstract class TestSuite extends JUnitSuite {
-
-  val dir = new File("test-outputs")
-  val blankLines_re = """(?m)^\s*$[\r\n]+""".r
+abstract class TestSuite extends JUnitSuite with TestHelpers {
+  // This functionality has been replaced by the static TestHelper object
+  //  and should be elminated.
   @Before def initialize() {
-    dir.mkdir
-    Driver.initChisel(Array[String]())
   }
-
-  def assertFile( filename: String ) {
-    val useNewCompare = true
-    val url = getClass.getResource(filename)
-    // Did we find the resource?
-    if (url == null) {
-      println("assertFile: \"%s\" not found".format(filename))
-      // Make sure we don't inadvertently pass this test.
-      assertResult(filename) { "" }
-      return
-    }
-    val reffile = scala.io.Source.fromURL(url)
-    val refText = blankLines_re.replaceAllIn(reffile.mkString, "")
-    reffile.close()
-    val testfile = scala.io.Source.fromFile(
-      dir.getPath + "/" + filename, "utf-8")
-    val testText = blankLines_re.replaceAllIn(testfile.mkString, "")
-    testfile.close()
-    if (useNewCompare) {
-      val comparator = new TextComparator()
-      val testTextWithSubstitutions = comparator.substituteTextIfPossible(refText, testText)
-      assertResult(refText) { testTextWithSubstitutions }
-    } else {
-      assertResult(refText) { testText }
-    }
-  }
-
 
   def launchTester[M <: Module : ClassTag, T <: Tester[M]](b: String, t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) {
     val ctor = implicitly[ClassTag[M]].runtimeClass.getConstructors.head
@@ -104,26 +74,4 @@ abstract class TestSuite extends JUnitSuite {
   }
   def launchCppTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) = launchTester("c", t, fArg)
   def launchVerilogTester[M <: Module : ClassTag, T <: Tester[M]](t: M => T, fArg: Option[(Array[String]) => Array[String]] = None) = launchTester("v", t, fArg)
-
-
-  class BoolIO extends Bundle {
-    val in  = Bool(INPUT)
-    val out = Bool(OUTPUT)
-  }
-
-  class UIntIO extends Bundle {
-    val in  = UInt(INPUT, 4)
-    val out = UInt(OUTPUT, 4)
-  }
-
-  class DecoupledUIntIO extends Bundle {
-    val in = Decoupled(UInt(width = 4)).flip
-    val out = Decoupled(UInt(width = 4))
-  }
-
-  class EnableIO extends Bundle {
-    val en  = Bool(INPUT)
-    val in  = UInt(INPUT, 4)
-    val out = UInt(OUTPUT, 4)
-  }
 }
