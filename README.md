@@ -1,3 +1,8 @@
+#### NOTE: This README.md describes (and associated repository contains) version 2.x of Chisel, and while we continue to support this version of Chisel, we encourage people to migrate to the new version: [Chisel3](https://github.com/ucb-bar/chisel3)
+
+We've removed the Getting Started section of this document.
+If you're just getting started, you should be using Chisel3.
+
 About Chisel
 ============
 
@@ -13,18 +18,10 @@ types, and type inference.
 Visit the [community website](http://chisel.eecs.berkeley.edu/) for more
 information.
 
-**NOTE**: This README.md describes (and associated repository contains)
-version 2.x of Chisel, and while we continue to support this version of
-Chisel, we encourage people to migrate to the new version:
-[Chisel3](https://github.com/ucb-bar/chisel3)
-
-We've removed the Getting Started section of this document.
-If you're just getting started, you should be using Chisel3.
-
 Documentation
 -------------
 
-Documentation has been moved to a separate [repo](https://github.com/ucb-bar/chisel-doc).
+Documentation has been moved to a separate [repository](https://github.com/ucb-bar/chisel-doc).
 
 
 Chisel3
