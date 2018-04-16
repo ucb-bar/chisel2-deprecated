@@ -564,4 +564,6 @@ object Driver extends FileSystemUtilities{
   lazy val isVCSAvailable = isCommandAvailable("vcs")
   // Print Chisel version when driver object is constructed, hopefully, just once.
   println(chiselVersionString)
+  // Indicate this version of Chisel is deprecated and advise moving to chisel3.
+  System.err.println("Chisel2 is deprecated. Please use Chisel3: https://github.com/freechipsproject/chisel3")
 }
