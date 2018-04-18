@@ -60,6 +60,7 @@ object TesterDriver {
         c.step(1)
         c.finish
       }
+      Driver.done
       true
     } catch {
       case e: Throwable =>

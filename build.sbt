@@ -2,11 +2,11 @@ def versionToArray(v: String): Array[String] = v.split('.')
 
 lazy val chiselBuildSettings = Seq (
     organization := "edu.berkeley.cs",
-    // version := "2.2.38",
-    version := "2.2.38",
+    // version := "2.2.39",
+    version := "2.2.39",
     name := "Chisel",
-    scalaVersion := "2.11.7",
-    crossScalaVersions := Seq("2.10.6", "2.11.7"),
+    scalaVersion := "2.11.11",
+    crossScalaVersions := Seq("2.10.6", "2.11.11"),
     //sourceDirectory := new File("@srcTop@"),
     publishMavenStyle := true,
     publishArtifact in Test := false,
