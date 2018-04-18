@@ -36,6 +36,13 @@ import sys.process.{BasicIO,stringSeqToProcess}
 import BuildInfo._
 
 object Driver extends FileSystemUtilities{
+  // Indicate this version of Chisel is deprecated and advise moving to chisel3.
+  val deprecatedWarning = new ChiselError(() => "Chisel2 is deprecated. Please use Chisel3: https://github.com/freechipsproject/chisel3", null, ChiselError.warningLevel)
+
+  def done: Unit = {
+    deprecatedWarning.print()
+  }
+
   def apply[T <: Module](args: Array[String], gen: () => T, wrapped:Boolean): T = {
     initChisel(args)
     try {
@@ -46,6 +53,7 @@ object Driver extends FileSystemUtilities{
         println("Re-running Chisel in debug mode to obtain erroneous line numbers...")
         apply(args :+ "--lineNumbers", gen, wrapped)
       }
+      done
     }
   }
 
@@ -69,6 +77,7 @@ object Driver extends FileSystemUtilities{
       } finally {
         Tester.close
       }
+      done
     }
     mod
   }
