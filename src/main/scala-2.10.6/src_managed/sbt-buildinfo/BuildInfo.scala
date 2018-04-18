@@ -6,16 +6,16 @@ import scala.Predef._
 case object BuildInfo {
   /** The value is "Chisel". */
   val buildInfoPackage: String = "Chisel"
-  /** The value is "2.2.38". */
-  val version: String = "2.2.38"
+  /** The value is "2.2.39". */
+  val version: String = "2.2.39"
   /** The value is "2.10.6". */
   val scalaVersion: String = "2.10.6"
-  /** The value is "0.13.11". */
-  val sbtVersion: String = "0.13.11"
-  /** The value is "2017-04-24 18:44:57.905". */
-  val builtAtString: String = "2017-04-24 18:44:57.905"
-  /** The value is 1493059497905L. */
-  val builtAtMillis: scala.Long = 1493059497905L
+  /** The value is "0.13.16". */
+  val sbtVersion: String = "0.13.16"
+  /** The value is "2018-04-18 17:10:54.007". */
+  val builtAtString: String = "2018-04-18 17:10:54.007"
+  /** The value is 1524071454007L. */
+  val builtAtMillis: scala.Long = 1524071454007L
   override val toString: String = {
     "buildInfoPackage: %s, version: %s, scalaVersion: %s, sbtVersion: %s, builtAtString: %s, builtAtMillis: %s" format (
       buildInfoPackage, version, scalaVersion, sbtVersion, builtAtString, builtAtMillis
