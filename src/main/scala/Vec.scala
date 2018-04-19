@@ -239,7 +239,7 @@ class Vec[T <: Data](val gen: (Int) => T, elts: Seq[T]) extends Aggregate with V
     }
   }
 
-  override def cloneType: this.type = Vec.tabulate(size)(gen).asInstanceOf[this.type] //Vec(this: Seq[T]).asInstanceOf[this.type]
+  override def cloneType: this.type = Vec(elts.map(_.cloneType)).asInstanceOf[this.type]
   override def asDirectionless: this.type = { self.foreach(_.asDirectionless) ; this }
   override def asOutput: this.type = { self.foreach(_.asOutput) ; this }
   override def asInput: this.type = { self.foreach(_.asInput) ; this }
