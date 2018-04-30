@@ -882,3 +882,47 @@ object DelayBetween {
     nodeShortestPathSearch(List(b), a)
   }
 }
+
+/** @param data The data type for the payload
+  *
+  * The DCInput module provides timing closure on the INPUT
+  * side of a module by registering the "ready" signal coming
+  * out of a larger design block.  This is consistent with a
+  * registered-output design methodology.
+  */
+class DCInput[T <: Bits](data: T)  extends Module {
+  val io = new Bundle {
+    val c = new DecoupledIO(data).flip
+    val p = new DecoupledIO(data)
+  }
+  val nxt_occupied = Bool()
+  val occupied = Reg(next = nxt_occupied, init = Bool(false))
+  val nxt_hold = UInt()
+  val hold = Reg(next = nxt_hold)
+  val drain = occupied & io.p.ready
+  val load = io.c.valid & io.c.ready & (!io.p.ready | drain)
+  val nxt_c_drdy = (!occupied & !load) | (drain & !load)
+  val c_drdy = Reg(next = nxt_c_drdy, init = Bool(false))
+
+  when (occupied)
+    { io.p.bits := hold }
+  .otherwise
+    { io.p.bits := io.c.bits }
+  io.p.valid := (io.c.valid & io.c.ready) | occupied
+  nxt_hold := hold
+  when (load) {
+    nxt_hold := io.c.bits
+    nxt_occupied := Bool(true)
+  }.elsewhen (drain) {
+    nxt_occupied := Bool(false)
+  }.otherwise {
+    nxt_occupied := occupied
+  }
+  io.c.ready := c_drdy
+}
+
+/** @param data The data type for the payload
+  *
+  * Syntactic sugar for a single-entry queue which registers valid and bits.
+  */
+class DCOutput[T <: Data](data: T) extends Queue(data, 1, true, false)
