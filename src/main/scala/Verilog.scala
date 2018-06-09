@@ -80,10 +80,8 @@ class VerilogBackend extends Backend {
   override def emitRef(node: Node): String = {
     node match {
       case x: Literal => emitLit(x.value, x.needWidth())
-      case _: Reg =>
-        if (node.name != "") node.name else "R" + node.emitIndex
       case _ =>
-        if (node.name != "") node.name else "T" + node.emitIndex
+          super.emitRef(node)
     }
   }
 

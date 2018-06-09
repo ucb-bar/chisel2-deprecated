@@ -204,6 +204,8 @@ class Backend extends FileSystemUtilities{
       comp dfs {
         case reg: Reg if reg.name.isEmpty =>
           reg setName "R" + reg.component.nextIndex
+        case clk: Clock if clk.name == "" =>
+          clk setName "C" + clk.component.nextIndex
         case mem: Mem[_] if mem.name.isEmpty =>
           mem setName "T" + mem.component.nextIndex
         case node: Node if !node.isTypeNode && node.name.isEmpty && node.compOpt != None =>
@@ -221,6 +223,8 @@ class Backend extends FileSystemUtilities{
       comp dfs {
         case reg: Reg =>
           reg setName namespace.getUniqueName(reg.name)
+        case clk: Clock =>
+          clk setName namespace.getUniqueName(clk.name)
         case mem: Mem[_] =>
           mem setName namespace.getUniqueName(mem.name)
         case node: Node if !node.isTypeNode && !node.isLit && !node.isIo => {
@@ -266,6 +270,8 @@ class Backend extends FileSystemUtilities{
         node.name
       case _: Reg =>
         if (node.named) node.name else "R" + node.emitIndex
+      case _: Clock =>
+        if (node.named) node.name else "C" + node.emitIndex
       case _ =>
         if (node.named) node.name else "T" + node.emitIndex
     }
