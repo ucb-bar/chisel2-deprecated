@@ -1,0 +1,109 @@
+From 747f26151cb26ec40e6aa07529584b99c32bc1bd Mon Sep 17 00:00:00 2001
+From: Carlos Alberto Petry <carlos.petry@ic.unicamp.br>
+Date: Sat, 29 Aug 2015 20:07:40 -0300
+Subject: [PATCH 2/7] Updated Sysc.scala, not funcional yet. Fix Chisel version
+ in Makefile.
+
+---
+ Makefile                            |  2 +-
+ src/main/resources/template_cpp.txt |  6 +++---
+ src/main/resources/template_h.txt   |  1 -
+ src/main/scala/SysC.scala           | 30 ++++++++++++++++++++----------
+ 4 files changed, 24 insertions(+), 15 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 6e8f99a..5418b1b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -9,7 +9,7 @@ CLEAN_DIRS	:= doc
+ SRC_DIR	?= .
+ #SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
+ SYSCTESTS ?= $(addsuffix .sysctest,$(notdir $(basename $(wildcard $(SRC_DIR)/src/test/scala/SysCTest/*.scala))))
+-CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
++CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.11/chisel_2.11-2.3-SNAPSHOT.jar
+ TEST_OUTPUT_DIR ?= ./test-outputs
+ 
+ .PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test
+diff --git a/src/main/resources/template_cpp.txt b/src/main/resources/template_cpp.txt
+index 1996287..948ef66 100644
+--- a/src/main/resources/template_cpp.txt
++++ b/src/main/resources/template_cpp.txt
+@@ -4,7 +4,7 @@ void {!name!}::input_thread(void){
+   while(true){
+ //    wait(data_written_event);
+     {!input_thread!}
+-    {!set_valid_ready!}
++//    {!set_valid_ready!}
+     //Clock Lo
+     c->clock_lo(reset);
+     wait(Step);
+@@ -15,9 +15,9 @@ void {!name!}::input_thread(void){
+ void {!name!}::output_thread(void){
+ //  data_written_event.notify(SC_ZERO_TIME);
+   while(true){
+-    wait(data_read_event);
++//    wait(data_read_event);
+     {!output_thread!}
+-    {!reset_valid_ready!}
++//    {!reset_valid_ready!}
+     //Clock Hi
+     c->clock_hi(reset);
+     wait(Step);
+diff --git a/src/main/resources/template_h.txt b/src/main/resources/template_h.txt
+index f1f4644..257cd96 100644
+--- a/src/main/resources/template_h.txt
++++ b/src/main/resources/template_h.txt
+@@ -34,7 +34,6 @@ SC_MODULE({!name!}){
+ 
+     // Clock Initialization? Don't understand what this is for. Copied from emulator.
+     for(int i = 0; i < 5; i++) {
+-      dat_t<1> reset = LIT<1>(1);
+       c->clock_lo(reset);
+       c->clock_hi(reset);
+     }
+diff --git a/src/main/scala/SysC.scala b/src/main/scala/SysC.scala
+index 73c17e1..84534c2 100644
+--- a/src/main/scala/SysC.scala
++++ b/src/main/scala/SysC.scala
+@@ -55,18 +55,28 @@ class SysCBackend extends CppBackend {
+             case aggregate: Aggregate => {
+               // Collect all the inputs and outputs.
+               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+-              if (inputs.length > 0) {
+-                val aName = "dat_t<" + aggregate.width + ">"		//"cs_" + aggregate.name + "_i"
+-                //cdef.structs(aName)= new CStruct(aName, inputs)
+-                val entry = new CEntry(name, true, aName, aggregate.width, aggregate.name, delt.ready.name, delt.valid.name)
+-                cdef.entries += (entry)
+-              }
++             // if (inputs.length > 0) {
++				val l = inputs.length
++				for (i <- 1 to l) {
++				  //val aName = "cs_" + aggregate.name + "_i"
++				  val cmpnt = aggregate.flatten.map(_._2)
++				  val vtype = "dat_t<" + 1 + ">" 
++                  //cdef.structs(aName)= new CStruct(aName, inputs)
++                  //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
++                  val entry = new CEntry(name, true, vtype, 1, aggregate.name, "ready", "valid")
++                  cdef.entries += (entry)
++				}
++              //}
+               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+               if (outputs.length > 0) {
+-                val aName = "dat_t<" + aggregate.width + ">"		//"cs_" + aggregate.name + "_o"
+-                //cdef.structs(aName) = new CStruct(aName, outputs)
+-                val entry = new CEntry(name, false, aName, aggregate.width, aggregate.name, delt.ready.name, delt.valid.name)
+-                cdef.entries += (entry)
++				for (t <- 0 until outputs.length) {
++                  //val aName = "cs_" + aggregate.name + "_o"
++				  val vtype = "dat_t<" + 1 + ">" 
++                  //cdef.structs(aName) = new CStruct(aName, outputs)
++                  //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
++                  val entry = new CEntry(name, false, vtype, 1, aggregate.name, "ready", "valid")
++                  cdef.entries += (entry)
++				}
+               }
+             }
+             case _ => badElements(name) = elt
+-- 
+2.1.0
+

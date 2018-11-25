@@ -1,0 +1,52 @@
+#ifndef __{!name!}__
+#define __{!name!}__
+
+#include <systemc.h>
+#include "{!header_file!}"
+
+// ========================================
+// dat_t needs to have this operator defined, so that
+// I'm allowed to use it with System C.
+// But be warned: I don't quite know what I
+// am doing.
+// ========================================
+template <int w>
+inline ostream& operator << (ostream& os, const dat_t<w>& arg){
+  return os;
+}
+
+SC_MODULE({!name!}){
+  {!component_type!}* c;
+
+  // in ports
+  {!input_ports!}
+  // out ports
+  {!output_ports!}
+  SC_HAS_PROCESS({!name!});
+  {!name!}(sc_module_name a_name, sc_time _step)
+  : sc_module(a_name), Step(_step)
+  {!sctor_list!}
+  {
+    // Initialize Component, Clock in RESET
+    c = new {!component_type!}();
+    c->init();
+    Step = Step;
+
+    // Clock Initialization? Don't understand what this is for. Copied from emulator.
+    for(int i = 0; i < 5; i++) {
+      c->clock_lo(reset);
+      c->clock_hi(reset);
+    }
+
+    //Register Thread
+    SC_THREAD(component_thread);
+  }
+
+  void component_thread(void);
+
+  dat_t<1> reset = LIT<1>(0);
+  dat_t<1> set = LIT<1>(1);
+  sc_time Step;
+};
+
+#endif  //__{!name!}__

@@ -9,7 +9,7 @@ CLEAN_DIRS	:=
 SRC_DIR	?= .
 #SYSTEMC ?= $(SRC_DIR)/../../systemc/systemc-2.3.1
 SYSCTESTS ?= $(addsuffix .sysctest,$(notdir $(basename $(wildcard $(SRC_DIR)/src/test/scala/SysCTest/*.scala))))
-CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.10/chisel_2.10-2.3-SNAPSHOT.jar
+CHISEL_JAR ?= $(SRC_DIR)/target/scala-2.11/chisel_2.11-2.3-SNAPSHOT.jar
 TEST_OUTPUT_DIR ?= ./test-outputs
 
 .PHONY:	smoke publish-local check clean jenkins-build sysctest coverage scaladoc test compile style

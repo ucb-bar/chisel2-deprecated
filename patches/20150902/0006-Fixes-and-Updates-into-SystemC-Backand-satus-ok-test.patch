@@ -1,0 +1,249 @@
+From be49342cf2945d343e70abfcae6f50e6a535ade2 Mon Sep 17 00:00:00 2001
+From: Carlos Alberto Petry <carlos.petry@ic.unicamp.br>
+Date: Tue, 1 Sep 2015 15:49:53 -0300
+Subject: [PATCH 6/7] Fixes and Updates into SystemC Backand: satus ok, tested
+ with AllTypes + FullAdder{Decoupled}.
+
+---
+ src/main/resources/template_cpp.txt |  5 ---
+ src/main/resources/template_h.txt   |  3 --
+ src/main/scala/SCWrapper.scala      | 51 +++++++++++++-------------
+ src/main/scala/SysC.scala           | 71 +++++++++++++++++++++++++++----------
+ 4 files changed, 79 insertions(+), 51 deletions(-)
+
+diff --git a/src/main/resources/template_cpp.txt b/src/main/resources/template_cpp.txt
+index 359adff..13f6076 100644
+--- a/src/main/resources/template_cpp.txt
++++ b/src/main/resources/template_cpp.txt
+@@ -2,24 +2,19 @@
+ 
+ void {!name!}::input_thread(void){
+   while(true){
+-//    wait(data_written_event);
+     {!input_thread!}
+     //Clock Lo
+     c->clock_lo(reset);
+     wait(Step);
+-//    data_read_event.notify(SC_ZERO_TIME);
+   }
+ }
+ 
+ void {!name!}::output_thread(void){
+-//  data_written_event.notify(SC_ZERO_TIME);
+   while(true){
+-//    wait(data_read_event);
+     {!output_thread!}
+     //Clock Hi
+     c->clock_hi(reset);
+     wait(Step);
+-//    data_written_event.notify(SC_ZERO_TIME);
+   }
+ }
+ 
+diff --git a/src/main/resources/template_h.txt b/src/main/resources/template_h.txt
+index 257cd96..020ac13 100644
+--- a/src/main/resources/template_h.txt
++++ b/src/main/resources/template_h.txt
+@@ -40,15 +40,12 @@ SC_MODULE({!name!}){
+ 
+     //Register Thread
+     SC_THREAD(input_thread);
+-//    {!sensitive_list!}
+     SC_THREAD(output_thread);
+   }
+ 
+   void input_thread(void);
+   void output_thread(void);
+ 
+-//  sc_event data_read_event;
+-//  sc_event data_written_event;
+   dat_t<1> reset = LIT<1>(0);
+   dat_t<1> set = LIT<1>(1);
+   sc_time Step;
+diff --git a/src/main/scala/SCWrapper.scala b/src/main/scala/SCWrapper.scala
+index 104885a..e5d2993 100644
+--- a/src/main/scala/SCWrapper.scala
++++ b/src/main/scala/SCWrapper.scala
+@@ -54,15 +54,15 @@ object SCWrapper {
+ 
+   def example_component_def(): ComponentDef = {
+     val cdef = new ComponentDef("GCD_t", "GCD")
+-    cdef.entries += new CEntry("a", true, "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
+-    cdef.entries += new CEntry("z", false, "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
++    cdef.entries += new CEntry("a", true, "dat_t<1>", "dat_t<1>", 1, "GCD__io_a", "GCD__io_r1", "GCD__io_v1")
++    cdef.entries += new CEntry("z", false, "dat_t<1>", "dat_t<1>", 1, "GCD__io_z", "GCD__io_rz", "GCD__io_vz")
+     cdef
+   }
+ 
+   def example_component_def2(): ComponentDef = {
+     val cdef = new ComponentDef("AddFilter_t", "AddFilter")
+-    cdef.entries += new CEntry("a", true, "dat_t<16>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
+-    cdef.entries += new CEntry("b", false, "dat_t<16>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
++    cdef.entries += new CEntry("a", true, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_a", "AddFilter__io_ar", "AddFilter__io_av")
++    cdef.entries += new CEntry("b", false, "dat_t<16>", "dat_t<1>", 16, "AddFilter__io_b", "AddFilter__io_br", "AddFilter__io_bv")
+     cdef
+   }
+ 
+@@ -115,10 +115,10 @@ object SCWrapper {
+       var output_thread = ""
+ 
+       for( e <- c.entries) {
+-        val decl_in  = "sc_in<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
+-        val decl_out = "sc_out<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
+-        val thread_in = "c->%s = LIT<%s>(%s->read().to_uint64());\n    ".format(e.data, e.cwidth, e.data)
+-        val thread_out = "%s->write(c->%s.to_ulong());\n    ".format(e.data, e.data)
++        val decl_in  = "sc_in<%s > %s;\n  ".format(e.ctype, e.data)
++        val decl_out = "sc_out<%s > %s;\n  ".format(e.ctype, e.data)
++        val thread_in = "c->%s = LIT<%s>(%s->read()%s);\n    ".format(e.data, e.cwidth, e.data, e.ccast)
++        val thread_out = "%s->write(c->%s%s);\n    ".format(e.data, e.data, e.ccast)
+         //val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
+         if(e.is_input) {
+           input_ports += decl_in
+@@ -339,24 +339,25 @@ object SCWrapper {
+   }
+ }
+ 
+-class CEntry(a_name: String, input: Boolean, a_type: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
+-   val name = a_name
+-   val is_input = input
+-   val ctype = a_type
+-   val cwidth = a_width
+-   val data = a_data
+-   val ready = a_ready
+-   val valid = a_valid
++class CEntry(a_name: String, input: Boolean, a_type: String, a_cast: String, a_width: Int, a_data: String, a_ready: String, a_valid: String) {
++  val name = a_name
++  val is_input = input
++  val ctype = a_type
++  val ccast = a_cast
++  val cwidth = a_width
++  val data = a_data
++  val ready = a_ready
++  val valid = a_valid
+ 
+-   override def toString(): String = {
+-     name + " " +
+-     is_input + " " +
+-     ctype + " " +
+-     cwidth + " " +
+-     data + " " +
+-     ready + " " +
+-     valid
+-   }
++  override def toString(): String = {
++    name + " " +
++    is_input + " " +
++    ctype + " " +
++    cwidth + " " +
++    data + " " +
++    ready + " " +
++    valid
++  }
+ }
+ 
+ class ComponentDef(a_type: String, a_name: String) {
+diff --git a/src/main/scala/SysC.scala b/src/main/scala/SysC.scala
+index 17b8301..ce94c1a 100644
+--- a/src/main/scala/SysC.scala
++++ b/src/main/scala/SysC.scala
+@@ -48,8 +48,11 @@ class SysCBackend extends CppBackend {
+           delt.bits match {
+             case bits: Bits => {
+               val is_input = bits.dir == INPUT
+-              val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
+-              val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, delt.ready.name, delt.valid.name)
++              val vtype = "sc_uint<" + bits.width + ">"; var tcast = ""
++			  if (is_input) { tcast = ".to_uint64()" }
++			  else { tcast = ".to_ulong()" }
++			  val vcast = tcast
++              val entry = new CEntry(name, is_input, vtype, vcast, bits.width, bits.name, delt.ready.name, delt.valid.name)
+               cdef.entries += (entry)
+ 			  cdef.valid_ready = true
+             }
+@@ -57,35 +60,67 @@ class SysCBackend extends CppBackend {
+               // Collect all the inputs and outputs.
+               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+               if (inputs.length > 0) {
+-			    for (in <- inputs) { 
+-				  val vtype = "dat_t<" + in._2.width + ">" 
+-                  val entry = new CEntry(name, true, vtype, in._2.width, in._2.name, "ready", "valid")
++			    for (in <- inputs) {
++				  var ttype = ""; var tcast = ""
++				   in._2 match {
++					case inUBool: Bool => ttype = "bool"; tcast = ""
++					case inSInt: SInt => ttype = "sc_int<" + in._2.width + ">";  tcast = ".to_uint64()"
++					//Bits is implemented as UInt
++					case inUInt: UInt => ttype = "sc_uint<" + in._2.width + ">"; tcast = ".to_uint64()"
++				  }
++				  val vtype = ttype; val vcast = tcast
++                  val entry = new CEntry(name, true, vtype, vcast, in._2.width, in._2.name, "ready", "valid")
+                   cdef.entries += (entry)
+ 				}
+-				//val aName = "cs_" + aggregate.name + "_i"
+-                //cdef.structs(aName)= new CStruct(aName, inputs)
+-                //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+               }
+               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+               if (outputs.length > 0) {
+-			    for (out <- outputs) { 
+-				  val vtype = "dat_t<" + out._2.width + ">" 
+-                  val entry = new CEntry(name, false, vtype, out._2.width, out._2.name, "ready", "valid")
++			    for (out <- outputs) {
++				  var ttype = ""; var tcast = ""
++				   out._2 match {
++					case outUBool: Bool => ttype = "bool"; tcast = ".to_ulong()"
++					case outSInt: SInt => ttype = "sc_int<" + out._2.width + ">";  tcast = ".to_ulong()"
++					//Bits is implemented as UInt
++					case outUInt: UInt => ttype = "sc_uint<" + out._2.width + ">"; tcast = ".to_ulong()"
++				  }
++				  val vtype = ttype; val vcast = tcast
++                  val entry = new CEntry(name, false, vtype, vcast, out._2.width, out._2.name, "ready", "valid")
+                   cdef.entries += (entry)
+ 				}
+-                //val aName = "cs_" + aggregate.name + "_o"
+-                //cdef.structs(aName) = new CStruct(aName, outputs)
+-                //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+               }
+ 			  cdef.valid_ready = true
+             }
+             case _ => badElements(name) = elt
+           }
+         }
+-        case bits: Bits => {
+-          val is_input = bits.dir == INPUT
+-          val vtype = "dat_t<" + bits.width + ">" // direct use of width here?
+-          val entry = new CEntry(name, is_input, vtype, bits.width, bits.name, "ready", "valid")
++        case bool: Bool => {
++          val is_input = bool.dir == INPUT
++          val vtype = "bool"; var tcast = ""
++		  if (is_input) { tcast = "" }
++		  else { tcast = ".to_ulong()" }
++		  val vcast = tcast
++          val entry = new CEntry(name, is_input, vtype, vcast, bool.width, bool.name, "ready", "valid")
++          cdef.entries += (entry)
++		  cdef.valid_ready = false
++        }
++        case sint: SInt => {
++          val is_input = sint.dir == INPUT
++          val vtype = "sc_int<" + sint.width + ">"; var tcast = ""
++		  if (is_input) { tcast = ".to_uint64()" }
++		  else { tcast = ".to_ulong()" }
++		  val vcast = tcast
++          val entry = new CEntry(name, is_input, vtype, vcast, sint.width, sint.name, "ready", "valid")
++          cdef.entries += (entry)
++		  cdef.valid_ready = false
++        }
++		//Bits is implemented as UInt
++        case uint: UInt => {
++          val is_input = uint.dir == INPUT
++          val vtype = "sc_uint<" + uint.width + ">"; var tcast = ""
++		  if (is_input) { tcast = ".to_uint64()" }
++		  else { tcast = ".to_ulong()" }
++		  val vcast = tcast
++          val entry = new CEntry(name, is_input, vtype, vcast, uint.width, uint.name, "ready", "valid")
+           cdef.entries += (entry)
+ 		  cdef.valid_ready = false
+         }
+-- 
+2.1.0
+

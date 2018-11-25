@@ -1,0 +1,125 @@
+From 34d69817deaaf22f712d0b34425ecae172b686cb Mon Sep 17 00:00:00 2001
+From: Carlos Alberto Petry <carlos.petry@ic.unicamp.br>
+Date: Sun, 30 Aug 2015 21:33:11 -0300
+Subject: [PATCH 3/7] SystemC backend running ok for Decoupled protocol (needs
+ to be teted with Sodor).
+
+---
+ src/main/resources/template_cpp.txt |  2 --
+ src/main/scala/SCWrapper.scala      | 22 ++++++++++++++++------
+ src/main/scala/SysC.scala           | 30 ++++++++++++++----------------
+ 3 files changed, 30 insertions(+), 24 deletions(-)
+
+diff --git a/src/main/resources/template_cpp.txt b/src/main/resources/template_cpp.txt
+index 948ef66..359adff 100644
+--- a/src/main/resources/template_cpp.txt
++++ b/src/main/resources/template_cpp.txt
+@@ -4,7 +4,6 @@ void {!name!}::input_thread(void){
+   while(true){
+ //    wait(data_written_event);
+     {!input_thread!}
+-//    {!set_valid_ready!}
+     //Clock Lo
+     c->clock_lo(reset);
+     wait(Step);
+@@ -17,7 +16,6 @@ void {!name!}::output_thread(void){
+   while(true){
+ //    wait(data_read_event);
+     {!output_thread!}
+-//    {!reset_valid_ready!}
+     //Clock Hi
+     c->clock_hi(reset);
+     wait(Step);
+diff --git a/src/main/scala/SCWrapper.scala b/src/main/scala/SCWrapper.scala
+index 2d58441..7a9d814 100644
+--- a/src/main/scala/SCWrapper.scala
++++ b/src/main/scala/SCWrapper.scala
+@@ -115,22 +115,32 @@ object SCWrapper {
+       var output_thread = ""
+ 
+       for( e <- c.entries) {
+-        val decl_in  = "sc_in<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
+-        val decl_out = "sc_out<sc_uint<%s> > %s__io_%s;\n  ".format(e.cwidth, c.name, e.name)
+-        val thread_in = "c->%s__io_%s = LIT<%s>(%s__io_%s->read());\n    ".format(c.name, e.name, e.cwidth, c.name, e.name)
+-        val thread_out = "%s__io_%s->write(c->%s__io_%s.to_ulong());\n    ".format(c.name, e.name, c.name, e.name)
++        val decl_in  = "sc_in<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
++        val decl_out = "sc_out<sc_bv<%s> > %s;\n  ".format(e.cwidth, e.data)
++        val thread_in = "c->%s = LIT<%s>(%s->read().to_uint64());\n    ".format(e.data, e.cwidth, e.data)
++        val thread_out = "%s->write(c->%s.to_ulong());\n    ".format(e.data, e.data)
+         //val decl = "sc_fifo<%s >* %s;\n  ".format(e.ctype, e.name)
+         if(e.is_input) {
+           input_ports += decl_in
+-          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
++          sctor_list += ", %s(\"%s\")\n  ".format(e.data, e.data)
+           //sensitive_list += " << %s__io_%s".format(c.name, e.name)
+           input_thread += thread_in
+         } else {
+           output_ports += decl_out
+-          sctor_list += ", %s__io_%s(\"%s\")".format(c.name, e.name, e.name)
++          sctor_list += ", %s(\"%s\")\n  ".format(e.data, e.data)
+           output_thread += thread_out
+         }
+       }
++	  output_ports += "sc_out<sc_bv<1> > %s__io_in_ready;\n  ".format(c.name)
++	  output_ports += "sc_out<sc_bv<1> > %s__io_out_valid;\n  ".format(c.name)
++	  sctor_list += ", %s__io_in_ready(\"%s__io_in_ready\")\n  ".format(c.name, c.name)
++	  sctor_list += ", %s__io_out_valid(\"%s__io_out_valid\")".format(c.name, c.name)
++	  input_thread += "c->%s__io_in_valid = set;\n    ".format(c.name)
++	  input_thread += "c->%s__io_out_ready = set;\n    ".format(c.name)
++	  output_thread += "%s__io_out_valid->write(c->%s__io_out_valid.to_ulong());\n    ".format(c.name, c.name)
++	  output_thread += "%s__io_in_ready->write(c->%s__io_in_ready.to_ulong());\n    ".format(c.name, c.name)
++	  output_thread += "c->%s__io_in_valid = reset;\n    ".format(c.name)
++	  output_thread += "c->%s__io_out_ready = reset;".format(c.name)
+       replacements += (("input_ports", input_ports))
+       replacements += (("output_ports", output_ports))
+       replacements += (("sctor_list", sctor_list))
+diff --git a/src/main/scala/SysC.scala b/src/main/scala/SysC.scala
+index 84534c2..e1c8f39 100644
+--- a/src/main/scala/SysC.scala
++++ b/src/main/scala/SysC.scala
+@@ -55,28 +55,26 @@ class SysCBackend extends CppBackend {
+             case aggregate: Aggregate => {
+               // Collect all the inputs and outputs.
+               val inputs = aggregate.flatten.filter(_._2.dir == INPUT)
+-             // if (inputs.length > 0) {
+-				val l = inputs.length
+-				for (i <- 1 to l) {
+-				  //val aName = "cs_" + aggregate.name + "_i"
+-				  val cmpnt = aggregate.flatten.map(_._2)
+-				  val vtype = "dat_t<" + 1 + ">" 
+-                  //cdef.structs(aName)= new CStruct(aName, inputs)
+-                  //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+-                  val entry = new CEntry(name, true, vtype, 1, aggregate.name, "ready", "valid")
++              if (inputs.length > 0) {
++			    for (in <- inputs) { 
++				  val vtype = "dat_t<" + in._2.width + ">" 
++                  val entry = new CEntry(name, true, vtype, in._2.width, in._2.name, "ready", "valid")
+                   cdef.entries += (entry)
+ 				}
+-              //}
++				//val aName = "cs_" + aggregate.name + "_i"
++                //cdef.structs(aName)= new CStruct(aName, inputs)
++                //val entry = new CEntry(name, true, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
++              }
+               val outputs = aggregate.flatten.filter(_._2.dir == OUTPUT)
+               if (outputs.length > 0) {
+-				for (t <- 0 until outputs.length) {
+-                  //val aName = "cs_" + aggregate.name + "_o"
+-				  val vtype = "dat_t<" + 1 + ">" 
+-                  //cdef.structs(aName) = new CStruct(aName, outputs)
+-                  //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+-                  val entry = new CEntry(name, false, vtype, 1, aggregate.name, "ready", "valid")
++			    for (out <- outputs) { 
++				  val vtype = "dat_t<" + out._2.width + ">" 
++                  val entry = new CEntry(name, false, vtype, out._2.width, out._2.name, "ready", "valid")
+                   cdef.entries += (entry)
+ 				}
++                //val aName = "cs_" + aggregate.name + "_o"
++                //cdef.structs(aName) = new CStruct(aName, outputs)
++                //val entry = new CEntry(name, false, aName, 1, aggregate.name, delt.ready.name, delt.valid.name)
+               }
+             }
+             case _ => badElements(name) = elt
+-- 
+2.1.0
+
