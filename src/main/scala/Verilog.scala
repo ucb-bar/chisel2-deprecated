@@ -316,6 +316,18 @@ class VerilogBackend extends Backend {
 
   def emitDecReg(node: Node): String = emitDecBase(node, "reg ")
 
+  def emitDecRom( node : ROMRead ) : String = {
+    if ( node.inputs.size == 2 &&
+      node.inputs(0).isInstanceOf[Literal] &&
+      node.inputs(1).isInstanceOf[ROMData]
+    ) {
+      val idx = node.inputs(0).asInstanceOf[Literal].value.toInt
+      val litNode = node.inputs(1).asInstanceOf[ROMData].sparseLits(idx)
+      s"  reg ${emitWidth(node)} ${emitRef(node)} = ${emitRef(litNode)};\n"
+    } else
+      emitDecReg( node )
+  }
+
   override def emitDec(node: Node): String = {
     val gotWidth = node.needWidth()
     val res =
@@ -331,8 +343,8 @@ class VerilogBackend extends Backend {
       case _: Sprintf =>
         emitDecReg(node)
 
-      case _: ROMRead =>
-        emitDecReg(node)
+      case r: ROMRead =>
+        emitDecRom(r)
 
       case m: Mem[_] if !m.isInline => ""
       case m: Mem[_] =>
