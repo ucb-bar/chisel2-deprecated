@@ -262,6 +262,16 @@ abstract class OrderedDecoupledHWIOTester extends HWIOTester {
     )
   }
 
+  private def createOutputIsMyTurnTable(events: ArrayBuffer[TestingEvent]): Vec[Bool] = {
+    val associated_event_numbers = events.map { event => event.event_number }.toSet
+    logScalaDebug(s"  associated event numbers ${associated_event_numbers.toArray.sorted.mkString(",")}")
+
+    Vec(
+      output_event_list.indices.map { event_number => Bool(associated_event_numbers.contains(event_number)) } ++
+        List(Bool(false)) // We append a false at the end so no-one tries to go when counter done
+    )
+  }
+
   /**
     * build a set of all ports referenced by all events associated with a particular
     * io interface
@@ -333,7 +343,7 @@ abstract class OrderedDecoupledHWIOTester extends HWIOTester {
   private def buildDecoupledOutputEventHandlers(event_counter: GlobalEventCounter) {
     decoupled_control_port_to_output_values.foreach { case (controlling_port, events) =>
       val ports_referenced_for_this_controlling_port = portsReferencedByEvents(events)
-      val is_this_my_turn = createIsMyTurnTable(events)
+      val is_this_my_turn = createOutputIsMyTurnTable(events)
 
       val counter_for_this_decoupled = Counter(output_event_list.length)
       logScalaDebug(s"Output decoupled controller ${name(controlling_port)} : ports " +
