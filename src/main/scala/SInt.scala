@@ -101,6 +101,8 @@ class SInt extends Bits with Num[SInt] {
     case _ => super.colonEquals(that)
   }
 
+  override def getLit( x : BigInt ) : SInt = { Lit(x, getWidth()) { SInt() } }
+
   def gen[T <: Bits](): T = SInt().asInstanceOf[T]
 
   // arithmetic operators

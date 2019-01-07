@@ -74,6 +74,8 @@ class Flo extends Bits with Num[Flo] {
     case _ => illegalAssignment(that)
   }
 
+  override def getLit( x : BigInt ) : Flo = { Lit(x, getWidth()) { Flo() } }
+
   /** Get Flo as an instance of T */
   def gen[T <: Bits](): T = Flo().asInstanceOf[T];
 
@@ -151,6 +153,8 @@ class Dbl extends Bits with Num[Dbl] {
     case _: Dbl => super.colonEquals(that)
     case _ => illegalAssignment(that)
   }
+
+  override def getLit( x : BigInt ) : Dbl = { Lit(x, getWidth()) { Dbl() } }
 
   def gen[T <: Bits](): T = Dbl().asInstanceOf[T];
 

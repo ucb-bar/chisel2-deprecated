@@ -63,6 +63,8 @@ class Bool extends UInt {
     Bool(x > 0).asInstanceOf[this.type]
   }
 
+  override def getLit( x : BigInt ) : Bool = { Lit(x, getWidth()) { Bool() } }
+
   /** Implementation of := operator, assigns value to this Bool */
   override protected def colonEquals(src: Bits): Unit = src match {
     case _: Bool => super.colonEquals(src(0))
