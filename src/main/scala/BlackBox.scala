@@ -90,7 +90,7 @@ class VerilogParameters {
   * // Implement functionality of DSP to allow simulation verification
   * } }}}
   */
-abstract class BlackBox extends Module {
+abstract class BlackBox( bbClock: Option[Clock] = None, bbReset: Option[Bool] = None) extends Module( bbClock, bbReset ) {
   Driver.blackboxes += this
   private val clockMapping = new HashMap[String, String]
 
